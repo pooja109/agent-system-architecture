@@ -1,0 +1,26 @@
+# Documentation for ACL policy: https://aka.ms/gim/docs/policy/acl
+
+name: Access control list
+description: List of teams and their permission levels
+resource: repository
+where:
+configuration:
+  manageAccess:
+  - member: trniel
+    role: Maintain
+  - member: acafarel
+    role: Maintain
+  - member: mohitasrivas
+    role: Maintain
+  - member: prasannah
+    role: Maintain    
+  - member: asreekumar
+    role: Maintain      
+  - member: jgroenlund
+    role: Maintain    
+  - member: risaha
+    role: Maintain     
+  - member: maggiebaar
+    role: Maintain 
+  - team: aoustapleslowtouchcontributors
+    role: Maintain

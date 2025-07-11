@@ -1,0 +1,6 @@
+inventory:
+- source: DirectOwners
+  items:
+  - id: trniel@microsoft.com
+  - id: acafarel@microsoft.com
+  isProduction: false

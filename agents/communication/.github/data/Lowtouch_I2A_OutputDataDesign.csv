@@ -1,0 +1,61 @@
+﻿REP_PSOFT,VERTICAL,PRIORITY,DIV,CUST_ID,CUST_NAME,PRIORITY_REASON,PRIMARY_CAT_1,PRIMARY_CAT_1_VALUE,SECONDARY_CAT_1,SECONDARY_CAT_1_VALUE,PRIMARY_CAT_2,PRIMARY_CAT_2_VALUE,SECONDARY_CAT_2,SECONDARY_CAT_2_VALUE,PRIMARY_CAT_3,PRIMARY_CAT_3_VALUE,SECONDARY_CAT_3,SECONDARY_CAT_3_VALUE
+9999603,Commercial,1,ATL,10000007,COASTAL COSMETIC FAMILY DENTISTRY,Growth,Paper, $674 ,Writing and Pads, $270 ,Ink," $2,201 ",Ink, $880 ,Furniture," $1,095 ",Food, $438 
+9999603,Commercial,2,ATL,10000087,REMA USA LLC,Growth,Ink," $2,507 ",Liners," $1,003 ",Breakroom," $4,046 ",Writing and Pads," $1,618 ",Office Supplies," $1,516 ",Tissues and Towels, $606 
+9999603,Commercial,3,ATL,10000232,INTERSTATE ELECTRICAL INC,Retention,Paper," $1,939 ",Liners, $776 ,Breakroom," $1,671 ",Cleaning Chemicals, $668 ,Technology," $4,653 ",Coffee and Tea," $1,861 "
+9999603,Commercial,4,ATL,10000255,KHAFRA,Growth,Paper," $2,900 ",Cleaning Chemicals," $1,160 ",Toner," $3,103 ",Food," $1,241 ",Ink," $4,756 ",Coffee and Tea," $1,902 "
+9999603,Commercial,5,ATL,10000318,ARCHITECTURAL GLASS PRODUCTS INC,Growth,Furniture," $1,039 ",Food, $416 ,JanSan," $1,816 ",Other Office Supplies, $726 ,Ink," $3,504 ",Beverage," $1,402 "
+9999603,Commercial,6,ATL,10000469,TILTWORKS,Retention,Toner," $4,790 ",Writing and Pads," $1,916 ",Technology, $648 ,Reman Toner, $259 ,Breakroom," $2,732 ",Reman Toner," $1,093 "
+9999603,Commercial,7,ATL,10000612,STRATEGIC LINK CONSULTING,Growth,Office Supplies," $2,888 ",Writing and Pads," $1,155 ",JanSan," $3,741 ","Computers, Mobile and Services"," $1,496 ",Office Supplies," $2,363 ",Ink, $945 
+9999603,Commercial,8,ATL,10000661,PALMETTO AUTOMATIC SPRINKLER CO,Retention,Breakroom," $2,810 ",Tissues and Towels," $1,124 ",Paper," $1,667 ",Beverage, $667 ,Ink," $2,017 ",Cut Sheet, $807 
+9999603,Commercial,9,ATL,10000735,HOLMES RICH AND SIGLER,Retention,Technology," $3,668 ",Tissues and Towels," $1,467 ",Furniture," $1,240 ",Other Office Supplies, $496 ,Breakroom," $2,662 ",Other Paper," $1,065 "
+9999603,Commercial,10,ATL,10000747,ARCLABS,Growth,JanSan," $3,542 ",Ink," $1,417 ",Toner," $2,671 ",Tissues and Towels," $1,068 ",Breakroom," $4,824 ","Computers, Mobile and Services"," $1,930 "
+9999603,Commercial,11,ATL,10000751,CAROLINA MECHANICAL,Growth,Office Supplies," $4,785 ",Food," $1,914 ",Paper," $2,436 ",Writing and Pads, $974 ,Ink," $4,267 ",Other Paper," $1,707 "
+9999603,Commercial,12,ATL,10000791,APPLIED CONCEPTS INC,Growth,Toner," $4,406 ",Coffee and Tea," $1,762 ",Technology, $585 ,Cut Sheet, $234 ,Paper," $1,686 ",Reman Toner, $674 
+9999603,Commercial,13,ATL,10000833,MARINER WEALTH ADVISORS,Retention,Office Supplies," $4,285 ",Coffee and Tea," $1,714 ",Paper, $712 ,Ink, $285 ,Breakroom," $3,908 ",Liners," $1,563 "
+9999603,Commercial,14,ATL,10000834,NEWBURGERANDES,Growth,Technology," $1,397 ",Food, $559 ,Ink," $2,892 ",Coffee and Tea," $1,157 ",Office Supplies," $1,047 ",Beverage, $419 
+9999603,Commercial,15,ATL,10000915,ATLEISURE,Growth,Ink," $1,239 ",Tissues and Towels, $496 ,Office Supplies," $1,452 ",Reman Toner, $581 ,Ink," $3,569 ",Cut Sheet," $1,428 "
+9999603,Commercial,16,ATL,10001003,OWEN MURPHY PC,Retention,Office Supplies," $3,051 ",Beverage," $1,220 ",Toner," $3,283 ",Reman Toner," $1,313 ",Ink," $3,510 ",Tissues and Towels," $1,404 "
+9999603,Commercial,17,ATL,10001148,CAROLINA REAL ESTATE COMPANY,Retention,Furniture," $1,248 ",Liners, $499 ,Office Supplies," $4,903 ",Ink," $1,961 ",JanSan," $2,196 ",Ink, $878 
+9999603,Commercial,18,ATL,10001194,BYRD SMALLEY ADAMS,Growth,Technology," $2,767 ",Other Paper," $1,107 ",Toner," $1,075 ",Food, $430 ,Breakroom, $800 ,Liners, $320 
+9999603,Commercial,19,ATL,10001255,STEALTH COMPONENTS INC,Growth,Furniture," $2,699 ",Reman Toner," $1,080 ",Breakroom," $1,621 ",Coffee and Tea, $648 ,Technology, $964 ,Liners, $386 
+9999603,Commercial,20,ATL,10001302,FRONTIER CAPITAL,Growth,Furniture," $4,031 ",Cleaning Chemicals," $1,612 ",Toner," $2,557 ",Beverage," $1,023 ",Ink," $2,773 ",Tissues and Towels," $1,109 "
+9999623,Healthcare,1,ATL,10002137,SALEM CHEST,Retention,Technology," $3,459 ",Cut Sheet," $1,384 ",Technology," $2,221 ",Other Paper, $888 ,Office Supplies, $627 ,Tissues and Towels, $251 
+9999623,Healthcare,2,ATL,10002401,SMALL MARTIN ORTHODONTICS,Growth,Breakroom, $683 ,Writing and Pads, $273 ,Office Supplies," $2,893 ",Tissues and Towels," $1,157 ",Office Supplies," $1,862 ",Writing and Pads, $745 
+9999623,Healthcare,3,ATL,10003001,COMMUNITY HEALTH PARTNERS,Retention,Paper," $2,215 ",Reman Toner, $886 ,Breakroom," $4,605 ",Food," $1,842 ",Technology," $3,956 ",Other Paper," $1,582 "
+9999623,Healthcare,4,ATL,10003457,GMG,Retention,Technology," $4,552 ",Writing and Pads," $1,821 ",JanSan," $3,772 ",Liners," $1,509 ",Technology," $4,364 ",Tissues and Towels," $1,746 "
+9999623,Healthcare,5,ATL,10004165,EASTERN CAROLINA CARDIOVASCULAR,Growth,Furniture," $1,844 ",Cleaning Chemicals, $738 ,Ink, $869 ,Coffee and Tea, $348 ,Paper, $855 ,Ink, $342 
+9999623,Healthcare,6,ATL,10004796,CAROLINA MACULA RETINA,Retention,JanSan," $4,759 ",Reman Toner," $1,904 ",Technology," $2,127 ",Tissues and Towels, $851 ,Breakroom," $2,099 ",Other Paper, $840 
+9999623,Healthcare,7,ATL,10005266,COBB DENTAL EXPRESSIONS,Retention,Technology," $3,237 ",Ink," $1,295 ",Toner," $4,539 ",Writing and Pads," $1,816 ",Toner," $4,279 ",Other Paper," $1,712 "
+9999623,Healthcare,8,ATL,10005342,MARSHALL DENTAL EXCELLENCE,Retention,Ink," $2,213 ",Food, $885 ,Ink," $2,176 ",Ink, $870 ,Ink," $1,107 ","Computers, Mobile and Services", $443 
+9999623,Healthcare,9,ATL,10006433,UNITED HOME CARE,Retention,Breakroom," $3,767 ",Coffee and Tea," $1,507 ",Technology, $580 ,Writing and Pads, $232 ,Technology," $1,692 ",Other Paper, $677 
+9999623,Healthcare,10,ATL,10007153,AGNINI FAMILY DENTAL,Growth,Breakroom," $3,494 ",Ink," $1,398 ",Technology," $3,605 ",Reman Toner," $1,442 ",Furniture," $1,033 ","Computers, Mobile and Services", $413 
+9999623,Healthcare,11,ATL,10007949,TRICOUNTY PEDIATRICS,Retention,Office Supplies," $3,254 ",Beverage," $1,302 ",Toner," $1,456 ",Other Paper, $582 ,Breakroom," $1,915 ",Other Paper, $766 
+9999623,Healthcare,12,ATL,10008038,WHITE OAK PEDIATRICS,Retention,Paper," $1,132 ",Ink, $453 ,Paper," $1,286 ",Liners, $514 ,Toner," $2,119 ",Other Paper, $848 
+9999623,Healthcare,13,ATL,10008439,PLAGE DENTISTRY,Growth,Paper," $2,913 ",Reman Toner," $1,165 ",Breakroom," $3,934 ",Writing and Pads," $1,574 ",Toner," $3,867 ",Liners," $1,547 "
+9999623,Healthcare,14,ATL,10008565,FLORIDA DENTAL IMPLANTS,Retention,Ink, $933 ,"Computers, Mobile and Services", $373 ,Toner," $1,711 ",Reman Toner, $684 ,Breakroom, $510 ,Reman Toner, $204 
+9999623,Healthcare,15,ATL,10009167,CLOVERDALE MANOR,Retention,Toner," $4,510 ",Ink," $1,804 ",Breakroom," $1,298 ",Reman Toner, $519 ,Breakroom, $613 ,"Computers, Mobile and Services", $245 
+9999623,Healthcare,16,ATL,10009604,PEDIATRIC ASSOCIATES OF KERSHAW CTY,Growth,Breakroom," $3,101 ",Other Office Supplies," $1,240 ",Ink, $600 ,Beverage, $240 ,JanSan," $2,536 ",Ink," $1,014 "
+9999623,Healthcare,17,ATL,10010213,STEDMANWADE HEALTH SERVICES INC,Retention,Office Supplies," $3,577 ",Writing and Pads," $1,431 ",Technology," $1,080 ",Other Office Supplies, $432 ,JanSan, $621 ,Cleaning Chemicals, $248 
+9999623,Healthcare,18,ATL,10011311,ANDERS CHIROPRACTIC AND SPORTS PERF,Retention,Toner," $2,496 ",Reman Toner, $998 ,Office Supplies," $4,089 ",Writing and Pads," $1,636 ",Breakroom," $3,241 ",Other Paper," $1,296 "
+9999623,Healthcare,19,ATL,10011564,SREENIVAS VANGARA MD,Growth,Toner," $1,911 ",Coffee and Tea, $764 ,Office Supplies," $4,051 ",Beverage," $1,620 ",Breakroom, $520 ,Ink, $208 
+9999623,Healthcare,20,ATL,10011567,THE WOMENS CENTER,Retention,Paper," $4,364 ",Tissues and Towels," $1,746 ",Office Supplies," $2,400 ",Coffee and Tea, $960 ,Breakroom," $1,230 ",Food, $492 
+9999624,Sled,1,ATL,10000341,OIC INC,Growth,JanSan," $4,359 ",Coffee and Tea," $1,744 ",Technology, $857 ,Beverage, $343 ,Office Supplies," $1,969 ",Tissues and Towels, $788 
+9999624,Sled,2,ATL,10001241,SAINT ANN CATHOLIC SCHOOL,Growth,Breakroom," $3,948 ",Beverage," $1,579 ",Toner," $4,987 ",Reman Toner," $1,995 ",Ink, $504 ,Liners, $202 
+9999624,Sled,3,ATL,10001791,VICTORY CHURCH,Retention,Breakroom, $557 ,Cut Sheet, $223 ,Paper," $3,917 ",Tissues and Towels," $1,567 ",Ink, $865 ,Food, $346 
+9999624,Sled,4,ATL,10001854,DURHAMCHAPEL HILL JEWISH FED,Growth,Office Supplies," $1,326 ",Coffee and Tea, $530 ,Paper," $4,891 ",Tissues and Towels," $1,956 ",Ink," $2,509 ",Liners," $1,004 "
+9999624,Sled,5,ATL,10002190,HIGH COUNTRY COUNCIL OF GOVERNMENTS,Retention,Furniture," $4,811 ",Cut Sheet," $1,924 ",Ink," $1,939 ",Reman Toner, $776 ,Furniture," $4,536 ",Cut Sheet," $1,814 "
+9999624,Sled,6,ATL,10002345,CLAY COUNTY BOE SW,Growth,Toner," $2,040 ",Beverage, $816 ,Toner, $795 ,Cut Sheet, $318 ,Breakroom," $1,480 ",Cleaning Chemicals, $592 
+9999624,Sled,7,ATL,10002458,FLORIDA BARBER ACADEMY,Retention,Toner," $3,086 ",Beverage," $1,234 ",JanSan, $920 ,Food, $368 ,Paper," $3,561 ",Writing and Pads," $1,424 "
+9999624,Sled,8,ATL,10003065,MECKLENBURG COUNTY BOY SCOUTS,Retention,Breakroom," $1,466 ",Coffee and Tea, $586 ,Toner, $722 ,Cut Sheet, $289 ,Breakroom," $4,569 ",Reman Toner," $1,828 "
+9999624,Sled,9,ATL,10003650,CHRISTIAN SERVICE CENTERNPP,Growth,Ink," $3,821 ",Writing and Pads," $1,528 ",Ink," $3,800 ",Beverage," $1,520 ",Breakroom," $1,062 ",Tissues and Towels, $425 
+9999624,Sled,10,ATL,10004741,THE FRANKLIN THEATRE,Retention,Ink," $1,766 ",Cut Sheet, $706 ,Technology," $1,190 ",Other Office Supplies, $476 ,JanSan, $512 ,Cut Sheet, $205 
+9999624,Sled,11,ATL,10004787,FLORIDA SCHOOL BOARDS ASSOCIATION,Retention,Furniture," $4,598 ",Tissues and Towels," $1,839 ",Office Supplies," $3,083 ",Tissues and Towels," $1,233 ",Breakroom," $3,042 ",Other Paper," $1,217 "
+9999624,Sled,12,ATL,10005277,THE CHURCH ON 68,Growth,Technology," $3,660 ","Computers, Mobile and Services"," $1,464 ",Breakroom," $3,513 ",Writing and Pads," $1,405 ",Paper," $1,765 ",Cleaning Chemicals, $706 
+9999624,Sled,13,ATL,10005329,CREDIT UNION FINANCIAL SERVICES,Growth,Ink," $1,343 ",Coffee and Tea, $537 ,Furniture," $3,927 ",Reman Toner," $1,571 ",Paper," $2,863 ",Coffee and Tea," $1,145 "
+9999624,Sled,14,ATL,10005732,HENDERSON COUNTY DSS,Retention,Ink," $1,317 ","Computers, Mobile and Services", $527 ,JanSan," $1,063 ","Computers, Mobile and Services", $425 ,JanSan," $4,251 ",Tissues and Towels," $1,700 "
+9999624,Sled,15,ATL,10006027,GEORGIA DISTRICT ASSEMBLIES OF GOD,Retention,Breakroom," $4,075 ",Other Paper," $1,630 ",JanSan," $1,398 ",Coffee and Tea, $559 ,Toner," $1,429 ",Reman Toner, $572 
+9999624,Sled,16,ATL,10008278,ASBURY ELEMENTARY SCHOOL,Retention,Technology," $3,597 ",Cleaning Chemicals," $1,439 ",Office Supplies," $4,676 ",Cleaning Chemicals," $1,870 ",Office Supplies," $2,769 ",Tissues and Towels," $1,108 "
+9999624,Sled,17,ATL,10008342,LILLY HILL BAPTIST CHURCH,Growth,Toner," $3,973 ",Beverage," $1,589 ",Ink," $1,397 ",Liners, $559 ,Ink," $2,466 ",Coffee and Tea, $986 
+9999624,Sled,18,ATL,10008478,WAYNE REED CHRISTIAN CHILDCARE,Retention,JanSan," $3,444 ",Beverage," $1,378 ",JanSan," $4,200 ",Ink," $1,680 ",Toner," $2,438 ",Tissues and Towels, $975 
+9999624,Sled,19,ATL,10008836,BETHLEHEM BAPTIST CHURCH,Growth,Furniture," $2,231 ",Food, $892 ,Toner, $899 ,Other Office Supplies, $360 ,Ink," $2,300 ",Beverage, $920 
+9999624,Sled,20,ATL,10010568,SPRING VALLEY BAPTIST CHURCH,Growth,Toner," $3,252 ",Tissues and Towels," $1,301 ",Paper," $1,197 ",Tissues and Towels, $479 ,Breakroom," $4,781 ","Computers, Mobile and Services"," $1,912 "
