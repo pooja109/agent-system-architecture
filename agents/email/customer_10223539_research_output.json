@@ -1,0 +1,77 @@
+{
+  "customer_name": "RAM INDUSTRIES",
+  "customer_id": "10223539",
+  "division": null,
+  "primary_reason_for_outreach": "Growth",
+  "issue": "Customer's 24-month spend has more than tripled compared to the prior 12 months, and a secondary contact has resumed purchasing, indicating further growth opportunity among both key contacts and under-tapped office supply categories.",
+  "sender_details": {
+    "first_name": "Victoria",
+    "last_name": "Grant",
+    "full_name": "Victoria Grant",
+    "email": "Staplesexpertteam@staples.com",
+    "title": "Manager, Account Expert Team",
+    "phone": null,
+    "team": "On behalf of the Staples Expert Team"
+  },
+  "contact_list": [
+    {
+      "first_name": "Kristin",
+      "last_name": "Fields",
+      "full_name": "Kristin Fields",
+      "email": "kfields@ramind.com",
+      "title": "Primary Purchaser",
+      "phone": null,
+      "salesforce_account_id": null,
+      "salesforce_contact_id": null
+    },
+    {
+      "first_name": "Tamika",
+      "last_name": "Wilson",
+      "full_name": "Tamika Wilson",
+      "email": "tamika@ramind.com",
+      "title": "Secondary Purchaser",
+      "phone": null,
+      "salesforce_account_id": null,
+      "salesforce_contact_id": null
+    }
+  ],
+  "summary": "Ram Industries, operating as Ram Windows, has demonstrated significant year-over-year spend growth, with key contacts Kristin Fields and Tamika Wilson driving increased engagement. There is clear opportunity to expand office supplies and binder-related purchases with tailored, time-saving replenishment solutions and personalized outreach to build on recent activity.",
+  "recommendations": [
+    "Promote custom-logo binders and scheduled replenishment for project documentation kits.",
+    "Offer a 5-minute demo of Staples' Auto-Restock Tool tailored to Kristin's core products.",
+    "Share a curated cart template and instructions for setting up 'Favorites' with Tamika to simplify future orders.",
+    "Launch an email nurture sequence highlighting seasonal office supplies to the full buyer list.",
+    "Deliver a 'Savings Through Consolidation' one-pager and centralize office supply purchases with a single-invoice program.",
+    "Monitor category expansion beyond binders and track buyer cadence for future cross-sell opportunities."
+  ],
+  "sample_email_subject": "Accelerate Project Readiness \u2013 Smart Binders & Auto-Replenish for Ram Windows' Next Growth Leap",
+  "sample_email_body": "Hi Kristin and Tamika,\n\nWe\u2019re delighted to see Ram Windows\u2019 surge in purchases this year. Kristin, your momentum has set a high bar, and Tamika, welcome back\u2014your recent orders in presentation supplies haven\u2019t gone unnoticed!\n\nTo help your teams deliver complete project kits on time, we recommend:\n\u2022 Custom-logo binders and matching accessories for your job-site and client documentation\n\u2022 Scheduled auto-replenishment timed to your project starts (never run short again)\n\u2022 Fast setup of personalized Favorites Folders, so repeat orders are just a click away\n\nWe\u2019d love to schedule a quick 5-minute walkthrough of the Staples Auto-Restock Tool\u2014let us show you how Kristin\u2019s core binder SKUs and Tamika\u2019s favorites can auto-populate for future orders, cutting admin time dramatically.\n\nAs a bonus, we can provide a single-invoice solution to simplify A/P and cost controls\u2014a win for your finance team as well.\n\nReady to take the next step or have questions? Reply here to set up a Teams meeting, or dive into your curated cart anytime at your StaplesAdvantage portal.\n\nThank you for choosing Staples\u2014let\u2019s make project kickoff even smoother at Ram Windows!\n\nBest regards,\nVictoria Grant\nManager, Account Expert Team\nOn behalf of the Staples Expert Team\nStaplesexpertteam@staples.com",
+  "citations": [
+    "customer dataset row for CUST_ID 10223539 \u2013 shows name (RAM INDUSTRIES), industry (MANUFACTURING), FTE (101) and primary/secondary category values (Office Supplies = 156; Binders, Presentation, Tools = 93).",
+    "dnb dataset row 86 \u2013 links CUST_ID 10223539 to business_name 'Ram Industries Acquisitions, LLC' and website www.ramwindows.com.",
+    "transactions dataset row 707 \u2013 contact KRISTIN FIELDS, TOTAL_SALES_AMOUNT_24M = 23 830.85; 12M = 7 966.43; 6M = 2 957.65.",
+    "transactions dataset row 708 \u2013 contact TAMIKA WILSON, TOTAL_SALES_AMOUNT_24M = 455.49; 12M = 0.00; 6M = 0.00."
+  ],
+  "url_citations": [
+    "https://caselaw.findlaw.com/court/tx-court-of-appeals/2065313.html"
+  ],
+  "company": {
+    "name": "Ram Industries Acquisitions, LLC"
+  },
+  "account": {
+    "summary": "Ram Industries has demonstrated a triple-digit percentage increase in 24-month office supplies spend, with both existing and returning buyers showing strong engagement. Opportunity exists to scale growth further by making ordering more seamless and bundling complementary products.",
+    "observations": "Kristin Fields is the primary spender with significant YoY spend growth; Tamika Wilson has recently reactivated purchasing.",
+    "action_plan": "Outreach should target both main and re-engaged buyers with offers for auto-replenish, custom binders, and convenience tools. Demonstrating Staples' tech-enabled procurement solutions will align with Ram Windows' growth momentum.",
+    "expected_upside": "25% office supplies category revenue increase over the next 6 months, with auto-restock adoption and new SKUs per order.",
+    "justification": "Growth priority is validated by the rise in aggregate account spend, particularly by the lead contact, and re-activation by another buyer. All recommended actions align with tracked purchasing categories.",
+    "citations": "See customer and transaction dataset citations as outlined above."
+  },
+  "other_fields": {
+    "website": "www.ramwindows.com",
+    "industry": "Manufacturing (Custom Commercial & Residential Windows)",
+    "estimated_employees": 101,
+    "customer_since": "April 24, 2018",
+    "primary_category": "Office Supplies",
+    "secondary_category": "Binders, Presentation Tools"
+  }
+}

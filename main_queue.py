@@ -8,6 +8,7 @@ from azure.core.exceptions import AzureError
 
 from utils.azurequeuehelper import AzureQueueHelper
 from utils.agentloghelper import AgentBatchRecord, createRecords, serializeRecords
+from manager import LowTouchManager
 
 # Load environment variables from .env file
 load_dotenv()
@@ -15,7 +16,7 @@ load_dotenv()
 # Configure logging (uncomment to enable debug output)
 # logging.basicConfig(level=logging.INFO)
 
-def process_logic(data):
+async def process_logic(data):
     """
     Handles the processing logic for each queue message.
     Logs success or failure, and handles exceptions.
@@ -26,6 +27,8 @@ def process_logic(data):
         if data.get("fail"):
             raise ValueError("Simulated failure")
         else:
+            mgr = LowTouchManager()
+            await mgr.run(data)
             logging.info(f"✅ Successfully processed: {data}")
     except AzureError as ae:
         logging.error(f"Azure error occurred: {ae}")

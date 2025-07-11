@@ -1,0 +1,1 @@
+# Configuration module for SendEmail application
