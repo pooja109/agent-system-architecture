@@ -66,6 +66,7 @@ class EvaluationFeedback(BaseModel):
     website_reference_violation: bool = Field(..., description="True if staplesbusiness.com is used incorrectly, or staples.com is used at all")
     signature_footer_violation: bool = Field(..., description="True if sender details are not included as a signature, or the required footer is not present verbatim")
     html_format_violation: bool = Field(..., description="True if the output is not valid HTML, or not all paragraphs are wrapped in <p> tags, or there is extra text or instructions")
+    promotions_rebate_violation: bool = Field(...,description="True if the email contains any mention of promotions, discounts, rebates, special offers, dollar amounts, revenue, or incentives/offers")
     score: Literal["pass", "needs_improvement", "fail"]
     feedback: str = Field(..., description="Concise explanation for any issues detected")
 
