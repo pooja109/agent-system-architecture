@@ -20,7 +20,7 @@ import logging
 from models import EmailTask
 
 load_dotenv()
-sys.stderr = open("error_log_email.txt", "w", encoding="utf-8")
+#sys.stderr = open("error_log_email.txt", "w", encoding="utf-8")
 INSTRUCTIONS = """
 You are an expert B2B outreach assistant for Staples. Your top priority is to draft professional and friendly introduction emails for low-touch customers using the provided context data. Your emails should highlight the value Staples can provide, reference relevant customer details, and encourage engagement.
 

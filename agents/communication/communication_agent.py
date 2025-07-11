@@ -38,7 +38,7 @@ from models import EmailTask, ResearchOutput, EmailDrafts,MultiContactEmailTask,
 
 
 
-sys.stderr = open("error_log.txt", "w", encoding="utf-8")
+#sys.stderr = open("error_log.txt", "w", encoding="utf-8")
 
 # Add the parent directory to the Python path to find the agents module
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
