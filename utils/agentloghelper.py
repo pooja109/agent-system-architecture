@@ -2,7 +2,7 @@ from datetime import date
 from pydantic import BaseModel
 from typing import Optional, List
 import json
-from models import AgentBatchRecord
+from utils.models import AgentBatchRecord
 
 
 def createRecords() -> List[AgentBatchRecord]:

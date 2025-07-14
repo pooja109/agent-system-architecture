@@ -17,10 +17,13 @@ if current_dir not in sys.path:
 from config import CommunicationConfig
 from blob_util import BlobUtil
 from agent_manager import AgentManager
+
 from models import (
     EmailTask, ResearchOutput, EvaluationFeedback, 
     EmailDrafts, MultiContactEmailTask
 )
+from utils.models import AgentBatchRecord
+
 
 logger = logging.getLogger(__name__)
 
@@ -33,11 +36,15 @@ class CommunicationManager:
         self.agent_manager = AgentManager()
         self.agents_created = False
     
-    def parse_input(self, json_str: str, model_class):
-        """Parse JSON string to Pydantic model."""
+    def parse_input(self, input_data, model_class):
+        """Parse input (dict or JSON string) to Pydantic model. Logs exception messages."""
         try:
-            return model_class.model_validate_json(json_str)
-        except Exception:
+            if isinstance(input_data, str):
+                return model_class.model_validate_json(input_data)
+            else:
+                return model_class.model_validate(input_data)
+        except Exception as e:
+            logger.error(f"parse_input error: {e}")
             return None
     
     def is_attribute_present(self, obj, attr_name: str) -> bool:
@@ -242,29 +249,44 @@ class CommunicationManager:
                 Fore.YELLOW, customer_id, draft_email, Style.RESET_ALL
             )
     
-    async def run(self):
-        """Main entry point to run the communication workflow."""
+    async def run(self, data):
+        """
+        Main entry point to run the communication workflow for a single AgentBatchRecord.
+        Uses the agent_output as customer_research and processes a single customer.
+        """
         total_start_time = time.time()
-        
         try:
             # Setup agents
             await self.setup_agents()
-            
-            # Process all blobs
-            prefix = self.config.input_folder_name
-            blob_list = self.blob_util.list_blobs(name_starts_with=prefix)
-            
-            async for blob in blob_list:
-                await self.process_single_blob(blob, prefix)
-                # Print total execution time summary
-                total_duration = time.time() - total_start_time
-                logger.info("%s Total time taken so far: %.3fs%s", Fore.WHITE, total_duration, Style.RESET_ALL)
-            
+            #convert the data which is string to AgentBatchRecord
+            data = self.parse_input(data, AgentBatchRecord)
+            # Use the provided AgentBatchRecord data
+            customer_id = data.customer_id
+            customer_research = data.agent_output
+            if self.config.sender_details:
+                customer_research = customer_research + "\n\n" + self.config.sender_details
+
+            output_folder_path = f"{self.config.output_folder_prefix}/{customer_id}/{self.config.output_folder_name}"
+
+            # Create input object
+            input_obj = EmailTask(
+                input="generate email for customer using the context data provided in instructions in the prompt",
+                draft_email="",
+                current_agent_name="User",
+                customer_id=customer_id,
+                customer_research=customer_research,
+            )
+
+            logger.info("%sProcessing customer_id: %s%s", Fore.YELLOW, customer_id, Style.RESET_ALL)
+
+            # Process the email generation workflow
+            await self._process_email_workflow(input_obj, customer_research, output_folder_path)
+
         except Exception as e:
-            logger.exception("%sError while iterating blobs: %s%s", Fore.RED, e, Style.RESET_ALL)
+            logger.exception("%sError while processing customer_id %s: %s%s", Fore.RED, data.customer_id, e, Style.RESET_ALL)
         finally:
             # Clean up resources
             await self.blob_util.close()
-        
+
         total_duration = time.time() - total_start_time
         logger.info("%s Total time taken: %.3fs%s", Fore.WHITE, total_duration, Style.RESET_ALL)

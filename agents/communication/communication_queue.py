@@ -8,7 +8,7 @@ from azure.core.exceptions import AzureError
 
 from utils.azurequeuehelper import AzureQueueHelper
 from utils.agentloghelper import AgentBatchRecord, createRecords, serializeRecords
-from manager import LowTouchManager
+from agents.communication.communication_manager import CommunicationManager
 
 # Load environment variables from .env file
 load_dotenv()
@@ -27,7 +27,7 @@ async def process_logic(data):
         if data.get("fail"):
             raise ValueError("Simulated failure")
         else:
-            mgr = LowTouchManager()
+            mgr = CommunicationManager()
             await mgr.run(data)
             logging.info(f"✅ Successfully processed: {data}")
     except AzureError as ae:
@@ -51,14 +51,14 @@ async def main() -> None:
     agentRecords = createRecords()
     for record in agentRecords:
         message = record.model_dump_json(indent=2)
-        helper.send_message(message)
+        #helper.send_message(message)
     logging.info(f"✅ {len(agentRecords)} messages sent to the queue.")
 
     # Continuously poll and process the queue
     while True:
         try:
             logging.info("🔄 Processing queue...")
-            helper.process_queue(handler=process_logic, max_retry=3)
+            await helper.process_queue(handler=process_logic, max_retry=3)
         except Exception as e:
             logging.error(f"Error processing queue: {e}")
         finally:

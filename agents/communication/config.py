@@ -29,6 +29,10 @@ class LoggingConfig:
         # Suppress Azure SDK info/debug logs
         logging.getLogger("azure").setLevel(logging.WARNING)
         logging.getLogger("azure.identity").setLevel(logging.WARNING)
+        # Suppress Azure SDK HTTP logs
+        logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(logging.WARNING)
+        logging.getLogger("azure.storage").setLevel(logging.WARNING)
+        logging.getLogger("azure").setLevel(logging.WARNING)
 
 class CommunicationConfig:
     """Configuration settings for the communication agent."""

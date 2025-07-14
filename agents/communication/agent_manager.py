@@ -8,13 +8,11 @@ import sys
 import os
 from colorama import Fore, Style
 
-# Add the parent directory to the Python path to find the agents module
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-import agents.sk_email_gen_agent as sk_email_gen_agent
-import agents.sk_email_review_agent as sk_email_review_agent
-import agents.sk_data_extractor_agent as sk_data_extractor_agent
-import agents.sk_emailpercontact_gen_agent as sk_emailpercontact_gen_agent
+from agents.communication.agents import sk_email_gen_agent
+from agents.communication.agents import sk_email_review_agent
+from agents.communication.agents import sk_data_extractor_agent
+from agents.communication.agents import sk_emailpercontact_gen_agent
 
 logger = logging.getLogger(__name__)
 
