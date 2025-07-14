@@ -77,6 +77,7 @@ Return a JSON object using the following Pydantic model:
 class EmailTask(BaseModel):
     input: str = Field(..., description="The instruction or input for the email generation task.")
     draft_email: str = Field(..., description="The generated email in valid HTML format, always present in the output.")
+    email_subject: str = Field(None, description="The subject line of the email, to be generated.")
     current_agent_name: str = Field(..., description="The name of the agent generating the email.")
     customer_id: str = Field(..., description="The unique customer ID for whom the email is generated.")
     extracted_input: Optional[ResearchOutput] = Field(None, description="The extracted research/context data used for email generation.")
@@ -87,6 +88,7 @@ class EmailTask(BaseModel):
 {
   "input": "generate email for customer using the context data provided in instructions in the prompt",
   "draft_email": "<p>Hello Alex,</p><p>I’m Victoria Grant, your dedicated sales consultant for Greenfield Dental’s Staples account...</p>...<footer html here>",
+  "email_subject": "Welcome to Staples Advantage, Alex!",
   "current_agent_name": "Email_Assistant",
   "customer_id": "27208226",
   "extracted_input": { ... },
@@ -101,7 +103,7 @@ The context data is provided in the `extracted_input` field of the input object.
 The review comments are provided in the `review_comments` field of the input object. If no review comments are provided, generate the email based on the context data and these instructions.
 
 **Draft Email:**
-- You must always generate and return the draft email in the `draft_email` field of the output object. This field must contain the complete email in valid HTML format.
+- You must always generate and return the draft email in the `draft_email` field and subject of the email in `email_subject` of the output object. This field must contain the complete email in valid HTML format.
 - If a draft_email is provided in the input, use it as the starting point for improvements or to incorporate review comments. Always return a new, complete draft in the draft_email field of the output.
 
 """

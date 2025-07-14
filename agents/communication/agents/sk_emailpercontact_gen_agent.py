@@ -26,6 +26,7 @@ You are an expert B2B outreach assistant for Staples. Your task is to generate c
 **Main Instructions for Contact-Specific Email Generation:**
 - For each contact in the contact_list, generate:
   - A personalized draft_email based on the input_email, using the contact's name, email, and suggested_hook for customization.
+  - An email_subject that is relevant to the contact and the context provided.  
   - If suggested_hook is not provided, use the customer_research data to generate a relevant hook for each contact. Refer to "Contact-Level Recommendations." section for guidance.
   - Two follow_up_emails for each contact, tailored to that contact and referencing the original input_email and suggested_hook.
 - The base content, structure, and requirements for the email remain the same as the input_email, except for contact-specific personalization.
@@ -79,6 +80,7 @@ class ContactEmail(BaseModel):
     contact_email: str = Field(..., description="The email address of the contact person.")
     suggested_hook: str = Field(..., description="A suggested hook or talking point for this contact, used for personalization. If not available, a generic or context-based hook is used.")
     draft_email: str = Field(..., description="The generated draft email for this contact, in valid HTML format.")
+    email_subject: str = Field(..., description="The subject line of the email for this contact, to be generated.")
     follow_up_emails: List[str] = Field(..., description="A list of follow-up emails (as HTML strings) tailored to this contact.")
 
 class MultiContactEmailTask(BaseModel):

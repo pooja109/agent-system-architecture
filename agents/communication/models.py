@@ -36,6 +36,8 @@ class Account(BaseModel):
 class ResearchOutput(BaseModel):
     customer_name: Optional[str] = Field(None, description="The name of the customer.")
     customer_id: Optional[str] = Field(None, description="The unique customer ID.")
+    customer_zip: Optional[str] = Field(None, description="The ZIP code of the customer.")
+    customer_state: Optional[str] = Field(None, description="The state of the customer.")
     division: Optional[str] = Field(None, description="The division or region for the customer.")
     primary_reason_for_outreach: Optional[str] = Field(None, description="The main reason for contacting the customer.")
     issue: Optional[str] = Field(None, description="A brief description of the main issue or opportunity.")
@@ -75,6 +77,7 @@ class ContactEmail(BaseModel):
     contact_email: str = Field(..., description="The email address of the contact person.")
     suggested_hook: str = Field(..., description="A suggested hook or talking point for this contact, used for personalization. If not available, a generic or context-based hook is used.")
     draft_email: str = Field(..., description="The generated draft email for this contact, in valid HTML format.")
+    email_subject: str = Field(..., description="The subject line of the email for this contact, to be generated.")
     follow_up_emails: List[str] = Field(..., description="A list of follow-up emails (as HTML strings) tailored to this contact.")
 
 class MultiContactEmailTask(BaseModel):
