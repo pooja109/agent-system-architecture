@@ -15,8 +15,10 @@ class LoggingConfig:
     
     @staticmethod
     def configure_logging():
-        """Configure root logger and suppress Azure SDK logs."""
-        # Configure root logger only once here
+        """
+        Configure root logger and suppress Azure SDK logs.
+        IMPORTANT: Call this at the very top of your main script, before any Azure SDK imports.
+        """
         logging.basicConfig(
             level=logging.INFO,
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -33,7 +35,6 @@ class LoggingConfig:
         logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(logging.WARNING)
         logging.getLogger("azure.storage").setLevel(logging.WARNING)
         logging.getLogger("azure").setLevel(logging.WARNING)
-
 class CommunicationConfig:
     """Configuration settings for the communication agent."""
     

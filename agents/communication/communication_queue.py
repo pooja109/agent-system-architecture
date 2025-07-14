@@ -6,13 +6,13 @@ from typing import List
 from dotenv import load_dotenv
 from azure.core.exceptions import AzureError
 
+from agents.communication.config import LoggingConfig
 from utils.azurequeuehelper import AzureQueueHelper
 from utils.agentloghelper import AgentBatchRecord, createRecords, serializeRecords
 from agents.communication.communication_manager import CommunicationManager
-
 # Load environment variables from .env file
 load_dotenv()
-
+LoggingConfig.configure_logging()
 # Configure logging (uncomment to enable debug output)
 # logging.basicConfig(level=logging.INFO)
 
@@ -51,7 +51,7 @@ async def main() -> None:
     agentRecords = createRecords()
     for record in agentRecords:
         message = record.model_dump_json(indent=2)
-        #helper.send_message(message)
+        helper.send_message(message)
     logging.info(f"✅ {len(agentRecords)} messages sent to the queue.")
 
     # Continuously poll and process the queue
