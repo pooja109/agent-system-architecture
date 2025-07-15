@@ -1,4 +1,4 @@
-import os, PyPDF2, json, tools, logging
+import os, sys, json, tools, logging
 import pandas as pd
 
 from openai import AzureOpenAI
@@ -20,6 +20,7 @@ from uszipcode import SearchEngine
 load_dotenv("./.env")
 
 
+
 client = AzureOpenAI( api_version="2024-12-01-preview",    
                      azure_endpoint=os.getenv("ST_AZURE_OPENAI_ENDPOINT"),    
                      api_key=os.getenv("ST_AZURE_OPENAI_API_KEY"))
@@ -39,16 +40,16 @@ logger.setLevel(logging.INFO)
 
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-log_file = './logs/research_agent_'+ datetime.now().strftime("%Y%m%d") +'.log'
-file_handler = logging.FileHandler(log_file)
-file_handler.setFormatter(formatter)
-file_handler.setLevel(logging.INFO)
+#log_file = './logs/research_agent_'+ datetime.now().strftime("%Y%m%d") +'.log'
+#file_handler = logging.FileHandler(log_file)
+#file_handler.setFormatter(formatter)
+#file_handler.setLevel(logging.INFO)
 
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(formatter)
 stream_handler.setLevel(logging.INFO)
 
-logger.addHandler(file_handler)
+#logger.addHandler(file_handler)
 logger.addHandler(stream_handler)   
 
 
@@ -236,11 +237,8 @@ def save_run_status(status: str, cust_id: str, cust_name: str, cust_zip: str, cu
     """
     # Here you would implement the logic to save the status in Databricks
     # batch_id	run_date	agent_name	status	input_file	output_file	is_reviewed	review_notes	is_approved	approved_notes	is_email_sent
-    # For now, write the status of execution to a csv file in output folder
     
     run_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    output_file = f"data/output/run_status.csv"
-    #with open(output_file, 'a') as f:
     
     print(f"Saving status for Customer ID: {cust_id}")
     print(f"Status: {status}")
@@ -552,23 +550,15 @@ provided_rules_and_policies="No provided rules and policies"
 
 
 sql_i2a = "select * from " \
-"(select * from snowflake_ml_dev.mlops.i2a_lowtouch WHERE VERTICAL =='Commercial' AND CUST_ID in (select distinct cust_id from snowflake_ml_dev.mlops.i2a_lowtouch_sls_cnct_lvl_t) and cust_id in (10016125, 10047395, 10052129, 10194024, 10214965, 10220156, 10223539, 10240492, 1231878, 1429218, 1464442, 1498928, 1557042, 1572192, 1590135, 27034414, 27112442, 27247439, 27439750, 70103197 )) Comm " \
+"(select * from snowflake_ml_dev.mlops.i2a_lowtouch WHERE VERTICAL =='Commercial' AND CUST_ID in (select distinct cust_id from snowflake_ml_dev.mlops.i2a_lowtouch_sls_cnct_lvl_t) LIMIT 3) Comm " \
 "UNION " \
-"select * from (select * from snowflake_ml_dev.mlops.i2a_lowtouch WHERE VERTICAL =='Healthcare' AND CUST_ID in (select distinct cust_id from snowflake_ml_dev.mlops.i2a_lowtouch_sls_cnct_lvl_t) and cust_id in (10017414, 10131399, 1568642, 70102823)) Health " \
+"select * from (select * from snowflake_ml_dev.mlops.i2a_lowtouch WHERE VERTICAL =='Healthcare' AND CUST_ID in (select distinct cust_id from snowflake_ml_dev.mlops.i2a_lowtouch_sls_cnct_lvl_t) LIMIT 1) Health " \
 "UNION " \
-"SELECT * from (select * from snowflake_ml_dev.mlops.i2a_lowtouch WHERE VERTICAL =='Sled' AND CUST_ID in (select distinct cust_id from snowflake_ml_dev.mlops.i2a_lowtouch_sls_cnct_lvl_t) and cust_id in (10252150, 1041385, 1044436, 1046110, 1066276, 1066693)) Sled"
+"SELECT * from (select * from snowflake_ml_dev.mlops.i2a_lowtouch WHERE VERTICAL =='Sled' AND CUST_ID in (select distinct cust_id from snowflake_ml_dev.mlops.i2a_lowtouch_sls_cnct_lvl_t) LIMIT 1) Sled"
 
 
 sql_txn = "select * from snowflake_ml_dev.mlops.i2a_lowtouch_sls_cnct_lvl_t where cust_id in (select distinct cust_id from snowflake_ml_dev.mlops.i2a_lowtouch)"    
 
-#sql_dnb = "select distinct cust_id, business_name, tradestyle, physical_street_address_1, physical_street_address_2, " \
-#            "physical_city, physical_state, physical_zip, country_name,state_name, county_name, telephone, ceo_full_name, ceo_first_name, ceo_middle_initial, " \
-#            "ceo_last_name, ceo_suffix, ceo_prefix, sales_volume, annual_sales_local_currency,currency_code, employees_total, employees_here, year_started, " \
-#            "subsidiary_indicator, manufacturing_indicator, small_business_indicator, minority_owned_indicator,public_private_indicator, owns_rents, square_footage, " \
-#            "global_ultimate_indicator, percent_growth_sales_3yr, percent_growth_employees_3yr, percent_growth_sales_5yr,percent_growth_employees_5yr, naics_codes, " \
-#            "naics_description, white_collar_flag, wholesale_office_sup_buy_index, wholesale_sup_buy_index_code, new_indicator, media_response_indicator, website, business_status " \
-#            "from snowflake_ml_dev.mlops.i2a_lowtouch_dnb_account_source_t " \
-#            "where cust_id in (select distinct cust_id from snowflake_ml_dev.mlops.i2a_lowtouch)"
 
 sql_dnb = "select distinct cust_id, business_name, website from snowflake_ml_dev.mlops.i2a_lowtouch_dnb_account_source_t where cust_id in (select distinct cust_id from snowflake_ml_dev.mlops.i2a_lowtouch)"
 
@@ -775,40 +765,47 @@ for cust in dataset1['CUST_ID']:
     #print(result)
     logger.info("END: CALL REASONING MODEL FOR RESEARCH")
 
-    # See the model's response to the input task.
-    #logger.info(result.response_to_input_task)
-    markdown_content = result.response_to_input_task.__str__()+ "\n\n"
+    try:
+        # See the model's response to the input task.
+        #logger.info(result.response_to_input_task)
+        markdown_content = result.response_to_input_task.__str__()+ "\n\n"
 
-    markdown_content += "\n\nPrimary and Secondary Categories : \n" + categories.__str__()+ "\n\n"
-    markdown_content += "Contacts : \n" + contacts.__str__() + "\n\n"
+        markdown_content += "\n\nCustomer's State: " + cust_state + "     Zip Code: " + cust_zip_code
 
-    logger.info("START: FORMATTING CONTENT IN MARKDOWN FORMAT")
-    formatted_content = format_content(markdown_content)  # Format the content in markdown format
-    logger.info("END: FORMATTING CONTENT IN MARKDOWN FORMAT")
+        markdown_content += "\n\nPrimary and Secondary Categories : \n" + categories.__str__()+ "\n\n"
+        markdown_content += "Contacts : \n" + contacts.__str__() + "\n\n"
 
-    # See the explanation of why the model made the decision it did. Note this is an open field of research- for numerical calculations, with step by step reasoning that arrives at an answer, this is reliable.
-    #print("\n\nJustification : \n",result.justification)
-    formatted_content += "\n\nJustification : \n" + result.justification.__str__() + "\n\n"
+        logger.info("START: FORMATTING CONTENT IN MARKDOWN FORMAT")
+        formatted_content = format_content(markdown_content)  # Format the content in markdown format
+        logger.info("END: FORMATTING CONTENT IN MARKDOWN FORMAT")
 
-    # See the data points the model used to make the decision it did.
-    #print("\n\nCitation : \n",result.citations)
-    formatted_content += "\n\nCitation : \n" + result.citations.__str__() + "\n\n"
+        # See the explanation of why the model made the decision it did. Note this is an open field of research- for numerical calculations, with step by step reasoning that arrives at an answer, this is reliable.
+        #print("\n\nJustification : \n",result.justification)
+        formatted_content += "\n\nJustification : \n" + result.justification.__str__() + "\n\n"
 
-    formatted_content += "\n\nBing Search Results and Citation : \n" + msg + "\n" + search_results + "\n" + search_citations + "\n\n"
-    
-    #file name and path
-    current_datetime = datetime.now()
-    #research_file = "research_output\\" + current_datetime.strftime("%Y%m%d") + "\\" + b_cust + current_datetime.strftime("_%Y-%m-%d_%H-%M-%S")+".md"
-    research_file = current_datetime.strftime("%Y%m%d") + "\\" + b_cust + "\\research_output\\" + b_cust + current_datetime.strftime("_%Y-%m-%d_%H-%M-%S")+".md"
+        # See the data points the model used to make the decision it did.
+        #print("\n\nCitation : \n",result.citations)
+        formatted_content += "\n\nCitation : \n" + result.citations.__str__() + "\n\n"
 
-    logger.info(f"START: SAVING RESEARCH REPORT: {research_file}")
-    
-    save_research_report(
-        container_name="lowtouch",              # changed from "lowtouch" to "mld01blobcontainerne0"
-        blob_name=research_file,
-        file_content=formatted_content          # changed from markdown_content to formatted_content
-    )
-    logger.info(f"END: SAVING RESEARCH REPORT: {research_file}")
-    logger.info("END: PROCESSING CUSTOMER ID: %s", cust)
-    logger.info("=" * 100)
+        formatted_content += "\n\nBing Search Results and Citation : \n" + msg + "\n" + search_results + "\n" + search_citations + "\n\n"
+        
+        #file name and path
+        current_datetime = datetime.now()
+        #research_file = "research_output\\" + current_datetime.strftime("%Y%m%d") + "\\" + b_cust + current_datetime.strftime("_%Y-%m-%d_%H-%M-%S")+".md"
+        research_file = current_datetime.strftime("%Y%m%d") + "\\" + b_cust + "\\research_output\\" + b_cust + current_datetime.strftime("_%Y-%m-%d_%H-%M-%S")+".md"
+
+        logger.info(f"START: SAVING RESEARCH REPORT: {research_file}")
+        
+        save_research_report(
+            container_name="lowtouch",              # changed from "lowtouch" to "mld01blobcontainerne0"
+            blob_name=research_file,
+            file_content=formatted_content          # changed from markdown_content to formatted_content
+        )
+        logger.info(f"END: SAVING RESEARCH REPORT: {research_file}")
+        logger.info("END: PROCESSING CUSTOMER ID: %s", cust)
+        logger.info("=" * 100)
+    except Exception as e:
+        logger.error(f"❌ Error processing customer {cust}: {e}")
+        print(f"❌ Error processing customer {cust}: {e}")
+        continue
     
