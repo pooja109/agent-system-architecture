@@ -77,10 +77,12 @@ class AzureQueueHelper:
             logger.error(f"❌ Failed to receive messages: {e}")
             return []
 
-    async def process_queue(self, handler, max_retry=3):
-        messages = self.receive_messages()
+    async def process_queue(self, handler, max_retry=3, batch_size=8):
+        messages = self.receive_messages(max_messages=batch_size)
 
         for msg_batch in messages.by_page():
+            msg_list = []
+            msg_objs = []
             for msg in msg_batch:
                 try:
                     data = json.loads(msg.content)
@@ -89,19 +91,26 @@ class AzureQueueHelper:
                     self.client.delete_message(msg)
                     continue
 
-                try:
-                    if msg.dequeue_count > max_retry:
-                        logger.warning(f"🚫 Max retries reached for message: {msg.content}")
-                        if self.dead_letter_client:
-                            self.dead_letter_client.send_message(msg.content)
-                        self.client.delete_message(msg)
-                        continue
-                    logger.info(f"Calling handler for message: {msg.content}")
-                    if inspect.iscoroutinefunction(handler):
-                        await handler(data)
-                    else:
-                        handler(data)
+                if msg.dequeue_count > max_retry:
+                    logger.warning(f"🚫 Max retries reached for message: {msg.content}")
+                    if self.dead_letter_client:
+                        self.dead_letter_client.send_message(msg.content)
                     self.client.delete_message(msg)
+                    continue
+
+                msg_list.append(data)
+                msg_objs.append(msg)
+
+            if msg_list:
+                logger.info(f"Calling handler for batch of {len(msg_list)} messages.")
+                try:
+                    if inspect.iscoroutinefunction(handler):
+                        await handler(msg_list)
+                    else:
+                        handler(msg_list)
+                    # Only delete messages if handler succeeds
+                    for msg in msg_objs:
+                        self.client.delete_message(msg)
                 except Exception as e:
-                    logger.error(f"❌ Error in handler: {e}. Message will retry.")
+                    logger.error(f"❌ Error in handler: {e}. Batch will retry.")
 

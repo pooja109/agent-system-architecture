@@ -46,7 +46,9 @@ class CommunicationConfig:
         self.output_custom_folder = os.getenv("AZURE_STORAGE_OUTPUT_CUSTOM_FOLDER", "")
         self.output_overwrite = os.getenv("AZURE_STORAGE_OUTPUT_OVERWRITE", "False").lower() == "true"
         self.max_iterations = 2
-        
+        self.connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+        self.queue_name = os.getenv("AZURE_EMAIL_INPUT_QUEUE")
+        self.dead_letter_queue = os.getenv("AZURE_EMAIL_INPUT_DLQ", None)
         # Sender details configuration
         self.sender_details = """Sender details : 
         Victoria Grant
@@ -57,9 +59,28 @@ class CommunicationConfig:
     
     @property
     def output_folder_prefix(self):
-        """Get the output folder prefix based on configuration."""
+        """Get the output folder prefix based on configuration and current date."""
         from datetime import datetime
         if self.output_custom_folder:
             return self.output_custom_folder
         else:
             return datetime.now().strftime("%Y%m%d")
+
+    def get_output_folder_prefix_from_run_date(self, run_date):
+        """
+        Get the output folder prefix using a run_date (str or date) from the data object.
+        If output_custom_folder is set, use that. Otherwise, use run_date formatted as YYYYMMDD.
+        """
+        from datetime import datetime, date
+        if self.output_custom_folder:
+            return self.output_custom_folder
+        if isinstance(run_date, str):
+            try:
+                dt = datetime.fromisoformat(run_date)
+            except Exception:
+                dt = datetime.now()
+        elif isinstance(run_date, date):
+            dt = run_date
+        else:
+            dt = datetime.now()
+        return dt.strftime("%Y%m%d")
