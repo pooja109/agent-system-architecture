@@ -82,9 +82,10 @@ class CommunicationManager:
         )
 
         message_json = comm_output.model_dump_json()
-        logger.info(f"📤 Sending message to queue for customer_id={customer_id}, message: {message_json}")
+        #logger.info(f"📤 Sending message to queue for customer_id={customer_id}, message: {message_json} :END")
         self.queue_helper.send_message(message_json)
         logger.info(f"📤 CommunicationOutput sent to queue for customer_id={customer_id}")
+        return comm_output
         
     def parse_input(self, input_data, model_class):
         """Parse input (dict or JSON string) to Pydantic model. Logs exception messages."""
@@ -261,7 +262,7 @@ class CommunicationManager:
                 per_contact_email_agent=per_contact_email_agent,
                 thread=thread
             )
-            self.send_communication_output_to_queue(
+            comm_output = self.send_communication_output_to_queue(
                 customer_id=customer_id,
                 research_output=research_output,
                 evaluation=review_comments,
@@ -270,6 +271,7 @@ class CommunicationManager:
             
             # Save feedback
             await self.blob_util.save_string_to_blob(output_folder_path, customer_id+"_feedback.json", email_drafts_obj.model_dump())
+            await self.blob_util.save_string_to_blob(output_folder_path, customer_id+"_comm_output.json", comm_output.model_dump())
             logger.info("%sEnd Thread id: %s", Fore.GREEN, Style.RESET_ALL)
             
         except Exception as e:
