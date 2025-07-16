@@ -64,7 +64,7 @@ class CommunicationQueue:
                 logging.error(f"Error processing queue: {e}")
             finally:
                 logging.info("⏳ Waiting before next poll...")
-                await asyncio.sleep(2)  # 2 seconds
+                await asyncio.sleep(2000)  # 2 seconds
 
 if __name__ == "__main__":
     queue = CommunicationQueue()
