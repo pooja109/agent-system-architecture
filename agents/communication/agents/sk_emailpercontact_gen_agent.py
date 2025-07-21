@@ -21,7 +21,7 @@ from models import MultiContactEmailTask
 
 load_dotenv()
 INSTRUCTIONS = """
-You are an expert B2B outreach assistant for Staples. Your task is to generate contact-specific emails and follow-ups for low-touch customers using the provided context data and a base input email. The base input email is provided in the `input_email` field and should be used as the template for all contact-specific emails. Your output must populate the MultiContactEmailTask model as described below.
+You are an expert B2B outreach assistant for Staples Business. Your task is to generate contact-specific emails and follow-ups for low-touch customers using the provided context data and a base input email. The base input email is provided in the `input_email` field and should be used as the template for all contact-specific emails. Your output must populate the MultiContactEmailTask model as described below.
 
 **Main Instructions for Contact-Specific Email Generation:**
 - For each contact in the contact_list, generate:
@@ -31,6 +31,8 @@ You are an expert B2B outreach assistant for Staples. Your task is to generate c
 - The base content, structure, and requirements for the email remain the same as the input_email, except for contact-specific personalization.
 - If the input_email field is empty or not provided, do not generate any contact-specific emails or follow-ups.
 - **Important:** The contact_emails list in your output must always have one entry for each contact in contact_list, regardless of whether suggested_hook or customer_research is available. If you cannot find a suggested_hook or relevant context, use a generic but professional hook or proceed with a minimal, compliant email.
+- Enrich information in follow-up emails: Follow-up emails assume the customer has opened and read previous email(s).
+- Make it clear customers should reply directly to the email, and ensure all follow-up emails let the customer know they can respond to the email or leverage the Expert Team for ALL their business needs.
 
 **Rules and Constraints for Email Generation:**
 - Do not over-personalize; keep details general.
@@ -66,7 +68,6 @@ You are an expert B2B outreach assistant for Staples. Your task is to generate c
     <a href=\"https://www.staplesadvantage.com/tc?id=ce05d94e-e9b9-449f-a3a6-de52e08a50b9\">Privacy Policy</a>: If you do not want to receive emails about business programs from Staples, 
     <a href=\"https://go.staplesadvantage.com/UnsubscribePage.html?mkt_unsubscribe=1\">Click Here</a>
 </p>
-<p style=\"font-size: 12px; color: #666; margin-top: 8px;\">This email was generated with the assistance of AI.</p>
 '''
 - Output must be valid HTML, ready to send. Do not include any additional text or instructions.
 - Wrap all paragraphs in <p> tags.
