@@ -205,3 +205,49 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Claude Code Assistant / AI Tools
+# Claude-generated test files and artifacts
+test_*_config.py
+test_*_suppression.py
+test_salesforce_fix.py
+test_ssl_suppression.py
+test_comprehensive_suppression.py
+test_scenario_9_config.py
+
+# Integration test reports and outputs
+integration_test_report_*.txt
+*_test_report_*.txt
+test_output/
+output/*.json
+
+# Backup files created during development
+*.backup
+*.aiohttp.backup
+
+# Application-specific temporary files
+# Email processing outputs
+agents/*/output/
+agents/*/test_output/
+agents/email/customer_*_email.html
+agents/email/customer_*_research_output.json
+agents/email/*_email_content.txt
+agents/email/processed_email.html
+agents/email/debug_processed_email.html
+
+# Generated example outputs
+examples/outputs/
+
+# Sensitive configuration files (if any)
+.env.local
+.env.*.local
+config.local.*
+
+# Databricks and other service logs
+*.databricks.log
+*.salesforce.log
+
+# Claude Code specific
+.claude/
+claude_*
+*claude*
