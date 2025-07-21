@@ -36,6 +36,8 @@ class Account(BaseModel):
 class ResearchOutput(BaseModel):
     customer_name: Optional[str] = Field(None, description="The name of the customer.")
     customer_id: Optional[str] = Field(None, description="The unique customer ID.")
+    customer_zip: Optional[str] = Field(None, description="The ZIP code of the customer.")
+    customer_state: Optional[str] = Field(None, description="The state of the customer.")
     division: Optional[str] = Field(None, description="The division or region for the customer.")
     primary_reason_for_outreach: Optional[str] = Field(None, description="The main reason for contacting the customer.")
     issue: Optional[str] = Field(None, description="A brief description of the main issue or opportunity.")
@@ -70,25 +72,28 @@ class EvaluationFeedback(BaseModel):
     score: Literal["pass", "needs_improvement", "fail"]
     feedback: str = Field(..., description="Concise explanation for any issues detected")
 
+class Email(BaseModel):
+    subject: str = Field(..., description="The subject line of the email.")
+    body_html: str = Field(..., description="The HTML body of the email.")
+
 class ContactEmail(BaseModel):
     contact_name: str = Field(..., description="The name of the contact person for whom the email is generated.")
     contact_email: str = Field(..., description="The email address of the contact person.")
-    suggested_hook: str = Field(..., description="A suggested hook or talking point for this contact, used for personalization. If not available, a generic or context-based hook is used.")
-    draft_email: str = Field(..., description="The generated draft email for this contact, in valid HTML format.")
-    follow_up_emails: List[str] = Field(..., description="A list of follow-up emails (as HTML strings) tailored to this contact.")
+    email: Email = Field(..., description="The generated email object for this contact.")
+    follow_up_emails: List[Email] = Field(..., description="A list of follow-up Email objects tailored to this contact.")
 
 class MultiContactEmailTask(BaseModel):
     input: str = Field(..., description="The instruction or input for the contact-specific email generation task.")
-    input_email: str = Field(..., description="The base email to use for all contact-specific emails.")
+    input_email: Optional[Email] = Field(None, description="The base email object to use for all contact-specific emails.")
     customer_id: str = Field(..., description="The unique customer ID for whom the emails are generated.")
-    contact_emails: List[ContactEmail] = Field(..., description="A list of ContactEmail objects, one for each contact in contact_list, each containing the generated draft and follow-up emails.")
+    contact_emails: List[ContactEmail] = Field(..., description="A list of ContactEmail objects, one for each contact in contact_list, each containing the generated email and follow-up emails.")
     contact_list: Optional[List[Contact]] = Field(default_factory=list, description="A list of key contacts for the customer.")
     review_comments: Optional[EvaluationFeedback] = Field(None, description="Review feedback or comments for the generated emails, if any.")
     customer_research: Optional[str] = Field(None, description="Raw research or context data as a string, if available.")
 
 class EmailTask(BaseModel):
     input: str = Field(..., description="The instruction or input for the email generation task.")
-    draft_email: str = Field(..., description="The generated email in valid HTML format, always present in the output.")
+    draft_email: Email = Field(..., description="The generated email object, always present in the output.")
     current_agent_name: str = Field(..., description="The name of the agent generating the email.")
     customer_id: str = Field(..., description="The unique customer ID for whom the email is generated.")
     extracted_input: Optional[ResearchOutput] = Field(None, description="The extracted research/context data used for email generation.")
@@ -105,3 +110,14 @@ class EmailDrafts(BaseModel):
     def add_draft(self, draft: str, evaluation: EvaluationFeedback):
         self.drafts.append(draft)
         self.evaluations.append(evaluation)
+
+class CommunicationOutput(BaseModel):
+    """Model to hold the output of the communication agent."""
+    customer_id: str = Field(..., description="The unique customer ID for whom the communication is generated.")
+    customer_name: Optional[str] = Field(None, description="The name of the customer.")
+    customer_id: Optional[str] = Field(None, description="The unique customer ID.")
+    customer_zip: Optional[str] = Field(None, description="The ZIP code of the customer.")
+    customer_state: Optional[str] = Field(None, description="The state of the customer.")
+    final_evaluation: EvaluationFeedback = Field(None, description="Final evaluation for the communication.")
+    contact_emails: List[ContactEmail] = Field(default_factory=list, description="List of emails generated for each contact.")
+
