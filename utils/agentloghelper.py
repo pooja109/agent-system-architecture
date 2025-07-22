@@ -248,12 +248,12 @@ Electralloy - News : https://electralloy.com/info-news/news
     # Create a list of records
     records: List[AgentBatchRecord] = [
         AgentBatchRecord(
-            batch_id=101,
-            run_date=date(2025, 7, 1),
+            batch_id="101",
+            run_date="2025-07-01 00:00:00",
             customer_id="10250758",
             contact_id="0033t00004NKpTmAAL",
             agent_name="research_agent",
-            status="success",
+            status="S",
             agent_output=amazing_kidz_output,
             agent_output_path="/outputs/customer_10250758_research_output.md",
             is_reviewed=True,
@@ -264,12 +264,12 @@ Electralloy - News : https://electralloy.com/info-news/news
             customer_id_type="internal"
         ),
         AgentBatchRecord(
-            batch_id=102,
-            run_date=date(2025, 7, 1),
+            batch_id="102",
+            run_date="2025-07-01 00:00:00",
             customer_id="1480156",
             contact_id="0013000005z3uPAAQ",
             agent_name="research_agent",
-            status="success", 
+            status="S", 
             agent_output=electralloy_output,
             agent_output_path="/outputs/customer_1480156_research_output.md",
             is_reviewed=True,

@@ -29,6 +29,13 @@ class CommunicationQueue:
             dead_letter_queue=os.getenv("AZURE_COMMUNICATION_INPUT_DLQ", None)
         )
 
+    def send_test_message(self, payload: dict):
+        # Create and send test agent records to the queue
+        agentRecords = createRecords()
+        for record in agentRecords:
+            message = record.model_dump_json(indent=2)
+            self.listener_queue.send_message(message)
+        logging.info(f"✅ {len(agentRecords)} messages sent to the queue.")
     async def process_logic(self, data_list):
         """
         Handles the processing logic for a batch of queue messages.
@@ -48,18 +55,13 @@ class CommunicationQueue:
         Main entry point for the queue processing script.
         Initializes the AzureQueueHelper, sends messages, and processes the queue in a loop.
         """
-        # Create and send test agent records to the queue
-        agentRecords = createRecords()
-        for record in agentRecords:
-            message = record.model_dump_json(indent=2)
-            self.listener_queue.send_message(message)
-        logging.info(f"✅ {len(agentRecords)} messages sent to the queue.")
+        #self.send_test_message()
 
         # Continuously poll and process the queue
         while True:
             try:
                 logging.info("🔄 Processing queue...")
-                await self.listener_queue.process_queue(handler=self.process_logic, max_retry=3, batch_size=8)
+                await self.listener_queue.process_queue(handler=self.process_logic, max_retry=20, batch_size=1)
             except Exception as e:
                 logging.error(f"Error processing queue: {e}")
             finally:

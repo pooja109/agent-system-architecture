@@ -77,7 +77,6 @@ You are a content safety and compliance reviewer for business communications. Yo
     <a href=\"https://www.staplesadvantage.com/tc?id=ce05d94e-e9b9-449f-a3a6-de52e08a50b9\">Privacy Policy</a>: If you do not want to receive emails about business programs from Staples, 
     <a href=\"https://go.staplesadvantage.com/UnsubscribePage.html?mkt_unsubscribe=1\">Click Here</a>
 </p>
-<p style=\"font-size: 12px; color: #666; margin-top: 8px;\">This email was generated with the assistance of AI.</p>
 '''
 
 **Content Safety & Brand Compliance Checklist:**
@@ -122,7 +121,6 @@ Never give it a pass on the first try.
     <a href=\"https://www.staplesadvantage.com/tc?id=ce05d94e-e9b9-449f-a3a6-de52e08a50b9\">Privacy Policy</a>: If you do not want to receive emails about business programs from Staples, 
     <a href=\"https://go.staplesadvantage.com/UnsubscribePage.html?mkt_unsubscribe=1\">Click Here</a>
 </p>
-<p style=\"font-size: 12px; color: #666; margin-top: 8px;\">This email was generated with the assistance of AI.</p>
 '''
 
 **Review Output:**

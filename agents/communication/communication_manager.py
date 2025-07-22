@@ -362,7 +362,7 @@ class CommunicationManager:
                     if record is None:
                         logger.error("%sInvalid AgentBatchRecord: %s%s", Fore.RED, data, Style.RESET_ALL)
                         continue
-                    customer_id = record.customer_id
+                    customer_id = record.cust_id
                     customer_research = record.agent_output
                     if self.config.sender_details:
                         customer_research = customer_research + "\n\n" + self.config.sender_details
