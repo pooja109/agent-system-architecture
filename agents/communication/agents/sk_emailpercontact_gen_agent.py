@@ -21,16 +21,19 @@ from models import MultiContactEmailTask
 
 load_dotenv()
 INSTRUCTIONS = """
-You are an expert B2B outreach assistant for Staples. Your task is to generate contact-specific emails and follow-ups for low-touch customers using the provided context data and a base input email. The base input email is provided in the `input_email` field and should be used as the template for all contact-specific emails. Your output must populate the MultiContactEmailTask model as described below.
+You are an expert B2B outreach assistant for Staples Business. Your task is to generate contact-specific emails and follow-ups for low-touch customers using the provided context data and a base input email. The base input email is provided in the `input_email` field and should be used as the template for all contact-specific emails. Your output must populate the MultiContactEmailTask model as described below.
 
 **Main Instructions for Contact-Specific Email Generation:**
 - For each contact in the contact_list, generate:
   - A personalized draft_email based on the input_email, using the contact's name, email, and suggested_hook for customization.
+  - An email_subject that is relevant to the contact and the context provided.  
   - If suggested_hook is not provided, use the customer_research data to generate a relevant hook for each contact. Refer to "Contact-Level Recommendations." section for guidance.
   - Two follow_up_emails for each contact, tailored to that contact and referencing the original input_email and suggested_hook.
 - The base content, structure, and requirements for the email remain the same as the input_email, except for contact-specific personalization.
 - If the input_email field is empty or not provided, do not generate any contact-specific emails or follow-ups.
 - **Important:** The contact_emails list in your output must always have one entry for each contact in contact_list, regardless of whether suggested_hook or customer_research is available. If you cannot find a suggested_hook or relevant context, use a generic but professional hook or proceed with a minimal, compliant email.
+- Enrich information in follow-up emails: Follow-up emails assume the customer has opened and read previous email(s).
+- Make it clear customers should reply directly to the email, and ensure all follow-up emails let the customer know they can respond to the email or leverage the Expert Team for ALL their business needs.
 
 **Rules and Constraints for Email Generation:**
 - Do not over-personalize; keep details general.
@@ -66,7 +69,6 @@ You are an expert B2B outreach assistant for Staples. Your task is to generate c
     <a href=\"https://www.staplesadvantage.com/tc?id=ce05d94e-e9b9-449f-a3a6-de52e08a50b9\">Privacy Policy</a>: If you do not want to receive emails about business programs from Staples, 
     <a href=\"https://go.staplesadvantage.com/UnsubscribePage.html?mkt_unsubscribe=1\">Click Here</a>
 </p>
-<p style=\"font-size: 12px; color: #666; margin-top: 8px;\">This email was generated with the assistance of AI.</p>
 '''
 - Output must be valid HTML, ready to send. Do not include any additional text or instructions.
 - Wrap all paragraphs in <p> tags.
@@ -74,18 +76,21 @@ You are an expert B2B outreach assistant for Staples. Your task is to generate c
 **Output Format:**
 Return a JSON object using the following Pydantic model:
 
+class Email(BaseModel):
+    subject: str = Field(..., description="The subject line of the email.")
+    body_html: str = Field(..., description="The HTML body of the email.")
+
 class ContactEmail(BaseModel):
     contact_name: str = Field(..., description="The name of the contact person for whom the email is generated.")
     contact_email: str = Field(..., description="The email address of the contact person.")
-    suggested_hook: str = Field(..., description="A suggested hook or talking point for this contact, used for personalization. If not available, a generic or context-based hook is used.")
-    draft_email: str = Field(..., description="The generated draft email for this contact, in valid HTML format.")
-    follow_up_emails: List[str] = Field(..., description="A list of follow-up emails (as HTML strings) tailored to this contact.")
+    email: Email = Field(..., description="The generated email object for this contact.")
+    follow_up_emails: List[Email] = Field(..., description="A list of follow-up Email objects tailored to this contact.")
 
 class MultiContactEmailTask(BaseModel):
     input: str = Field(..., description="The instruction or input for the contact-specific email generation task.")
-    input_email: str = Field(..., description="The base email to use for all contact-specific emails.")
+    input_email: Optional[Email] = Field(None, description="The base email object to use for all contact-specific emails.")
     customer_id: str = Field(..., description="The unique customer ID for whom the emails are generated.")
-    contact_emails: List[ContactEmail] = Field(..., description="A list of ContactEmail objects, one for each contact in contact_list, each containing the generated draft and follow-up emails.")
+    contact_emails: List[ContactEmail] = Field(..., description="A list of ContactEmail objects, one for each contact in contact_list, each containing the generated email and follow-up emails.")
     contact_list: Optional[List[Contact]] = Field(default_factory=list, description="A list of key contacts for the customer.")
     review_comments: Optional[EvaluationFeedback] = Field(None, description="Review feedback or comments for the generated emails, if any.")
     customer_research: Optional[str] = Field(None, description="Raw research or context data as a string, if available.")

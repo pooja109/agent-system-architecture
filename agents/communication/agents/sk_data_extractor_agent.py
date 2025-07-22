@@ -44,6 +44,8 @@ Instructions:
 Required output fields:
 - customer_name
 - customer_id
+- customer_zip
+- customer_state
 - division
 - primary_reason_for_outreach
 - issue
@@ -65,6 +67,8 @@ Example output (strictly follow this format):
 {
   "customer_name": "HOLMES ELECTRIC INC",
   "customer_id": "27208226",
+  "customer_zip": "30303",
+  "customer_state": "GA",
   "division": "ATL",
   "primary_reason_for_outreach": "Retention",
   "issue": "Customer spend has fallen to $0 in the last 6 months, compared to $11.6K two years ago.",
