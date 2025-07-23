@@ -13,7 +13,7 @@ from azure.identity import DefaultAzureCredential
 # Add the project root to Python path so we can import utils
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
 sys.path.insert(0, project_root)
-print("\nProject Root Path: ", project_root)
+#print("\nProject Root Path: ", project_root)
 
 #from utils.azurequeuehelper import AzureQueueHelper
 #from utils.models import AgentBatchRecord
@@ -31,9 +31,7 @@ async def get_data_from_databricks(query: str) -> pd.DataFrame:
         pd.DataFrame: DataFrame containing the results of the query.
     """
     try:
-        # Load environment variables
-        load_dotenv()
-        
+       
         # Connect to Databricks
         with sql.connect(
         server_hostname=os.getenv("DATABRICKS_SERVER_HOSTNAME"),
@@ -43,7 +41,7 @@ async def get_data_from_databricks(query: str) -> pd.DataFrame:
             with connection.cursor() as cursor:
                 # Accessing a table in an external catalog (e.g., Unity Catalog)
                 
-                cursor.execute(query)                                                             # I2A Low Touch Customer Data - currently limited to 5 Customers
+                cursor.execute(query)
                 result = cursor.fetchall()      
                 df = pd.DataFrame(result, columns=[col[0] for col in cursor.description])  
         return df
@@ -57,6 +55,12 @@ async def get_data_from_databricks(query: str) -> pd.DataFrame:
 
 async def main() -> None:
     
+     # Load environment variables
+    load_dotenv()
+        
+    BATCH_ID = datetime.now().strftime("%Y%m%d%H%M%S")
+    queue_name = "researchagentqueue01"
+
     # Creating a separate logger for this module
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
@@ -69,7 +73,6 @@ async def main() -> None:
     #logger.addHandler(file_handler)
     logger.addHandler(stream_handler)  
 
-    BATCH_ID = datetime.now().strftime("%Y%m%d%H%M%S")
     
     logger.info("Getting data from Databricks...")
     try:
@@ -84,29 +87,38 @@ async def main() -> None:
 
         sql_dnb = "select distinct cust_id, business_name, website from snowflake_ml_dev.mlops.i2a_lowtouch_dnb_account_source_t where cust_id in (select distinct cust_id from snowflake_ml_dev.mlops.i2a_lowtouch)"
 
+        sql_marketing = "select * from mld01_sandbox_de.ai_garage.marketing_category_hierarchy"
+
+        sql_i2a_marketing = "select * from mld01_sandbox_de.ai_garage.i2a_to_marketing_category_map"
+
         df_i2a = await get_data_from_databricks(sql_i2a)
         df_txn = await get_data_from_databricks(sql_txn)
         df_dnb = await get_data_from_databricks(sql_dnb)
-
+        df_marketing = await get_data_from_databricks(sql_marketing)
+        df_i2a_marketing = await get_data_from_databricks(sql_i2a_marketing)
+        
         logger.info("Data fetched successfully from Databricks")
-
 
         #print(df_i2a.head(5))
     except Exception as e:
         logger.error(f"Error fetching data from Databricks: {e}")
         return
     
- 
+    try:
+        # Merge the marketing data and i2a marketing data on Marketing Category
+        if not df_marketing.empty and not df_i2a_marketing.empty:
+            df_marketing = pd.merge(df_marketing, df_i2a_marketing, on="Marketing_Primary_Category", how="outer")
+            logger.info("Successfully merged marketing data.")
+    except Exception as e:
+        logger.error(f"Error merging marketing data: {e}")
+        df_marketing = pd.DataFrame()
+
     # create a connection to researchagentqueue01 azure storage queue
     # This queue will be used to send the research report for each customer to the Azure Storage Communication Queue
 
-
-    queue_name = "researchagentqueue01"
-
     # Get connection string and validate
     connection_string = os.getenv("AZURE_QUEUE_CONNECTION_STRING")
-    #print(f"\n\nQueue Connection String: {connection_string}")
-
+    
     if not connection_string:
         logger.error("❌ AZURE_QUEUE_CONNECTION_STRING environment variable is not set")
         raise ValueError("AZURE_QUEUE_CONNECTION_STRING environment variable is required")
@@ -146,14 +158,60 @@ async def main() -> None:
         filtered_df = df_i2a[df_i2a['CUST_ID'] == b_cust]               # Filtered I2A Data for the specific customer
         filtered_txn_df = df_txn[df_txn['CUST_ID'] == b_cust]           # Filtered Transaction Data for the specific customer
         filtered_dnb_df = df_dnb[df_dnb['cust_id'] == b_cust]           # Filtered DNB Data for the specific customer
-        
+
+        if not filtered_df['PRIMARY_CAT_1'].values[0] is None :
+            cat1 = filtered_df['PRIMARY_CAT_1'].values[0]
+            filtered_df = filtered_df.merge(df_i2a_marketing[['I2A_Primary_Category', 'Marketing_Primary_Category']], left_on='PRIMARY_CAT_1', right_on='I2A_Primary_Category', how='left', suffixes=('', 'M_'))
+            filtered_df.rename(columns={'Marketing_Primary_Category': 'MARKETING_CAT_1'}, inplace=True)
+            filtered_df.drop(columns=['I2A_Primary_Category'], inplace=True)
+            #print("Primary Category 1: ", cat1, " and Marketing Category 1: ", filtered_df['MARKETING_CAT_1'].values[0])
+        else:
+            cat1 = None
+            #print("No Primary Category 1 found for this customer.")
+
+        if not filtered_df['PRIMARY_CAT_2'].values[0] is None :
+            cat2 = filtered_df['PRIMARY_CAT_2'].values[0]
+            filtered_df = filtered_df.merge(df_i2a_marketing[['I2A_Primary_Category', 'Marketing_Primary_Category']], left_on='PRIMARY_CAT_2', right_on='I2A_Primary_Category', how='left', suffixes=('', 'M_'))
+            filtered_df.rename(columns={'Marketing_Primary_Category': 'MARKETING_CAT_2'}, inplace=True)
+            filtered_df.drop(columns=['I2A_Primary_Category'], inplace=True)
+            #print("Primary Category 2: ", cat2, " and Marketing Category 2: ", filtered_df['MARKETING_CAT_2'].values[0])
+        else:
+            cat2 = None
+            #print("No Primary Category 2 found for this customer.")
+
+        if not filtered_df['PRIMARY_CAT_3'].values[0] is None:
+            cat3 = filtered_df['PRIMARY_CAT_3'].values[0]
+            filtered_df = filtered_df.merge(df_i2a_marketing[['I2A_Primary_Category', 'Marketing_Primary_Category']], left_on='PRIMARY_CAT_3', right_on='I2A_Primary_Category', how='left', suffixes=('', 'M_'))
+            filtered_df.rename(columns={'Marketing_Primary_Category': 'MARKETING_CAT_3'}, inplace=True)
+            filtered_df.drop(columns=['I2A_Primary_Category'], inplace=True)
+            #print("Primary Category 3: ", cat3, " and Marketing Category 3: ", filtered_df['MARKETING_CAT_3'].values[0])
+        else:
+            cat3 = None
+            #print("No Primary Category 3 found for this customer.")
+
+        # Filter the marketing data for the specific customer based on Primary Categories
+        if cat1 is None and cat2 is None and cat3 is None:
+            filtered_marketing_df = df_marketing[df_marketing['I2A_Primary_Category'].isnull()]
+        else:
+            filtered_marketing_df = df_marketing[(df_marketing['I2A_Primary_Category'] == cat1) | (df_marketing['I2A_Primary_Category'] == cat2) | (df_marketing['I2A_Primary_Category'] == cat3)]
+
+        # Store only Marketing Secondary Category in the filtered_marketing_df. Remove any duplicate records based on 'Marketing Secondary Category'
+        if not filtered_marketing_df.empty:
+            filtered_marketing_df = filtered_marketing_df[['Marketing_Secondary_Category']]
+            # remove duplicate records based on 'Marketing Secondary Category'
+            filtered_marketing_df = filtered_marketing_df.drop_duplicates(subset=['Marketing_Secondary_Category'])
+    
+
+
         current_datetime = datetime.now()
 
         # convert the DataFrame to a dictionary and then to a JSON string
         # This is to ensure that the data is in a format that can be sent to the Azure Queue
-        filtered_df_json = filtered_df.to_json(orient='records')
-        filtered_txn_df_json = filtered_txn_df.to_json(orient='records')
-        filtered_dnb_df_json = filtered_dnb_df.to_json(orient='records')
+        filtered_df_json = filtered_df.to_json(orient='records') if not filtered_df.empty else "[]"
+        filtered_txn_df_json = filtered_txn_df.to_json(orient='records') if not filtered_txn_df.empty else "[]"
+        filtered_dnb_df_json = filtered_dnb_df.to_json(orient='records') if not filtered_dnb_df.empty else "[]"
+        marketing_json = filtered_marketing_df.to_json(orient='records') if not filtered_marketing_df.empty else "[]"
+        #i2a_marketing_json = df_i2a_marketing.to_json(orient='records') if not df_i2a_marketing.empty else "[]"
 
         # Create a json object for the customer with details from each DataFrame
         customer_data = {
@@ -164,7 +222,8 @@ async def main() -> None:
             "customer_id": b_cust,
             "i2a_data": filtered_df_json,
             "transactions_data": filtered_txn_df_json,
-            "dnb_data": filtered_dnb_df_json
+            "dnb_data": filtered_dnb_df_json,
+            "marketing_data": marketing_json
         }
 
         try:

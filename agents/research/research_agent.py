@@ -724,6 +724,17 @@ for msg_batch in messages.by_page():
                 dnb_data = pd.DataFrame([dnb_data])
             else:
                 dnb_data = pd.DataFrame()
+
+            marketing_data = data.get("marketing_data", "Unknown")
+            # convert marketing data to dataframe
+            if isinstance(marketing_data, str):
+                marketing_data = json.loads(marketing_data)
+            if isinstance(marketing_data, list):
+                marketing_data = pd.DataFrame(marketing_data)
+            elif isinstance(marketing_data, dict):
+                marketing_data = pd.DataFrame([marketing_data])
+            else:
+                marketing_data = pd.DataFrame()
         except Exception as e:
             print(f"❌ Error converting data to DataFrame: {e}. ")
             continue
@@ -749,10 +760,6 @@ for msg_batch in messages.by_page():
         # check if i2a_data['PRIMARY_CAT_1'].values[0] is not None and i2a_data['PRIMARY_CAT_2'].values[0] is not None and i2a_data['PRIMARY_CAT_3'].values[0] is not None
         if not i2a_data['PRIMARY_CAT_1'].values[0] is None :
             cat1 = i2a_data['PRIMARY_CAT_1'].values[0]
-            i2a_data = i2a_data.merge(df_i2a_marketing[['I2A Primary Category', 'Marketing Primary Category']], left_on='PRIMARY_CAT_1', right_on='I2A Primary Category', how='left', suffixes=('', 'M_'))
-            i2a_data.rename(columns={'Marketing Primary Category': 'MARKETING_CAT_1'}, inplace=True)
-            i2a_data.drop(columns=['I2A Primary Category'], inplace=True)
-
             print("Primary Category 1: ", cat1, " and Marketing Category 1: ", i2a_data['MARKETING_CAT_1'].values[0])
         else:
             cat1 = None
@@ -760,10 +767,6 @@ for msg_batch in messages.by_page():
         
         if not i2a_data['PRIMARY_CAT_2'].values[0] is None :
             cat2 = i2a_data['PRIMARY_CAT_2'].values[0]
-            i2a_data = i2a_data.merge(df_i2a_marketing[['I2A Primary Category', 'Marketing Primary Category']], left_on='PRIMARY_CAT_2', right_on='I2A Primary Category', how='left', suffixes=('', 'M_'))
-            i2a_data.rename(columns={'Marketing Primary Category': 'MARKETING_CAT_2'}, inplace=True)
-            i2a_data.drop(columns=['I2A Primary Category'], inplace=True)
-
             print("Primary Category 2: ", cat2, " and Marketing Category 2: ", i2a_data['MARKETING_CAT_2'].values[0])
         else:
             cat2 = None
@@ -771,29 +774,13 @@ for msg_batch in messages.by_page():
 
         if not i2a_data['PRIMARY_CAT_3'].values[0] is None:
             cat3 = i2a_data['PRIMARY_CAT_3'].values[0]
-            i2a_data = i2a_data.merge(df_i2a_marketing[['I2A Primary Category', 'Marketing Primary Category']], left_on='PRIMARY_CAT_3', right_on='I2A Primary Category', how='left', suffixes=('', 'M_'))
-            i2a_data.rename(columns={'Marketing Primary Category': 'MARKETING_CAT_3'}, inplace=True)
-            i2a_data.drop(columns=['I2A Primary Category'], inplace=True)
-
             print("Primary Category 3: ", cat3, " and Marketing Category 3: ", i2a_data['MARKETING_CAT_3'].values[0])
         else:
             cat3 = None
             print("No Primary Category 3 found for this customer.")
 
-        # Filter the marketing data for the specific customer based on Primary Categories
-        if cat1 is None and cat2 is None and cat3 is None:
-            filtered_marketing_df = df_marketing[df_marketing['I2A Primary Category'].isnull()]
-        else:
-            filtered_marketing_df = df_marketing[(df_marketing['I2A Primary Category'] == cat1) | (df_marketing['I2A Primary Category'] == cat2) | (df_marketing['I2A Primary Category'] == cat3)]
-            
-        # Store only Marketing Secondary Category in the filtered_marketing_df. Remove any duplicate records based on 'Marketing Secondary Category'
-        if not filtered_marketing_df.empty:
-            filtered_marketing_df = filtered_marketing_df[['Marketing Secondary Category']]
-            # remove duplicate records based on 'Marketing Secondary Category'
-            filtered_marketing_df = filtered_marketing_df.drop_duplicates(subset=['Marketing Secondary Category'])
 
-        #print("Filtered Marketing Data for the specific customer: ", filtered_marketing_df)
-        
+      
         City_code = i2a_data['DIV'].values[0] if not i2a_data.empty else None
         cust_name = i2a_data['CUST_NAME'].values[0] if not i2a_data.empty else None
         cust_industry = i2a_data['INDUSTRY'].values[0] if not i2a_data.empty else None
@@ -869,7 +856,7 @@ for msg_batch in messages.by_page():
             <transactions> {transactions_data} </transactions>
             <dnb> {dnb_data} </dnb>
             <websearch> {search_results} </websearch>
-            <marketing> {filtered_marketing_df} </marketing>
+            <marketing> {marketing_data} </marketing>
         </datasets>
 
         Here are the instructions and tasks to perform:
