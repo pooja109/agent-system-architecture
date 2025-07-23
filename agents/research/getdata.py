@@ -167,6 +167,7 @@ async def main() -> None:
             #print("Primary Category 1: ", cat1, " and Marketing Category 1: ", filtered_df['MARKETING_CAT_1'].values[0])
         else:
             cat1 = None
+            filtered_df['MARKETING_CAT_1'] = None
             #print("No Primary Category 1 found for this customer.")
 
         if not filtered_df['PRIMARY_CAT_2'].values[0] is None :
@@ -177,6 +178,7 @@ async def main() -> None:
             #print("Primary Category 2: ", cat2, " and Marketing Category 2: ", filtered_df['MARKETING_CAT_2'].values[0])
         else:
             cat2 = None
+            filtered_df['MARKETING_CAT_2'] = None
             #print("No Primary Category 2 found for this customer.")
 
         if not filtered_df['PRIMARY_CAT_3'].values[0] is None:
@@ -187,6 +189,7 @@ async def main() -> None:
             #print("Primary Category 3: ", cat3, " and Marketing Category 3: ", filtered_df['MARKETING_CAT_3'].values[0])
         else:
             cat3 = None
+            filtered_df['MARKETING_CAT_3'] = None
             #print("No Primary Category 3 found for this customer.")
 
         # Filter the marketing data for the specific customer based on Primary Categories

@@ -27,9 +27,21 @@ client = AzureOpenAI(api_version=os.getenv("ST_API_VERSION"),
                      api_key=os.getenv("ST_AZURE_OPENAI_API_KEY"))
 
 
+# ===================== Constants ====================
+
 RESEARCH_AGENT_NAME = "Research_Agent"  # The agent name to use for the research agent - chat completion
 FORMAT_AGENT_NAME = "Markdown_Agent"  # The agent name to use for formatting the content in a markdown format
 AGENT_NAME = "Bing_Search_Assistant"  # The agent name to use for the Bing Search Assistant
+BATCH_ID = datetime.now().strftime("%Y%m%d%H%M%S")  # Batch ID for the run, based on current date and time
+CONTAINER_NAME = os.getenv("AZURE_CONTAINER_NAME")
+STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+AI_FOUNDRY_ENDPOINT = os.getenv("ST_AI_FOUNDRY_ENDPOINT")
+AI_FOUNDRY_API_KEY = os.getenv("ST_AI_FOUNDRY_API_KEY")
+BING_CONNECTION_NAME = os.environ["ST_BING_CONNECTION_NAME"]  # Default connection name for Bing Grounding Tool
+source_queue_name = "researchagentqueue01"
+queue_name = "communicationagentqueue01"
+
+
 
 # ===================== Logging Configuration ====================
 
@@ -39,21 +51,13 @@ logger.setLevel(logging.INFO)
 
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-#log_file = './logs/research_agent_'+ datetime.now().strftime("%Y%m%d") +'.log'
-#log_file = 'research_agent_'+ datetime.now().strftime("%Y%m%d") +'.log'
-#file_handler = logging.FileHandler(log_file)
-#file_handler.setFormatter(formatter)
-#file_handler.setLevel(logging.INFO)
-
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(formatter)
 stream_handler.setLevel(logging.INFO)
 
-#logger.addHandler(file_handler)
 logger.addHandler(stream_handler)   
 
 
-BATCH_ID = datetime.now().strftime("%Y%m%d%H%M%S")
 
 
 
@@ -72,12 +76,12 @@ def get_bing_search_results(query: str):
         pd.DataFrame: A DataFrame containing the search results
     """
     project_client = AIProjectClient(
-    endpoint=os.environ["ST_AI_FOUNDRY_ENDPOINT"],
+    endpoint=AI_FOUNDRY_ENDPOINT,
     credential=DefaultAzureCredential(),
     )
 
     # [START create_agent_with_bing_grounding_tool]
-    conn_name = os.environ["ST_BING_CONNECTION_NAME"]
+    conn_name = BING_CONNECTION_NAME
     search_results = ""
     search_citations = ""
 
@@ -195,38 +199,6 @@ def get_bing_search_results(query: str):
     
     
     return search_results, search_citations
-
-
-
-
-
-# ==================== Function to read Marketing Data ====================
-
-def read_marketing_data(file_path: str) -> pd.DataFrame:
-    """
-    Reads a marketing data file and returns it as a DataFrame.
-    
-    Args:
-        file_path (str): The path to the marketing data file.
-        
-    Returns:
-        pd.DataFrame: The DataFrame containing the marketing data.
-    """
-    try:
-        # Read the file into a DataFrame
-        df = pd.read_csv(file_path)
-        logger.info(f"Successfully read marketing data from {file_path}")
-        return df
-    except FileNotFoundError:
-        logger.error(f"File not found: {file_path}")
-        return pd.DataFrame()  # Return an empty DataFrame if file not found
-    except Exception as e:
-        logger.error(f"An error occurred while reading the file: {e}")
-        return pd.DataFrame()  # Return an empty DataFrame on error
-
-
-
-
 
 
 
@@ -369,7 +341,7 @@ def save_research_report(container_name, blob_name, file_content):
     """
     try:
         # Azure Blob Storage configuration
-        account_url = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+        account_url = STORAGE_CONNECTION_STRING
         
         # Initialize Azure credentials
         credential = DefaultAzureCredential()
@@ -547,7 +519,7 @@ The column (PRIMARY_CAT_1) represents the primary category and the column (PRIMA
 Secondary category are more granular than primary categories. They are the children of primary and so on. 
 The columns like PRIMARY_CAT_2, SECONDARY_CAT_2 etc. represent the second category of items bough and their potential of revenue or loss from customer dataset. 
 The column named Category with the value of Growth and Retention determine if the dollar values in PRIMARY_CAT_1_Value are potential of growth or decline. 
-When doing research take into consideration whether they are a growth account or retention account. 
+When doing research take into consideration whether they are a growth account or retention account. Provide recommendations for all the primary categories in the customer dataset.
 """
 
 
@@ -572,8 +544,6 @@ provided_rules_and_policies="No provided rules and policies"
 # Create a connection to communicationagentqueue01 azure storage queue which will push the research report for each customer to the Azure Storage Communication Queue
 
 
-source_queue_name = "researchagentqueue01"
-queue_name = "communicationagentqueue01"
 
 # Get connection string and validate
 connection_string = os.getenv("AZURE_QUEUE_CONNECTION_STRING")
@@ -614,24 +584,6 @@ except Exception as e:
         raise
 
 
-# Loading  Marketing data from the CSV files
-
-try:
-    df_marketing = read_marketing_data("aou-s01-lowtouch/data/Marketing.csv")  # Read marketing data from CSV file
-    df_i2a_marketing = read_marketing_data("aou-s01-lowtouch/data/I2A-Marketing.csv")  # Read I2A marketing data from CSV file
-
-     # Merge the marketing data and i2a marketing data on Marketing Category
-    if not df_marketing.empty and not df_i2a_marketing.empty:
-        df_marketing = pd.merge(df_marketing, df_i2a_marketing, on="Marketing Primary Category", how="outer")
-        print(df_marketing.head())
-        logger.info("Successfully loaded marketing data.")
-except Exception as e:
-    logger.error(f"Error reading marketing data: {e}")
-    df_marketing = pd.DataFrame()
-
-
-
-
 
 # Define the rules and policies that the model should follow
 provided_rules_and_policies="""
@@ -667,7 +619,7 @@ class Response(BaseModel):
 logger.info("STARTING PROCESSING FOR LOW TOUCH CUSTOMERS from {source_queue_name} queue")
 
 # ==================== Main Execution Loop ====================
-messages = source_queue_client.receive_messages(max_messages=5, visibility_timeout=300)  # Increased timeout to 5 minutes
+messages = source_queue_client.receive_messages(max_messages=3, visibility_timeout=300)  # Increased timeout to 5 minutes
 for msg_batch in messages.by_page():
     for msg in msg_batch:
         # Store the message reference for deletion
@@ -815,9 +767,7 @@ for msg_batch in messages.by_page():
             
             logger.info("START: BING SEARCH")
             search_results , search_citations = get_bing_search_results(query=query)  # Get Bing Search results
-            #logger.info("BING QUERY", query)
-            #logger.info("Bing Search Results:", search_results)
-            #logger.info("Bing Search Citations:", search_citations)
+            
             logger.info("END: BING SEARCH")
         except Exception as e:
             logger.error(f"❌ Error during Bing Search: {e}")
@@ -837,7 +787,7 @@ for msg_batch in messages.by_page():
             Specify the priority reason for outreach, which can be either Retention or Growth.
             Analyze and Research the data for """ + cust_name + """ and create a research report for the customer and their contact details. 
             The research report and recommendations will be used to create hyper-personalized report for """ + cust_name + """. 
-            Recommendations should be based on the Primary and Secondary Categories in the customer dataset for the categories to target that Customer.
+            Recommendations should be based on the Primary and Secondary Categories in the customer dataset. Use all the Primary categories to target that Customer.
             Use data from marketing to propose additional products. Use Bing Search to enhance the research report.
             Provide a contact wise generic report in the output along with your other research output and recommendations. 
         """
@@ -907,7 +857,7 @@ for msg_batch in messages.by_page():
 
             markdown_content += "\n\nI2A Primary, Secondary Categories and Marketing Primary Categories: \n" + categories.__str__()+ "\n\n"
             
-            markdown_content += "Marketing Categories : \n" + filtered_marketing_df.__str__() + "\n\n"
+            markdown_content += "Marketing Categories : \n" + marketing_data.__str__() + "\n\n"
 
             markdown_content += "Contacts : \n" + contacts.__str__() + "\n\n"
 
@@ -933,7 +883,7 @@ for msg_batch in messages.by_page():
             logger.info(f"START: SAVING RESEARCH REPORT: {research_file}")
             
             save_research_report(
-                container_name=os.getenv("AZURE_STORAGE_CONTAINER_NAME"),             # changed from "lowtouch" to "mld01blobcontainerne0"
+                container_name=CONTAINER_NAME,             # changed from "lowtouch" to "mld01blobcontainerne0"
                 blob_name=research_file,
                 file_content=formatted_content                      # changed from markdown_content to formatted_content
             )
