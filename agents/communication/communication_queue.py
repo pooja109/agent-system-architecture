@@ -61,7 +61,7 @@ class CommunicationQueue:
         while True:
             try:
                 logging.info("🔄 Processing queue...")
-                await self.listener_queue.process_queue(handler=self.process_logic, max_retry=100, batch_size=10)
+                await self.listener_queue.process_queue(handler=self.process_logic, max_retry=3, batch_size=10)
             except Exception as e:
                 logging.error(f"Error processing queue: {e}")
             finally:
