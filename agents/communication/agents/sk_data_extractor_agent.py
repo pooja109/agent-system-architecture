@@ -34,6 +34,7 @@ INPUT_FILE = os.getenv("INPUT_FILE")
 INSTRUCTIONS = """
 You are an expert data extraction assistant.
 
+
 Instructions:
 - Extract all available information for the required fields listed below from the context data.
 - Output only a valid JSON object, enclosed strictly between --- --- (three dashes on a line before and after).
@@ -57,9 +58,19 @@ Required output fields:
 - sample_email_body
 - citations (as a list of strings)
 - url_citations (as a list of strings)
+- marketing_and_category_insights (as a list of CategoryInsight objects; see below for structure)
 - other_fields (object for any extra data)
 - company (object, if company info is present)
 - account (object, if account info is present)
+
+Each CategoryInsight object should have the following structure:
+{
+  "primary_category": string,  // e.g., "Office Supplies"
+  "secondary_categories": [string] | null, // e.g., ["Toner", "Paper"]
+  "marketing_categories": [string] | null, // e.g., ["Print & Marketing", "Ink & Toner"]
+  "value": string | null, // e.g., "$1,200.50"
+  "opportunity": string | null // e.g., "Suggest toner bundle discount. Customer has not purchased toner in 6 months."
+}
 
 Example output (strictly follow this format):
 
@@ -121,6 +132,22 @@ Example output (strictly follow this format):
     "justification": "Justification here.",
     "citations": "Citations here."
   },
+  "marketing_and_category_insights": [
+    {
+      "primary_category": "Office Supplies",
+      "secondary_categories": ["Toner", "Paper"],
+      "marketing_categories": ["Print & Marketing", "Ink & Toner"],
+      "value": "$1,200.50",
+      "opportunity": "Suggest toner bundle discount. Customer has not purchased toner in 6 months."
+    },
+    {
+      "primary_category": "Breakroom",
+      "secondary_categories": ["Coffee", "Snacks"],
+      "marketing_categories": ["Breakroom Supplies"],
+      "value": "$800.00",
+      "opportunity": "Introduce new eco-friendly breakroom products. Purchases are stable year-over-year."
+    }
+  ],
   "other_fields": {}
 }
 ---

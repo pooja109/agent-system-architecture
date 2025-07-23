@@ -141,6 +141,7 @@ class CommunicationManager:
         output_blob_name = f"{output_folder_path}{customer_id}_feedback.json"
         
         # Check if output already exists
+        logger.info("%sChecking if output exists: %s%s", Fore.YELLOW, output_blob_name, Style.RESET_ALL)
         if not self.config.output_overwrite and await self.blob_util.output_blob_exists(output_blob_name):
             logger.info("%sSkipping %s as output already exists: %s%s", Fore.YELLOW, filename, output_blob_name, Style.RESET_ALL)
             return
@@ -239,12 +240,12 @@ class CommunicationManager:
                 if str(review_value).strip().upper() == "PASS":
                     logger.info("%sReview complete with %s. for customer_id: %s%s", Fore.CYAN,review_value, customer_id, Style.RESET_ALL)
                     await self.blob_util.save_string_to_blob(output_folder_path, f"{customer_id}_email.json", draft_email)
-                    await self.blob_util.save_string_to_blob(output_folder_path, f"{customer_id}_email.html", draft_email.body_html)
+                    await self.blob_util.save_string_to_blob(output_folder_path, f"{customer_id}_email.html", "Subject: " + draft_email.subject + "<br>" + draft_email.body_html)
                     await self.blob_util.save_string_to_blob(output_folder_path, f"{customer_id}_research_output.json", email_input_data.extracted_input)
                     break
                 elif i == (self.config.max_iterations-1):
                     logger.info("%s Review complete with %s for customer_id:%s%s", Fore.CYAN, review_value, customer_id, Style.RESET_ALL)
-                    await self.blob_util.save_string_to_blob(output_folder_path, f"{customer_id}_email_{review_value}.html", draft_email.body_html)
+                    await self.blob_util.save_string_to_blob(output_folder_path, f"{customer_id}_email_{review_value}.html","Subject: " + draft_email.subject + "<br>" + draft_email.body_html)
                     await self.blob_util.save_string_to_blob(output_folder_path, f"{customer_id}_email_{review_value}.json", draft_email)
                     await self.blob_util.save_string_to_blob(output_folder_path, f"{customer_id}_research_output.json", email_input_data.extracted_input)
             
@@ -293,7 +294,7 @@ class CommunicationManager:
         contact_list = getattr(research_output, 'contact_list', None)
         if not draft_email:
             logger.info("%sSkipping contact-specific email generation for customer_id: %s. Reason: No draft_email provided.%s", Fore.YELLOW, customer_id, Style.RESET_ALL)
-        elif contact_list and len(contact_list) > 1:
+        elif contact_list and len(contact_list) >= 1:
             multi_contact_input = MultiContactEmailTask(
                 input="Generate contact-specific emails and follow-ups for each contact using the input email provided.",
                 input_email=draft_email,
@@ -312,16 +313,23 @@ class CommunicationManager:
             per_contact_email_obj = self.parse_input(per_contact_email_response.message.content, MultiContactEmailTask)
             if self.is_attribute_present(per_contact_email_obj, 'contact_emails'):
                 for idx, contact_email in enumerate(per_contact_email_obj.contact_emails, 1):
+    
+                    subject = contact_email.email.subject if contact_email.email and hasattr(contact_email.email, 'subject') and contact_email.email.subject else ""
+                    body_html = contact_email.email.body_html if contact_email.email and hasattr(contact_email.email, 'body_html') and contact_email.email.body_html else ""
+                    html_content = f"Subject: {subject}<br>{body_html}"
                     await self.blob_util.save_string_to_blob(
                         output_folder_path,
                         f"{customer_id}_contact_{idx}_email.html",
-                        contact_email.email.body_html if contact_email.email else ""
+                        html_content
                     )
                     for fidx, followup in enumerate(contact_email.follow_up_emails, 1):
+                        subject = followup.subject if followup and hasattr(followup, 'subject') and followup.subject else ""
+                        body_html = followup.body_html if followup and hasattr(followup, 'body_html') and followup.body_html else ""
+                        html_content = f"Subject: {subject}<br>{body_html}"
                         await self.blob_util.save_string_to_blob(
                             output_folder_path,
                             f"{customer_id}_contact_{idx}_followup_{fidx}.html",
-                            followup.body_html if followup else ""
+                            html_content
                         )
             else:
                 logger.info(
@@ -329,7 +337,7 @@ class CommunicationManager:
                     Fore.YELLOW, customer_id, Style.RESET_ALL
                 )
             return per_contact_email_obj.contact_emails
-        else: #single contact
+        else: #single contact # remove later
             logger.info(
                 "%sSkipping contact-specific email generation for customer_id: %s. Reason: Only one contact or draft_email missing. draft_email: %s%s",
                 Fore.YELLOW, customer_id, draft_email, Style.RESET_ALL
@@ -380,7 +388,12 @@ class CommunicationManager:
                     )
 
                     logger.info("%sProcessing customer_id: %s%s", Fore.YELLOW, customer_id, Style.RESET_ALL)
-
+                    # Check if output already exists
+                    output_blob_name = f"{output_folder_path}{customer_id}_feedback.json"
+                    logger.info("%sChecking if output exists: %s%s", Fore.YELLOW, output_blob_name, Style.RESET_ALL)
+                    if not self.config.output_overwrite and await self.blob_util.output_blob_exists(output_blob_name):
+                        logger.info("%sSkipping %s as output already exists: %s%s", Fore.YELLOW, customer_id, output_blob_name, Style.RESET_ALL)
+                        continue
                     # Process the email generation workflow
                     await self._process_email_workflow(input_obj, customer_research, output_folder_path)
                 except Exception as e:

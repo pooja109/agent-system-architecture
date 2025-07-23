@@ -1,6 +1,13 @@
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List, Literal
 
+class CategoryInsight(BaseModel):
+    primary_category: str = Field(..., description="The primary category name.")
+    secondary_categories: Optional[List[str]] = Field(None, description="List of secondary categories under the primary category.")
+    marketing_categories: Optional[List[str]] = Field(None, description="List of marketing categories associated with this primary category.")
+    value: Optional[str] = Field(None, description="Value or spend associated with this category, if available.")
+    opportunity: Optional[str] = Field(None, description="Opportunity or notes for this category, if available.")
+
 class Contact(BaseModel):
     first_name: str = Field(..., description="The contact's first name.")
     last_name: str = Field(..., description="The contact's last name.")
@@ -49,6 +56,10 @@ class ResearchOutput(BaseModel):
     sample_email_body: Optional[str] = Field(None, description="A sample email body for outreach.")
     citations: Optional[List[str]] = Field(None, description="List of citations or references.")
     url_citations: Optional[List[str]] = Field(None, description="List of URLs for external citations.")
+    marketing_and_category_insights: Optional[List[CategoryInsight]] = Field(
+        None,
+        description="Structured list of category insights, each with primary, secondary, and marketing categories, values, and opportunities."
+    )
     company: Optional[Company] = Field(None, description="Company information, if available.")
     account: Optional[Account] = Field(None, description="Account information, if available.")
     other_fields: Optional[Dict[str, Any]] = Field(None, description="Any additional fields or data.")
@@ -57,7 +68,7 @@ class EvaluationFeedback(BaseModel):
     profanity: bool = Field(..., description="True if any offensive or unprofessional language is detected")
     bias: bool = Field(..., description="True if any discriminatory or biased language is found")
     misleading_claims: bool = Field(..., description="True if the email includes exaggerated or unverified claims")
-    aggressive_language: bool = Field(..., description="True if the tone is overly pushy, demanding, or manipulative")
+    aggressive_pushy_language: bool = Field(..., description="True if the tone is overly pushy, demanding, or manipulative")
     privacy_violation: bool = Field(..., description="True if personal or confidential information is exposed")
     tone_misalignment: bool = Field(..., description="True if tone does not align with Staples brand voice")
     sensitive_topics: bool = Field(..., description="True if the email mishandles sensitive topics (e.g., health, politics)")
