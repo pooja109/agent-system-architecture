@@ -42,6 +42,7 @@ DATABRICKS_STATUS_CAT_SCHEMA_NAME = os.getenv("DATABRICKS_STATUS_CAT_SCHEMA_NAME
 status_table_name = f"{DATABRICKS_STATUS_CAT_SCHEMA_NAME}.email_communication_pipeline_dev"
 source_queue_name = "researchagentqueue01"
 queue_name = "communicationagentqueue01"
+MAX_MESSAGES = int(os.getenv("MAX_MESSAGES"))  # Maximum number of messages to process at once
 status_cols = ["batch_id", "run_date", "agent_name", "status", "customer_id", "customer_name", "output_file", "blob_date_folder","created_at"]
 #batch_id, run_date, agent_name, status, output_file, customer_id, customer_name, blob_date_folder, created_at
 
@@ -519,6 +520,9 @@ async def o3call(prompt, reasoning_effort, tools=None, tool_choice="auto", respo
 
 
 
+
+
+
 async def main() -> None:
 
     ###############     Define inputs       ############### 
@@ -627,10 +631,10 @@ async def main() -> None:
 
 
 
-    logger.info("STARTING PROCESSING FOR LOW TOUCH CUSTOMERS from {source_queue_name} queue")
+    logger.info("STARTING PROCESSING FOR LOW TOUCH CUSTOMERS from " + source_queue_name + " queue")
 
     # ==================== Main Execution Loop ====================
-    messages = source_queue_client.receive_messages(max_messages=3, visibility_timeout=300)  # Increased timeout to 5 minutes
+    messages = source_queue_client.receive_messages(max_messages=MAX_MESSAGES, visibility_timeout=300)  # Increased timeout to 5 minutes
     for msg_batch in messages.by_page():
         for msg in msg_batch:
             # Store the message reference for deletion
