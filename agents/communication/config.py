@@ -45,7 +45,7 @@ class CommunicationConfig:
         self.output_folder_name = os.getenv("AZURE_STORAGE_OUTPUT_FOLDER_NAME", "communication_output/")
         self.output_custom_folder = os.getenv("AZURE_STORAGE_OUTPUT_CUSTOM_FOLDER", "")
         self.output_overwrite = os.getenv("AZURE_STORAGE_OUTPUT_OVERWRITE", "False").lower() == "true"
-        self.max_iterations = 2
+        self.max_iterations = int(os.getenv("REVIEW_EMAIL_MAX_ITERATIONS", "2"))
         self.connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
         self.queue_name = os.getenv("AZURE_EMAIL_INPUT_QUEUE")
         self.dead_letter_queue = os.getenv("AZURE_EMAIL_INPUT_DLQ", None)

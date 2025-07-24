@@ -8,6 +8,7 @@ from typing import List
 from dotenv import load_dotenv
 from azure.core.exceptions import AzureError
 
+from agents.communication.blob_util import BlobUtil
 from agents.communication.config import LoggingConfig
 from utils.azurequeuehelper import AzureQueueHelper
 from utils.agentloghelper import AgentBatchRecord, createRecords, serializeRecords
@@ -22,6 +23,7 @@ LoggingConfig.configure_logging()
 class CommunicationQueue:
     def __init__(self):
         self.mgr = CommunicationManager()
+        self.blob_util = self.mgr.get_blob_util()
         # Initialize listener_queue from environment variables
         self.listener_queue = AzureQueueHelper(
             connection_string=os.getenv("AZURE_STORAGE_CONNECTION_STRING"),
@@ -56,17 +58,22 @@ class CommunicationQueue:
         Initializes the AzureQueueHelper, sends messages, and processes the queue in a loop.
         """
         #self.send_test_message()
-
-        # Continuously poll and process the queue
-        while True:
+        try:
+            # Continuously poll and process the queue
+            while True:
+                try:
+                    logging.info("🔄 Processing queue...")
+                    await self.listener_queue.process_queue(handler=self.process_logic, max_retry=100, batch_size=10)
+                except Exception as e:
+                    logging.error(f"Error processing queue: {e}")
+                finally:
+                    logging.info("⏳ Waiting before next poll...")
+                    await asyncio.sleep(2000)  # 2 seconds
+        finally:
             try:
-                logging.info("🔄 Processing queue...")
-                await self.listener_queue.process_queue(handler=self.process_logic, max_retry=3, batch_size=10)
-            except Exception as e:
-                logging.error(f"Error processing queue: {e}")
-            finally:
-                logging.info("⏳ Waiting before next poll...")
-                await asyncio.sleep(2000)  # 2 seconds
+                await self.blob_util.close()                
+            except Exception as cleanup_error:
+                logging.error(f"Error during resource cleanup: {cleanup_error}")
 
 if __name__ == "__main__":
     queue = CommunicationQueue()

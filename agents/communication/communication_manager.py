@@ -311,9 +311,14 @@ class CommunicationManager:
             logger.info("%sContact-specific email generation time: %.3f seconds%s", Fore.MAGENTA, per_contact_email_duration, Style.RESET_ALL)
             
             per_contact_email_obj = self.parse_input(per_contact_email_response.message.content, MultiContactEmailTask)
+            if per_contact_email_obj is None:
+                logger.error(
+                    "%sFailed to parse MultiContactEmailTask for customer_id: %s. Response: %s%s",
+                    Fore.RED, customer_id, per_contact_email_response.message.content, Style.RESET_ALL
+                )
+                return []
             if self.is_attribute_present(per_contact_email_obj, 'contact_emails'):
                 for idx, contact_email in enumerate(per_contact_email_obj.contact_emails, 1):
-    
                     subject = contact_email.email.subject if contact_email.email and hasattr(contact_email.email, 'subject') and contact_email.email.subject else ""
                     body_html = contact_email.email.body_html if contact_email.email and hasattr(contact_email.email, 'body_html') and contact_email.email.body_html else ""
                     html_content = f"Subject: {subject}<br>{body_html}"
@@ -331,12 +336,13 @@ class CommunicationManager:
                             f"{customer_id}_contact_{idx}_followup_{fidx}.html",
                             html_content
                         )
+                return per_contact_email_obj.contact_emails
             else:
                 logger.info(
                     "%sSkipping contact-specific email generation for customer_id: %s. Reason: No contact_emails found in response.%s",
                     Fore.YELLOW, customer_id, Style.RESET_ALL
                 )
-            return per_contact_email_obj.contact_emails
+                return []
         else: #single contact # remove later
             logger.info(
                 "%sSkipping contact-specific email generation for customer_id: %s. Reason: Only one contact or draft_email missing. draft_email: %s%s",
