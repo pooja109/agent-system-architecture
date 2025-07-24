@@ -10,6 +10,8 @@ from azure.identity import DefaultAzureCredential
 
 
 
+
+
 # Add the project root to Python path so we can import utils
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
 sys.path.insert(0, project_root)
@@ -87,6 +89,11 @@ async def main() -> None:
         
     BATCH_ID = datetime.now().strftime("%Y%m%d%H%M%S")
     queue_name = "researchagentqueue01"
+    DATABRICKS_STATUS_CAT_SCHEMA_NAME = os.getenv("DATABRICKS_STATUS_CAT_SCHEMA_NAME")
+    DATABRICKS_I2A_CAT_SCHEMA_NAME = os.getenv("DATABRICKS_I2A_CAT_SCHEMA_NAME")
+    DATABRICKS_TXN_CAT_SCHEMA_NAME = os.getenv("DATABRICKS_TXN_CAT_SCHEMA_NAME")
+    DATABRICKS_DNB_CAT_SCHEMA_NAME = os.getenv("DATABRICKS_DNB_CAT_SCHEMA_NAME")
+    DATABRICKS_MKT_CAT_SCHEMA_NAME = os.getenv("DATABRICKS_MKT_CAT_SCHEMA_NAME")
 
     # Creating a separate logger for this module
     logger = logging.getLogger(__name__)
@@ -101,22 +108,38 @@ async def main() -> None:
     logger.addHandler(stream_handler)  
 
     
+    i2a_table_name = f"{DATABRICKS_I2A_CAT_SCHEMA_NAME}.i2a_lowtouch"
+    txn_table_name = f"{DATABRICKS_TXN_CAT_SCHEMA_NAME}.i2a_lowtouch_sls_cnct_lvl_t"
+    dnb_table_name = f"{DATABRICKS_DNB_CAT_SCHEMA_NAME}.i2a_lowtouch_dnb_account_source_t"  
+    marketing_table_name = f"{DATABRICKS_MKT_CAT_SCHEMA_NAME}.marketing_category_hierarchy"
+    i2a_marketing_table_name = f"{DATABRICKS_MKT_CAT_SCHEMA_NAME}.i2a_to_marketing_category_map" 
+    status_table_name = f"{DATABRICKS_STATUS_CAT_SCHEMA_NAME}.email_communication_pipeline_dev"
+
+    print(i2a_table_name, "; ", txn_table_name, "; ", dnb_table_name, "; ", marketing_table_name, "; ", i2a_marketing_table_name, "; ", status_table_name)
+
     logger.info("Getting data from Databricks...")
     try:
         sql_i2a = "select * from " \
-        "(select * from snowflake_ml_dev.mlops.i2a_lowtouch WHERE VERTICAL =='Commercial' AND CUST_ID in (select distinct cust_id from snowflake_ml_dev.mlops.i2a_lowtouch_sls_cnct_lvl_t) LIMIT 10) Comm " \
+        "(select * from " + i2a_table_name + " WHERE VERTICAL =='Commercial' AND CUST_ID in (select distinct cust_id from " + txn_table_name + ") LIMIT 10) Comm " \
         "UNION " \
-        "select * from (select * from snowflake_ml_dev.mlops.i2a_lowtouch WHERE VERTICAL =='Healthcare' AND CUST_ID in (select distinct cust_id from snowflake_ml_dev.mlops.i2a_lowtouch_sls_cnct_lvl_t) LIMIT 5) Health " \
+        "select * from (select * from " + i2a_table_name + " WHERE VERTICAL =='Healthcare' AND CUST_ID in (select distinct cust_id from " + txn_table_name + ") LIMIT 5) Health " \
         "UNION " \
-        "SELECT * from (select * from snowflake_ml_dev.mlops.i2a_lowtouch WHERE VERTICAL =='Sled' AND CUST_ID in (select distinct cust_id from snowflake_ml_dev.mlops.i2a_lowtouch_sls_cnct_lvl_t) LIMIT 5) Sled"
+        "SELECT * from (select * from " + i2a_table_name + " WHERE VERTICAL =='Sled' AND CUST_ID in (select distinct cust_id from " + txn_table_name + ") LIMIT 5) Sled"
 
-        sql_txn = "select * from snowflake_ml_dev.mlops.i2a_lowtouch_sls_cnct_lvl_t where cust_id in (select distinct cust_id from snowflake_ml_dev.mlops.i2a_lowtouch)"    
+        sql_txn = "select * from " + txn_table_name + " where cust_id in (select distinct cust_id from " + i2a_table_name + ")"
 
-        sql_dnb = "select distinct cust_id, business_name, website from snowflake_ml_dev.mlops.i2a_lowtouch_dnb_account_source_t where cust_id in (select distinct cust_id from snowflake_ml_dev.mlops.i2a_lowtouch)"
+        sql_dnb = "select distinct cust_id, business_name, website from " + dnb_table_name + " where cust_id in (select distinct cust_id from " + i2a_table_name + ")"
 
-        sql_marketing = "select * from mld01_sandbox_de.ai_garage.marketing_category_hierarchy"
+        sql_marketing = "select * from " + marketing_table_name
 
-        sql_i2a_marketing = "select * from mld01_sandbox_de.ai_garage.i2a_to_marketing_category_map"
+        sql_i2a_marketing = "select * from " + i2a_marketing_table_name
+
+        #print("sql_i2a: ", sql_i2a)
+        #print("sql_txn: ", sql_txn)
+        #print("sql_dnb: ", sql_dnb)
+        #print("sql_marketing: ", sql_marketing)
+        #print("sql_i2a_marketing: ", sql_i2a_marketing)
+
 
         df_i2a = await get_data_from_databricks(sql_i2a)
         df_txn = await get_data_from_databricks(sql_txn)
@@ -289,9 +312,12 @@ async def main() -> None:
             cust_name,
             datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         )]
-
-        await update_status_in_databricks(status_cols=status_cols, status_vals=status_vals, table_name="mld01_sandbox_de.ai_garage.email_communication_pipeline_dev", status="S")
-        logger.info(f"Status updated in Databricks for customer {b_cust}")
+        try:
+            await update_status_in_databricks(status_cols=status_cols, status_vals=status_vals, table_name=status_table_name, status="S")
+            logger.info(f"Status updated in Databricks for customer {b_cust}")
+        except Exception as e:
+            logger.error(f"Error updating status in Databricks for customer {b_cust}: {e}")
+        
 
 
 

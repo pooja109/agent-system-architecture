@@ -38,10 +38,12 @@ STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
 AI_FOUNDRY_ENDPOINT = os.getenv("ST_AI_FOUNDRY_ENDPOINT")
 AI_FOUNDRY_API_KEY = os.getenv("ST_AI_FOUNDRY_API_KEY")
 BING_CONNECTION_NAME = os.environ["ST_BING_CONNECTION_NAME"]  # Default connection name for Bing Grounding Tool
+DATABRICKS_STATUS_CAT_SCHEMA_NAME = os.getenv("DATABRICKS_STATUS_CAT_SCHEMA_NAME")
+status_table_name = f"{DATABRICKS_STATUS_CAT_SCHEMA_NAME}.email_communication_pipeline_dev"
 source_queue_name = "researchagentqueue01"
 queue_name = "communicationagentqueue01"
-
-
+status_cols = ["batch_id", "run_date", "agent_name", "status", "customer_id", "customer_name", "output_file", "blob_date_folder","created_at"]
+#batch_id, run_date, agent_name, status, output_file, customer_id, customer_name, blob_date_folder, created_at
 
 # ===================== Logging Configuration ====================
 
@@ -892,8 +894,9 @@ async def main() -> None:
                 
                 #file name and path
                 current_datetime = datetime.now()
+                folder_name = current_datetime.strftime("%Y%m%d")
                 #research_file = "research_output\\" + current_datetime.strftime("%Y%m%d") + "\\" + b_cust + current_datetime.strftime("_%Y-%m-%d_%H-%M-%S")+".md"
-                research_file = current_datetime.strftime("%Y%m%d") + "\\" + b_cust + "\\research_output\\" + b_cust + current_datetime.strftime("_%Y-%m-%d_%H-%M-%S")+".md"
+                research_file =  folder_name + "\\" + b_cust + "\\research_output\\" + b_cust + current_datetime.strftime("_%Y-%m-%d_%H-%M-%S")+".md"
 
                 logger.info(f"START: SAVING RESEARCH REPORT: {research_file}")
                 
@@ -905,11 +908,12 @@ async def main() -> None:
                 logger.info(f"END: SAVING RESEARCH REPORT: {research_file}")
 
                 logger.info("START: PUSHING THE MESSAGE TO QUEUE")
-
+                
+                run_date = current_datetime.strftime("%Y-%m-%d %H:%M:%S")
                 # Send the research report to the Azure Storage Queue
                 research_msg = {
                     "batch_id": BATCH_ID,
-                    "run_date": current_datetime.strftime("%Y-%m-%d %H:%M:%S"),
+                    "run_date": run_date,
                     "agent_name": RESEARCH_AGENT_NAME,
                     "status": "S",
                     "cust_id": b_cust,
@@ -930,6 +934,30 @@ async def main() -> None:
 
                 logger.info("END: PUSHING THE MESSAGE TO QUEUE")
 
+                logger.info(f"START: UPDATE STATUS IN DATABRICKS for customer {b_cust}")
+                
+                # Update the status in Databricks
+                status_vals = [(
+                    int(BATCH_ID),
+                    run_date,
+                    RESEARCH_AGENT_NAME,
+                    "S",
+                    b_cust,
+                    cust_name,
+                    research_file,
+                    folder_name,
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                )]
+
+                #status_cols = ["batch_id", "run_date", "agent_name", "status", "customer_id", "customer_name", "output_file", "blob_date_folder","created_at"]
+                try:
+                    await update_status_in_databricks(status_cols=status_cols, status_vals=status_vals, table_name=status_table_name, status="S")
+                    logger.info(f"END: UPDATE STATUS IN DATABRICKS for customer {b_cust}")
+                except Exception as e:
+                    logger.error(f"Error updating status in Databricks for customer {b_cust}: {e}")
+                
+                
+                
                 logger.info("END: PROCESSING CUSTOMER ID: %s", cust)
                 logger.info("=" * 100)
             except Exception as e:
