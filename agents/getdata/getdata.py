@@ -52,6 +52,33 @@ async def get_data_from_databricks(query: str) -> pd.DataFrame:
 
 
 
+async def update_status_in_databricks(status_cols, status_vals, table_name, status):
+    st_cols =  ({', '.join(status_cols)})
+    st_vals =  status_vals.__str__().replace("[(","(").replace(")]",")")
+    #print(f"INSERT INTO {table_name} ({', '.join(status_cols)}) VALUES {st_vals}") 
+    #print(f"INSERT INTO {table_name} ({', '.join(status_cols)}) VALUES ({', '.join(['%s'] * len(status_vals))})", status_vals)
+    try:
+        # Establish a connection to Databricks
+        with sql.connect(
+            server_hostname=os.getenv("DATABRICKS_SERVER_HOSTNAME"),
+            http_path=os.getenv("DATABRICKS_HTTP_PATH"),
+            access_token=os.getenv("DATABRICKS_TOKEN")
+        ) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(f"INSERT INTO {table_name} ({', '.join(status_cols)}) VALUES {st_vals}")
+
+                connection.commit()
+                print(f"Updated execution status in {table_name} successfully.")
+        
+    except Exception as e:
+        print(f"Error updating execution status into {table_name}: {e}")
+        raise e    
+
+
+
+
+
+
 
 async def main() -> None:
     
@@ -149,15 +176,30 @@ async def main() -> None:
             logger.error(f"❌ Failed to connect to queue '{queue_name}': {e}")
             raise
 
+    status_cols = [
+    "batch_id",
+    "run_date",
+    "agent_name",
+    "status",
+    "customer_id",
+    "customer_name",
+    "created_at"
+    ]
+    
+    
+    
     # ==================== Main Execution Loop ====================
     for cust in df_i2a['CUST_ID']:
         logger.info("PROCESSING CUSTOMER ID: %s", cust)
                 
         b_cust = f"{cust}"
         
+
         filtered_df = df_i2a[df_i2a['CUST_ID'] == b_cust]               # Filtered I2A Data for the specific customer
         filtered_txn_df = df_txn[df_txn['CUST_ID'] == b_cust]           # Filtered Transaction Data for the specific customer
         filtered_dnb_df = df_dnb[df_dnb['cust_id'] == b_cust]           # Filtered DNB Data for the specific customer
+
+        cust_name = filtered_df['CUST_NAME'].values[0] if not filtered_df.empty else None
 
         if not filtered_df['PRIMARY_CAT_1'].values[0] is None :
             cat1 = filtered_df['PRIMARY_CAT_1'].values[0]
@@ -216,10 +258,11 @@ async def main() -> None:
         marketing_json = filtered_marketing_df.to_json(orient='records') if not filtered_marketing_df.empty else "[]"
         #i2a_marketing_json = df_i2a_marketing.to_json(orient='records') if not df_i2a_marketing.empty else "[]"
 
+        run_date = current_datetime.strftime("%Y-%m-%d %H:%M:%S")
         # Create a json object for the customer with details from each DataFrame
         customer_data = {
             "batch_id": BATCH_ID,
-            "run_date": current_datetime.strftime("%Y-%m-%d %H:%M:%S"),
+            "run_date": run_date,
             "agent_name": "dbDataAgent",
             "status": "S",
             "customer_id": b_cust,
@@ -236,7 +279,19 @@ async def main() -> None:
             logger.error(f"Error pushing message to queue '{queue_name}' for customer {b_cust}: {e}")
         
 
+        # Update the status in Databricks
+        status_vals = [(
+            int(BATCH_ID),
+            run_date,
+            "dbDataAgent",
+            "S",
+            b_cust,
+            cust_name,
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        )]
 
+        await update_status_in_databricks(status_cols=status_cols, status_vals=status_vals, table_name="mld01_sandbox_de.ai_garage.email_communication_pipeline_dev", status="S")
+        logger.info(f"Status updated in Databricks for customer {b_cust}")
 
 
 
