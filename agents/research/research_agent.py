@@ -32,16 +32,20 @@ client = AzureOpenAI(api_version=os.getenv("ST_API_VERSION"),
 RESEARCH_AGENT_NAME = "Research_Agent"  # The agent name to use for the research agent - chat completion
 FORMAT_AGENT_NAME = "Markdown_Agent"  # The agent name to use for formatting the content in a markdown format
 AGENT_NAME = "Bing_Search_Assistant"  # The agent name to use for the Bing Search Assistant
+REASONING_MODEL_NAME = os.getenv("REASONING_MODEL_NAME", "o3")  # The reasoning model name to use for the o3 reasoning model
+
 BATCH_ID = datetime.now().strftime("%Y%m%d%H%M%S")  # Batch ID for the run, based on current date and time
 CONTAINER_NAME = os.getenv("AZURE_CONTAINER_NAME")
 STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
 AI_FOUNDRY_ENDPOINT = os.getenv("ST_AI_FOUNDRY_ENDPOINT")
 AI_FOUNDRY_API_KEY = os.getenv("ST_AI_FOUNDRY_API_KEY")
 BING_CONNECTION_NAME = os.environ["ST_BING_CONNECTION_NAME"]  # Default connection name for Bing Grounding Tool
-DATABRICKS_STATUS_CAT_SCHEMA_NAME = os.getenv("DATABRICKS_STATUS_CAT_SCHEMA_NAME")
-status_table_name = f"{DATABRICKS_STATUS_CAT_SCHEMA_NAME}.email_communication_pipeline_dev"
-source_queue_name = "researchagentqueue01"
-queue_name = "communicationagentqueue01"
+DATABRICKS_STATUS_CATALOG_NAME = os.getenv("DATABRICKS_STATUS_CATALOG_NAME")
+DATABRICKS_STATUS_SCHEMA_NAME = os.getenv("DATABRICKS_STATUS_SCHEMA_NAME")
+DATABRICKS_STATUS_TABLE_NAME = os.getenv("DATABRICKS_STATUS_TABLE_NAME")
+status_table_name = f"{DATABRICKS_STATUS_CATALOG_NAME}.{DATABRICKS_STATUS_SCHEMA_NAME}.{DATABRICKS_STATUS_TABLE_NAME}"
+source_queue_name = os.getenv("AZURE_SRC_QUEUE_NAME")  # Source queue name for the research agent
+queue_name = os.getenv("AZURE_TGT_QUEUE_NAME")  # Target queue name for the research agent
 MAX_MESSAGES = int(os.getenv("MAX_MESSAGES"))  # Maximum number of messages to process at once
 status_cols = ["batch_id", "run_date", "agent_name", "status", "customer_id", "customer_name", "output_file", "blob_date_folder","created_at"]
 #batch_id, run_date, agent_name, status, output_file, customer_id, customer_name, blob_date_folder, created_at
@@ -193,12 +197,13 @@ async def get_bing_search_results(query: str):
         # Print the Agent's response message with optional citation
         response_message = agents_client.messages.get_last_message_by_role(thread_id=thread.id, role=MessageRole.AGENT)
         if response_message:
+            #logger.info(f"Agent response message ID: {response_message}")
             for text_message in response_message.text_messages:
                 print(f"Agent response: {text_message.text.value}")
-                search_results = text_message.text.value
+                search_results += text_message.text.value + "\n"
             for annotation in response_message.url_citation_annotations:
                 print(f"URL Citation: [{annotation.url_citation.title}]({annotation.url_citation.url})")
-                search_citations = "\n\nURL Citation:\n" + annotation.url_citation.title + " : " + annotation.url_citation.url
+                search_citations += "\n\nURL Citation:\n" + annotation.url_citation.title + " : " + annotation.url_citation.url
     
     
     return search_results, search_citations
@@ -309,12 +314,12 @@ async def format_content(content: str) -> str:
                         name=FORMAT_AGENT_NAME,
                         instructions="""You are an assistant that formats this markdown better without changing any of the content. The idea is to use this markdown in a presentation to executives. 
                         Need it to be visually appealing and easy to read. Do not change any content or add any new content. 
-                        Do not change the names of Primary Categories, Secondary Categories, Marketing Categories. Show them in a table format.
+                        Do not change the names of Categories. Show them in a single tables.
                         Just format the content better.""",
                 )
                 print(f"Created agent, ID: {agent.id}")
 
-
+                #Do not change the names of Primary Categories, Secondary Categories, Marketing Primary Categories. Show them in a table format.
 #           agent = project.agents.get_agent(FORMAT_AGENT_NAME)
 
             # Create thread for communication
@@ -424,7 +429,7 @@ async def o3call(prompt, reasoning_effort, tools=None, tool_choice="auto", respo
     
     # Create the base parameters for the API call
     params = {
-        "model": "o3",
+        "model": "{REASONING_MODEL_NAME}",
         "messages": [
             {
                 "role": "user", 
@@ -630,11 +635,13 @@ async def main() -> None:
 
 
 
-
+    
     logger.info("STARTING PROCESSING FOR LOW TOUCH CUSTOMERS from " + source_queue_name + " queue")
 
     # ==================== Main Execution Loop ====================
     messages = source_queue_client.receive_messages(max_messages=MAX_MESSAGES, visibility_timeout=300)  # Increased timeout to 5 minutes
+    #messages = source_queue_client.receive_messages(max_messages=10, visibility_timeout=300)  # execute for 10 customers at a time
+    
     for msg_batch in messages.by_page():
         for msg in msg_batch:
             # Store the message reference for deletion
@@ -644,17 +651,17 @@ async def main() -> None:
             try:
                 data = json.loads(msg.content)
                 cust = data.get("customer_id", "Unknown")
-                print(f"Processing message: {data}")
+                #print(f"Processing message: {data}")
             except json.JSONDecodeError:
                 print(f"⚠️ Invalid JSON, deleting: {msg.content}")
                 try:
                     source_queue_client.delete_message(message_to_delete)
-                    print("✅ Deleted invalid JSON message")
+                    logger.error("✅ Deleted invalid JSON message")
                 except Exception as delete_error:
-                    print(f"❌ Failed to delete invalid message: {delete_error}")
+                    logger.error(f"❌ Failed to delete invalid message: {delete_error}")
                 continue
             except Exception as e:
-                print(f"❌ Error processing message: {e}. Message will retry.")
+                logger.error(f"❌ Error processing message: {e}.")
                 continue
             
             # Convert the data to DataFrames
@@ -703,7 +710,7 @@ async def main() -> None:
                 else:
                     marketing_data = pd.DataFrame()
             except Exception as e:
-                print(f"❌ Error converting data to DataFrame: {e}. ")
+                logger.error(f"❌ Error converting data to DataFrame: {e}. ")
                 continue
     
             # Let the service know we're finished with the message and it can be safely deleted.
@@ -778,9 +785,10 @@ async def main() -> None:
                     query = f"Show me the latest news from past 3 months from {curr_date}, for {cust_name}, a company operating in the {cust_industry} industry. "
                 
                 if cust_website is not None and cust_website != "": 
-                    query += "You could also search their website {cust_website} for the latest news."
+                    query += "You could also search their website "+ cust_website + " for the latest news."
                 
                 logger.info("START: BING SEARCH")
+                logger.info(f"Querying Bing Search with query: {query}")
                 search_results , search_citations = await get_bing_search_results(query=query)  # Get Bing Search results
                 
                 logger.info("END: BING SEARCH")
@@ -789,6 +797,7 @@ async def main() -> None:
                 search_results = "No search results found."
                 search_citations = "No citations found."
                 msg = "Bing Search failed, using default message."
+                logger.info("END: BING SEARCH")
 
             contacts = transactions_data[['SF_ACCOUNT_ID', 'SF_CONTACT_ID', 'FIRST_NAME', 'LAST_NAME','EMAIL']].drop_duplicates()
             categories = i2a_data[['PRIMARY_CAT_1', 'PRIMARY_CAT_2', 'PRIMARY_CAT_3',
@@ -931,9 +940,9 @@ async def main() -> None:
                 # Let the service know we're finished with the message and it can be safely deleted.
                 try:
                     source_queue_client.delete_message(message_to_delete)
-                    logger.info(f"✅ Successfully deleted message for customer {b_cust}")
+                    logger.info(f"✅ Successfully deleted message for customer {b_cust} from source queue {source_queue_name} after processing.")
                 except Exception as delete_error:
-                    logger.error(f"❌ Failed to delete message for customer {b_cust}: {delete_error}")
+                    logger.error(f"❌ Failed to delete message for customer {b_cust} from source queue {source_queue_name} : {delete_error}")
                     # Continue processing anyway since the main work is done
 
                 logger.info("END: PUSHING THE MESSAGE TO QUEUE")
