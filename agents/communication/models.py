@@ -132,3 +132,10 @@ class CommunicationOutput(BaseModel):
     final_evaluation: EvaluationFeedback = Field(None, description="Final evaluation for the communication.")
     contact_emails: List[ContactEmail] = Field(default_factory=list, description="List of emails generated for each contact.")
 
+class DatabricksSettings(BaseModel):
+    server_hostname: str = Field(..., description="Databricks server hostname")
+    http_path: str = Field(..., description="Databricks HTTP path")
+    access_token: str = Field(..., description="Databricks access token")
+    catalog: str = Field(..., description="Databricks catalog name")
+    schema: str = Field(..., description="Databricks schema name")
+    table_suffix: str = Field(default="", description="Table suffix for environments")

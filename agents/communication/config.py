@@ -6,6 +6,8 @@ import logging
 import sys
 import os
 from dotenv import load_dotenv
+from models import DatabricksSettings
+from datetime import datetime, date
 
 # Load environment variables
 load_dotenv()
@@ -49,6 +51,15 @@ class CommunicationConfig:
         self.connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
         self.queue_name = os.getenv("AZURE_EMAIL_INPUT_QUEUE")
         self.dead_letter_queue = os.getenv("AZURE_EMAIL_INPUT_DLQ", None)
+        self.databricks_settings = DatabricksSettings(
+            server_hostname=os.getenv("DATABRICKS_SERVER_HOSTNAME", ""),
+            http_path=os.getenv("DATABRICKS_HTTP_PATH", ""),
+            access_token=os.getenv("DATABRICKS_ACCESS_TOKEN", ""),
+            catalog=os.getenv("DATABRICKS_CATALOG", ""),
+            schema=os.getenv("DATABRICKS_SCHEMA", ""),
+            table_suffix=os.getenv("DATABRICKS_TABLE_SUFFIX", "")
+        )
+
         # Sender details configuration
         self.sender_details = """Sender details : 
         Victoria Grant
@@ -60,7 +71,6 @@ class CommunicationConfig:
     @property
     def output_folder_prefix(self):
         """Get the output folder prefix based on configuration and current date."""
-        from datetime import datetime
         if self.output_custom_folder:
             return self.output_custom_folder
         else:
@@ -71,7 +81,6 @@ class CommunicationConfig:
         Get the output folder prefix using a run_date (str or date) from the data object.
         If output_custom_folder is set, use that. Otherwise, use run_date formatted as YYYYMMDD.
         """
-        from datetime import datetime, date
         if self.output_custom_folder:
             return self.output_custom_folder
         if isinstance(run_date, str):

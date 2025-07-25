@@ -23,7 +23,8 @@ LoggingConfig.configure_logging()
 class CommunicationQueue:
     def __init__(self):
         self.mgr = CommunicationManager()
-        self.blob_util = self.mgr.get_blob_util()
+        self.blob_util = self.mgr.get_blob_util
+        self.databricks_client = self.mgr.get_databricks_client
         # Initialize listener_queue from environment variables
         self.listener_queue = AzureQueueHelper(
             connection_string=os.getenv("AZURE_STORAGE_CONNECTION_STRING"),
@@ -62,12 +63,14 @@ class CommunicationQueue:
             # Continuously poll and process the queue
             while True:
                 try:
+                    self.databricks_client.connect()
                     logging.info("🔄 Processing queue...")
                     await self.listener_queue.process_queue(handler=self.process_logic, max_retry=100, batch_size=10)
                 except Exception as e:
                     logging.error(f"Error processing queue: {e}")
                 finally:
                     logging.info("⏳ Waiting before next poll...")
+                    self.databricks_client.disconnect()# disconnect databricks connection after each batch
                     await asyncio.sleep(2000)  # 2 seconds
         finally:
             try:

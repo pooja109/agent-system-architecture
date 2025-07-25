@@ -14,6 +14,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
 
+from agents.communication.database.databricks_client import DatabricksClient
 from config import CommunicationConfig
 from blob_util import BlobUtil
 from agent_manager import AgentManager
@@ -27,11 +28,13 @@ from models import (
 
 from utils.azurequeuehelper import AzureQueueHelper
 from utils.models import AgentBatchRecord
+import datetime
 
 
 logger = logging.getLogger(__name__)
 
 class CommunicationManager:
+    
 
     
     
@@ -44,6 +47,7 @@ class CommunicationManager:
         self.queue_helper = AzureQueueHelper(self.config.connection_string, 
                                              self.config.queue_name, 
                                              self.config.dead_letter_queue)
+        self.databricks_client = DatabricksClient(self.config.databricks_settings)
 
     @property
     def queue_helper_instance(self):
@@ -51,6 +55,10 @@ class CommunicationManager:
         return self.queue_helper
     """Main manager class for the communication agent workflow."""
 
+    @property
+    def get_databricks_client(self):
+        """Get databricks client"""
+        return self.databricks_client
     @property
     def get_blob_util(self):
         """Get the BlobUtil instance for Azure Blob Storage operations."""
@@ -117,53 +125,9 @@ class CommunicationManager:
         if not self.agents_created:
             await self.agent_manager.create_agents()
             self.agents_created = True
-    
-    async def process_single_blob(self, blob, prefix: str) -> None:
-        """Process a single blob file."""
-        filename = blob.name[len(prefix):] if blob.name.startswith(prefix) else blob.name
-        blob_processing_start_time = time.time()
-        
-        if not filename.endswith(".md"):
-            return
-        
-        # Extract customer ID from filename
-        base_filename = filename.split("/")[-1]
-        base_filename_no_ext = base_filename.rsplit(".", 1)[0]
-        customer_id = base_filename_no_ext.split("_")[0]
-        
-        # Read customer research from blob
-        customer_research = await self.blob_util.read_from_blob(blob.name)
-        if self.config.sender_details:
-            customer_research = customer_research + "\n\n" + self.config.sender_details
-        
-        # Set up output paths
-        output_folder_path = f"{self.config.output_folder_prefix}/{customer_id}/{self.config.output_folder_name}"
-        output_blob_name = f"{output_folder_path}{customer_id}_feedback.json"
-        
-        # Check if output already exists
-        logger.info("%sChecking if output exists: %s%s", Fore.YELLOW, output_blob_name, Style.RESET_ALL)
-        if not self.config.output_overwrite and await self.blob_util.output_blob_exists(output_blob_name):
-            logger.info("%sSkipping %s as output already exists: %s%s", Fore.YELLOW, filename, output_blob_name, Style.RESET_ALL)
-            return
-        
-        # Create input object
-        input_obj = EmailTask(
-            input="generate email for customer using the context data provided in instructions in the prompt",
-            draft_email=Email(subject="", body_html=""),
-            current_agent_name="User",
-            customer_id=customer_id,
-            customer_research=customer_research,
-        )
-        
-        logger.info("%sProcessing file: %s%s", Fore.YELLOW, filename, Style.RESET_ALL)
-        
-        # Process the email generation workflow
-        await self._process_email_workflow(input_obj, customer_research, output_folder_path)
-        
-        blob_processing_duration = time.time() - blob_processing_start_time
-        logger.info("%s⏱️  Blob processing time: %.3f seconds%s", Fore.CYAN, blob_processing_duration, Style.RESET_ALL)
-    
-    async def _process_email_workflow(self, input_obj: EmailTask, customer_research: str, output_folder_path: str):
+
+
+    async def _process_email_workflow(self, input_obj: EmailTask, customer_research: str, output_folder_path: str, record: AgentBatchRecord, output_folder_prefix: str):
         """Process the email generation workflow for a single customer."""
         agents = self.agent_manager.get_agents()
         data_extractor_agent, email_generator_agent, email_review_agent, per_contact_email_agent = agents
@@ -173,8 +137,21 @@ class CommunicationManager:
         thread = None
         customer_id = input_obj.customer_id
         research_output=None
+        is_reviewed = False
+        final_review_comments = ""
+        status = "F"
+        customer_name = ""
         
         try:
+            # Extract batch_id and run_date from record
+            batch_id = getattr(record, 'batch_id', None) if record else None
+            run_date = getattr(record, 'run_date', None) if record else None
+            input_file_path = getattr(record, 'agent_output_path', None) if record else None
+            
+            if batch_id is None or run_date is None:
+                logger.error(f"Missing batch_id or run_date in AgentBatchRecord for customer_id: {input_obj.customer_id}")
+                # Optionally raise or continue
+                # raise ValueError("Missing batch_id or run_date in AgentBatchRecord")
             # Data extraction
             task = ChatMessageContent(role=AuthorRole.USER, content=input_obj.model_dump_json())
             data_extractor_start = time.time()
@@ -186,7 +163,7 @@ class CommunicationManager:
             logger.info("%sStart Thread id: %s%s", Fore.GREEN, thread.id, Style.RESET_ALL)
             research_output = self.parse_input(response.message.content, ResearchOutput)
             customer_id = research_output.customer_id if research_output and hasattr(research_output, 'customer_id') else customer_id
-            
+            customer_name = getattr(research_output, 'customer_name', None) if research_output else None
             # Email generation and review loop
             email_drafts_obj = EmailDrafts(drafts=email_drafts, evaluations=review_comments_list)
             review_iteration_start = time.time()
@@ -242,13 +219,17 @@ class CommunicationManager:
                     await self.blob_util.save_string_to_blob(output_folder_path, f"{customer_id}_email.json", draft_email)
                     await self.blob_util.save_string_to_blob(output_folder_path, f"{customer_id}_email.html", "Subject: " + draft_email.subject + "<br>" + draft_email.body_html)
                     await self.blob_util.save_string_to_blob(output_folder_path, f"{customer_id}_research_output.json", email_input_data.extracted_input)
+                    is_reviewed=True
+                    status = "S"
                     break
                 elif i == (self.config.max_iterations-1):
                     logger.info("%s Review complete with %s for customer_id:%s%s", Fore.CYAN, review_value, customer_id, Style.RESET_ALL)
                     await self.blob_util.save_string_to_blob(output_folder_path, f"{customer_id}_email_{review_value}.html","Subject: " + draft_email.subject + "<br>" + draft_email.body_html)
                     await self.blob_util.save_string_to_blob(output_folder_path, f"{customer_id}_email_{review_value}.json", draft_email)
                     await self.blob_util.save_string_to_blob(output_folder_path, f"{customer_id}_research_output.json", email_input_data.extracted_input)
-            
+                    is_reviewed=False
+                    status = "F"
+            final_review_comments=review_comments.feedback
             review_iteration_duration = time.time() - review_iteration_start
             logger.info("%s⏱️  Review loop completed after %d iteration(s) in %.3f seconds%s", Fore.MAGENTA, (i + 1) if i is not None else 0, review_iteration_duration, Style.RESET_ALL)
             
@@ -273,12 +254,93 @@ class CommunicationManager:
             # Save feedback
             await self.blob_util.save_string_to_blob(output_folder_path, customer_id+"_feedback.json", email_drafts_obj.model_dump())
             await self.blob_util.save_string_to_blob(output_folder_path, customer_id+"_comm_output.json", comm_output.model_dump())
+
+            # Prepare values for DB insert, with error handling for missing values
+            agent_name = "communication"
+            output_file = f"{output_folder_path}{customer_id}_comm_output.json"
+            is_email_sent = False
+            json_file_path = f"{output_folder_path}{customer_id}_comm_output.json"
+            html_file_path = f"{output_folder_path}{customer_id}_email.html"
+            processed_by = "communication"
+
+            try:
+                await self.insert_comm_output_to_db(
+                    batch_id=batch_id,
+                    run_date=run_date,
+                    agent_name=agent_name,
+                    status=status,
+                    customer_id=customer_id,
+                    customer_name=customer_name,
+                    input_file=input_file_path,
+                    output_file=output_file,
+                    is_reviewed=is_reviewed,
+                    is_email_sent=is_email_sent,
+                    blob_date_folder=output_folder_prefix,
+                    json_file_path=json_file_path,
+                    html_file_path=html_file_path,
+                    processed_by=processed_by,
+                    review_notes=final_review_comments
+                )
+            except Exception as db_exc:
+                logger.error(f"❌ Error inserting communication record for customer_id: {customer_id}: {db_exc}")
             logger.info("%sEnd Thread id: %s", Fore.GREEN, Style.RESET_ALL)
             
         except Exception as e:
             logger.exception("%s❌ Error in email workflow: %s%s", Fore.RED, e, Style.RESET_ALL)
             raise
-    
+
+    async def insert_comm_output_to_db(self, batch_id, run_date, agent_name, status, customer_id,customer_name,
+                                       input_file, output_file, is_reviewed, is_email_sent,
+                                       blob_date_folder, json_file_path, html_file_path,
+                                       processed_by='communication',review_notes=''):
+        """
+        Insert communication output metadata into the database.
+        Args:
+            databricks_client: Databricks client instance
+            batch_id, run_date, agent_name, status, customer_id, customer_name, input_file, output_file, is_reviewed, is_email_sent,
+            blob_date_folder, json_file_path, html_file_path, processed_by: fields for the database record
+        """
+        
+        current_time = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+        query = f"""
+        INSERT INTO {self.databricks_client._table_name} (
+            batch_id, run_date, agent_name, status, customer_id,customer_name,
+            input_file, output_file, is_reviewed, is_email_sent,
+            blob_date_folder, json_file_path, html_file_path,
+            created_at, updated_at, processed_by,review_notes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        try:
+            affected_rows = self.databricks_client.execute_update(query, [
+                batch_id,
+                current_time,
+                agent_name,
+                status,
+                customer_id,
+                customer_name,
+                input_file,
+                output_file,
+                is_reviewed,
+                is_email_sent,
+                blob_date_folder,
+                json_file_path,
+                html_file_path,
+                current_time,
+                current_time,
+                processed_by,
+                review_notes
+            ])
+            if affected_rows > 0:
+                logger.info(f"Inserted communication record for customer_id: {customer_id}")
+                return True
+            else:
+                logger.warning(f"No rows inserted for customer_id: {customer_id}")
+                return False
+        except Exception as e:
+            logger.error(f"❌ Error inserting communication record for customer_id: {customer_id}: {e}")
+            return False
+
+
     async def _generate_contact_specific_emails(
         self,
         research_output,
@@ -401,14 +463,13 @@ class CommunicationManager:
                         logger.info("%sSkipping %s as output already exists: %s%s", Fore.YELLOW, customer_id, output_blob_name, Style.RESET_ALL)
                         continue
                     # Process the email generation workflow
-                    await self._process_email_workflow(input_obj, customer_research, output_folder_path)
+                    await self._process_email_workflow(input_obj, customer_research, output_folder_path,record,output_folder_prefix)
                 except Exception as e:
                     logger.exception("%sError while processing customer_id %s: %s%s", Fore.RED, getattr(data, 'customer_id', 'unknown'), e, Style.RESET_ALL)
                     #TODO: add to dead letter queue or handle error
-        finally:
+        except Exception as oe:
             # Clean up resources
-            await self.blob_util.close()
-            pass
+            logger.exception("%sError when getting/creating agents: %s%s", Fore.RED, oe, Style.RESET_ALL)
 
         total_duration = time.time() - total_start_time
         logger.info("%s Total time taken: %.3fs%s", Fore.WHITE, total_duration, Style.RESET_ALL)
