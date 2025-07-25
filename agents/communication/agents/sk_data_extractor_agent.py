@@ -34,7 +34,6 @@ INPUT_FILE = os.getenv("INPUT_FILE")
 INSTRUCTIONS = """
 You are an expert data extraction assistant.
 
-
 Instructions:
 - Extract all available information for the required fields listed below from the context data.
 - Output only a valid JSON object, enclosed strictly between --- --- (three dashes on a line before and after).
@@ -51,7 +50,8 @@ Required output fields:
 - primary_reason_for_outreach
 - issue
 - sender_details: { first_name, last_name, full_name, email, title, phone, team }
-- contact_list: [ { first_name, last_name, full_name, email, title, phone, salesforce_account_id, salesforce_contact_id } ]
+- contact_list: [ { first_name, last_name, full_name, email, title, phone, salesforce_account_id, salesforce_contact_id, suggested_hooks } ]
+    - For each contact, extract a list of suggested_hooks (as a list of strings) summarizing key strategies, hooks, or talking points for that contact, if available. For example, extract bullet points under "Strategy" or similar sections for each contact.
 - summary
 - recommendations (as a list of strings)
 - sample_email_subject
@@ -94,15 +94,34 @@ Example output (strictly follow this format):
   },
   "contact_list": [
     {
-      "first_name": "Duncan",
-      "last_name": "Hubbard",
-      "full_name": "Duncan Hubbard",
-      "email": "dhubbard@holmeselectricsecurity.com",
-      "title": null,
-      "phone": null,
-      "salesforce_account_id": "0013t00002dCbkcAAC",
-      "salesforce_contact_id": "0033800002pDRPDAA4"
+      "first_name": "Ava",
+      "last_name": "Martinez",
+      "full_name": "Ava Martinez",
+      "email": "ava.martinez@acmeinc.com",
+      "title": "Operations Supervisor",
+      "phone": "+1-555-123-4567",
+      "salesforce_account_id": "0013t00002xYzabDEF",
+      "salesforce_contact_id": "0033800002pXYZ1234",
+      "suggested_hooks": [
+        "Highlight automated restocking solutions for cleaning supplies.",
+        "Emphasize cost savings from bulk purchasing."
+      ]
+    },
+    {
+      "first_name": "Liam",
+      "last_name": "Nguyen",
+      "full_name": "Liam Nguyen",
+      "email": "liam.nguyen@acmeinc.com",
+      "title": "Purchasing Manager",
+      "phone": "+1-555-987-6543",
+      "salesforce_account_id": "0013t00002xYzabXYZ",
+      "salesforce_contact_id": "0033800002pLMN5678",
+      "suggested_hooks": [
+        "Discuss quarterly review opportunities for supply contracts.",
+        "Present new eco-friendly product lines launching this quarter."
+      ]
     }
+    // ...other contacts...
   ],
   "summary": "This report can guide strategic discussions on re-engagement opportunities with Holmes Electric, focusing on tailored solutions to recapture spend while aligning with their compliance and sustainability goals.",
   "recommendations": [

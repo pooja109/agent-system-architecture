@@ -51,8 +51,7 @@ python -m agents.communication.communication_queue
 
 ```mermaid
 flowchart TD
-    A[Create Test Records] --> B[Send to Queue]
-    B --> C[Process Queue in Batches]
+    B[Start communication_queue.py] --> C[Process message from communication queue in batches]
     C --> D[Data Extractor Agent]
     D --> E[Email Generator Agent]
     E -.-> F[Email Review Agent]
@@ -60,6 +59,7 @@ flowchart TD
     F --> G[Per-Contact and Follow-up Email Agent]
     G --> H[Save Results to Blob Storage]
     G --> I[(Send to Output Queue)]
+    G --> J[(Save Audit values in Databricks)]
 ```
 
 ## Notes
