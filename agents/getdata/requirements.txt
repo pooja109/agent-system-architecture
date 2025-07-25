@@ -1,0 +1,19 @@
+azure-identity
+azure-storage-blob==12.25.1
+azure-storage-queue==12.12.0
+azure-keyvault-secrets
+python-dotenv
+semantic-kernel[azure]
+# Pin aiohttp to version that works well with Azure SDK
+aiohttp
+colorama
+pydantic
+pandas
+tools
+snowflake-connector-python
+snowflake-connector-python[secure-local-storage,pandas]
+databricks-sdk
+databricks-sql-connector
+uszipcode
+sqlalchemy_mate==2.0.0.0
+logging
