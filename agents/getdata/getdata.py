@@ -88,12 +88,43 @@ async def main() -> None:
     load_dotenv()
         
     BATCH_ID = datetime.now().strftime("%Y%m%d%H%M%S")
-    queue_name = "researchagentqueue01"
+    agent_name = "db_Data_Agent"
+    queue_name = os.getenv("AZURE_TGT_QUEUE_NAME") 
+    
+    DATABRICKS_STATUS_CATALOG_NAME = os.getenv("DATABRICKS_STATUS_CATALOG_NAME")
+    DATABRICKS_STATUS_SCHEMA_NAME = os.getenv("DATABRICKS_STATUS_SCHEMA_NAME")
+    DATABRICKS_STATUS_TABLE_NAME = os.getenv("DATABRICKS_STATUS_TABLE_NAME")
+
+    DATABRICKS_I2A_CATALOG_NAME = os.getenv("DATABRICKS_I2A_CATALOG_NAME")
+    DATABRICKS_I2A_SCHEMA_NAME = os.getenv("DATABRICKS_I2A_SCHEMA_NAME")
+    DATABRICKS_I2A_TABLE_NAME = os.getenv("DATABRICKS_I2A_TABLE_NAME")
+
+    DATABRICKS_TXN_CATALOG_NAME = os.getenv("DATABRICKS_TXN_CATALOG_NAME")
+    DATABRICKS_TXN_SCHEMA_NAME = os.getenv("DATABRICKS_TXN_SCHEMA_NAME")
+    DATABRICKS_TXN_TABLE_NAME = os.getenv("DATABRICKS_TXN_TABLE_NAME")
+
+    DATABRICKS_DNB_CATALOG_NAME = os.getenv("DATABRICKS_DNB_CATALOG_NAME")
+    DATABRICKS_DNB_SCHEMA_NAME = os.getenv("DATABRICKS_DNB_SCHEMA_NAME")
+    DATABRICKS_DNB_TABLE_NAME = os.getenv("DATABRICKS_DNB_TABLE_NAME")
+
+    DATABRICKS_MKT_CATALOG_NAME = os.getenv("DATABRICKS_MKT_CATALOG_NAME")
+    DATABRICKS_MKT_SCHEMA_NAME = os.getenv("DATABRICKS_MKT_SCHEMA_NAME")
+    DATABRICKS_MKT_TABLE_NAME = os.getenv("DATABRICKS_MKT_TABLE_NAME")
+
+    DATABRICKS_I2A_MKT_CATALOG_NAME = os.getenv("DATABRICKS_I2A_MKT_CATALOG_NAME")
+    DATABRICKS_I2A_MKT_SCHEMA_NAME = os.getenv("DATABRICKS_I2A_MKT_SCHEMA_NAME")
+    DATABRICKS_I2A_MKT_TABLE_NAME = os.getenv("DATABRICKS_I2A_MKT_TABLE_NAME")
+
+    
+
+
+    '''
     DATABRICKS_STATUS_CAT_SCHEMA_NAME = os.getenv("DATABRICKS_STATUS_CAT_SCHEMA_NAME")
     DATABRICKS_I2A_CAT_SCHEMA_NAME = os.getenv("DATABRICKS_I2A_CAT_SCHEMA_NAME")
     DATABRICKS_TXN_CAT_SCHEMA_NAME = os.getenv("DATABRICKS_TXN_CAT_SCHEMA_NAME")
     DATABRICKS_DNB_CAT_SCHEMA_NAME = os.getenv("DATABRICKS_DNB_CAT_SCHEMA_NAME")
     DATABRICKS_MKT_CAT_SCHEMA_NAME = os.getenv("DATABRICKS_MKT_CAT_SCHEMA_NAME")
+    '''
 
     # Creating a separate logger for this module
     logger = logging.getLogger(__name__)
@@ -107,15 +138,22 @@ async def main() -> None:
     #logger.addHandler(file_handler)
     logger.addHandler(stream_handler)  
 
-    
+    i2a_table_name = f"{DATABRICKS_I2A_CATALOG_NAME}.{DATABRICKS_I2A_SCHEMA_NAME}.{DATABRICKS_I2A_TABLE_NAME}"
+    txn_table_name = f"{DATABRICKS_TXN_CATALOG_NAME}.{DATABRICKS_TXN_SCHEMA_NAME}.{DATABRICKS_TXN_TABLE_NAME}"
+    dnb_table_name = f"{DATABRICKS_DNB_CATALOG_NAME}.{DATABRICKS_DNB_SCHEMA_NAME}.{DATABRICKS_DNB_TABLE_NAME}"  
+    marketing_table_name = f"{DATABRICKS_MKT_CATALOG_NAME}.{DATABRICKS_MKT_SCHEMA_NAME}.{DATABRICKS_MKT_TABLE_NAME}"
+    i2a_marketing_table_name = f"{DATABRICKS_I2A_MKT_CATALOG_NAME}.{DATABRICKS_I2A_MKT_SCHEMA_NAME}.{DATABRICKS_I2A_MKT_TABLE_NAME}" 
+    status_table_name = f"{DATABRICKS_STATUS_CATALOG_NAME}.{DATABRICKS_STATUS_SCHEMA_NAME}.{DATABRICKS_STATUS_TABLE_NAME}"
+
+    '''
     i2a_table_name = f"{DATABRICKS_I2A_CAT_SCHEMA_NAME}.i2a_lowtouch"
     txn_table_name = f"{DATABRICKS_TXN_CAT_SCHEMA_NAME}.i2a_lowtouch_sls_cnct_lvl_t"
     dnb_table_name = f"{DATABRICKS_DNB_CAT_SCHEMA_NAME}.i2a_lowtouch_dnb_account_source_t"  
     marketing_table_name = f"{DATABRICKS_MKT_CAT_SCHEMA_NAME}.marketing_category_hierarchy"
     i2a_marketing_table_name = f"{DATABRICKS_MKT_CAT_SCHEMA_NAME}.i2a_to_marketing_category_map" 
     status_table_name = f"{DATABRICKS_STATUS_CAT_SCHEMA_NAME}.email_communication_pipeline_dev"
-
-    print(i2a_table_name, "; ", txn_table_name, "; ", dnb_table_name, "; ", marketing_table_name, "; ", i2a_marketing_table_name, "; ", status_table_name)
+    '''
+    #print(i2a_table_name, "\n", txn_table_name, "\n", dnb_table_name, "\n", marketing_table_name, "\n", i2a_marketing_table_name, "\n", status_table_name)
 
     logger.info("Getting data from Databricks...")
     try:
@@ -140,11 +178,19 @@ async def main() -> None:
         #print("sql_marketing: ", sql_marketing)
         #print("sql_i2a_marketing: ", sql_i2a_marketing)
 
-
+        logger.info("Getting data from :",i2a_table_name)
         df_i2a = await get_data_from_databricks(sql_i2a)
+
+        logger.info("Getting data from :",txn_table_name)
         df_txn = await get_data_from_databricks(sql_txn)
+        
+        logger.info("Getting data from :",dnb_table_name)
         df_dnb = await get_data_from_databricks(sql_dnb)
+
+        logger.info("Getting data from :",marketing_table_name)
         df_marketing = await get_data_from_databricks(sql_marketing)
+
+        logger.info("Getting data from :",i2a_marketing_table_name)
         df_i2a_marketing = await get_data_from_databricks(sql_i2a_marketing)
         
         logger.info("Data fetched successfully from Databricks")
@@ -286,7 +332,7 @@ async def main() -> None:
         customer_data = {
             "batch_id": BATCH_ID,
             "run_date": run_date,
-            "agent_name": "dbDataAgent",
+            "agent_name": agent_name,
             "status": "S",
             "customer_id": b_cust,
             "i2a_data": filtered_df_json,
@@ -306,7 +352,7 @@ async def main() -> None:
         status_vals = [(
             int(BATCH_ID),
             run_date,
-            "dbDataAgent",
+            agent_name,
             "S",
             b_cust,
             cust_name,
