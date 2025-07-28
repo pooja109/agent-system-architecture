@@ -6,6 +6,7 @@ Service for processing emails from the inbox, including retrieval,
 storage, and folder management.
 """
 
+import asyncio
 import json
 import uuid
 from datetime import datetime
@@ -152,21 +153,64 @@ class EmailProcessor:
         email_id = message["id"]
 
         try:
+            # Validate input message
+            if not message or not isinstance(message, dict):
+                raise ValueError("Invalid message format")
+            if not message.get("id"):
+                raise ValueError("Message ID is required")
+                
+            subject = message.get("subject", "(No Subject)")
+            sender_info = message.get("from", {}).get("emailAddress", {}).get("address", "unknown")
+            
             self.logger.info(
                 "Processing email",
                 email_id=email_id,
-                subject=message.get("subject", ""),
+                subject=subject,
+                sender=sender_info,
+                processing_id=processing_id
             )
 
-            # Convert to Email model
-            email = self.graph_client.convert_to_email_model(message, processing_id, self.version)
+            # Convert to Email model with error handling
+            try:
+                email = self.graph_client.convert_to_email_model(message, processing_id, self.version)
+                if not email:
+                    raise ValueError("Failed to convert message to email model")
+            except Exception as e:
+                self.logger.error(
+                    "Failed to convert message to email model",
+                    error=str(e),
+                    email_id=email_id,
+                    message_keys=list(message.keys()) if message else []
+                )
+                raise ValueError(f"Email model conversion failed: {e}")
 
             # Store the email
             output_location = await self._store_email(email)
 
-            # Process email through scenarios
-            async with self.scenario_processor:
-                scenario_result = await self.scenario_processor.process_email_scenario(email)
+            # Process email through scenarios with timeout and error handling
+            scenario_result = None
+            try:
+                async with self.scenario_processor:
+                    # Add timeout to prevent hanging
+                    scenario_result = await asyncio.wait_for(
+                        self.scenario_processor.process_email_scenario(email),
+                        timeout=120.0  # 2 minute timeout
+                    )
+            except asyncio.TimeoutError:
+                self.logger.error(
+                    "Scenario processing timed out",
+                    email_id=email_id,
+                    timeout_seconds=120
+                )
+                # Continue with email processing even if scenario processing fails
+            except Exception as e:
+                self.logger.error(
+                    "Scenario processing failed",
+                    error=str(e),
+                    email_id=email_id,
+                    error_type=type(e).__name__
+                )
+                # Continue with email processing even if scenario processing fails
 
                 # If this is a customer response scenario (5-11), handle response processing
                 if scenario_result and scenario_result.scenario_type.value.startswith("scenario_"):
@@ -174,18 +218,32 @@ class EmailProcessor:
                         scenario_result.scenario_type.value
                     )
                     if scenario_num and 5 <= scenario_num <= 11:
+                        # Convert email back to message format for response handler
                         try:
-                            # Convert email back to message format for response handler
                             email_message = self._convert_email_to_message(message, email)
                             await self.response_handler.process_customer_response(
                                 email_message=email_message, scenario=scenario_num
                             )
+                            self.logger.info(
+                                "Successfully processed customer response",
+                                email_id=email_id,
+                                scenario=scenario_num
+                            )
+                        except ValueError as ve:
+                            self.logger.error(
+                                "Invalid data for customer response processing",
+                                error=str(ve),
+                                email_id=email_id,
+                                scenario=scenario_num,
+                            )
+                            # Don't fail the entire email processing due to validation errors
                         except Exception as e:
                             self.logger.error(
                                 "Failed to process customer response",
                                 error=str(e),
                                 email_id=email_id,
                                 scenario=scenario_num,
+                                error_type=type(e).__name__
                             )
                             # Don't fail the entire email processing due to response handling errors
 
@@ -412,16 +470,70 @@ class EmailProcessor:
 
         Returns:
             Dictionary in Graph API message format
+            
+        Raises:
+            ValueError: If required fields are missing or invalid
         """
-        # Use the original message as base and ensure required fields are present
-        return {
-            "id": original_message.get("id", email.message_id),
-            "from": original_message.get("from", {}),
-            "conversationId": original_message.get("conversationId"),
-            "receivedDateTime": original_message.get(
-                "receivedDateTime", email.received_time.isoformat() if email.received_time else None
-            ),
-            "subject": original_message.get("subject", email.subject),
-            "body": original_message.get("body", {"content": email.body_preview or ""}),
-            "sender": original_message.get("sender", {}),
-        }
+        try:
+            # Validate inputs
+            if not original_message:
+                raise ValueError("Original message cannot be empty")
+            if not email:
+                raise ValueError("Email model cannot be None")
+            if not email.id:
+                raise ValueError("Email ID is required")
+                
+            # Build message with proper fallbacks and validation
+            message = {
+                "id": original_message.get("id") or email.id,
+                "from": original_message.get("from", {}),
+                "conversationId": original_message.get("conversationId"),
+                "subject": original_message.get("subject") or email.subject or "(No Subject)",
+                "sender": original_message.get("sender", {}),
+            }
+            
+            # Handle receivedDateTime with proper error handling
+            if "receivedDateTime" in original_message:
+                message["receivedDateTime"] = original_message["receivedDateTime"]
+            elif email.received_datetime:
+                try:
+                    message["receivedDateTime"] = email.received_datetime.isoformat()
+                except (AttributeError, ValueError) as e:
+                    self.logger.warning(
+                        "Failed to format received datetime, using current time",
+                        error=str(e),
+                        email_id=email.id
+                    )
+                    message["receivedDateTime"] = datetime.utcnow().isoformat()
+            else:
+                message["receivedDateTime"] = datetime.utcnow().isoformat()
+            
+            # Handle body content with validation
+            if "body" in original_message and original_message["body"]:
+                message["body"] = original_message["body"]
+            else:
+                # Create proper body structure
+                body_content = ""
+                if hasattr(email, 'body') and email.body:
+                    if hasattr(email.body, 'content'):
+                        body_content = email.body.content or ""
+                    else:
+                        body_content = str(email.body)
+                elif email.body_preview:
+                    body_content = email.body_preview
+                    
+                message["body"] = {
+                    "content": body_content,
+                    "contentType": "text/plain"
+                }
+            
+            return message
+            
+        except Exception as e:
+            self.logger.error(
+                "Failed to convert email to message format",
+                error=str(e),
+                email_id=getattr(email, 'id', 'unknown'),
+                original_message_id=original_message.get('id', 'unknown') if original_message else 'unknown'
+            )
+            raise ValueError(f"Failed to convert email to message format: {e}")

@@ -50,7 +50,8 @@ class ContactLookupService:
 
     async def __aenter__(self) -> "ContactLookupService":
         """Async context manager entry."""
-        await self.connect()
+        if not self.connection:
+            await self.connect()
         return self
 
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
@@ -63,11 +64,19 @@ class ContactLookupService:
         Returns:
             True if connection successful, False otherwise
         """
+        if self.connection is not None:
+            return True
+            
         try:
             self.connection = sql.connect(
                 server_hostname=self.settings.server_hostname,
                 http_path=self.settings.http_path,
                 access_token=self.settings.access_token,
+                # Optimize connection settings
+                _user_agent_entry="inbox_monitor_contact_lookup/2.1.0",
+                # Add connection pooling settings
+                catalog=None,  # Will be set per query if needed
+                schema=None   # Will be set per query if needed
             )
             self.logger.info("Connected to Databricks for contact lookup service")
             return True
@@ -100,7 +109,9 @@ class ContactLookupService:
         """
         try:
             if self.connection is None:
-                raise RuntimeError("Database connection not established")
+                success = await self.connect()
+                if not success:
+                    raise RuntimeError("Database connection not established")
 
             # Handle test mode email substitution
             lookup_email = email
@@ -119,9 +130,9 @@ class ContactLookupService:
                     test_mode=True,
                 )
 
-            # Query the lookup table for account and contact IDs
+            # Optimized query with explicit column selection and index hint
             query = f"""
-            SELECT
+            SELECT /*+ INDEX(EMAIL) */
                 EMAIL,
                 SF_ACCOUNT_ID,
                 SF_CONTACT_ID

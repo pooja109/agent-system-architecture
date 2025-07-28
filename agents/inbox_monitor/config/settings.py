@@ -160,6 +160,39 @@ class TestModeSettings(BaseModel):
         return self
 
 
+class ContentFormattingSettings(BaseModel):
+    """Content formatting configuration settings."""
+    
+    content_format: str = Field(
+        default="structured", 
+        description="Format type: raw, clean_text, structured"
+    )
+    max_description_length: int = Field(
+        default=30000, 
+        description="Maximum length for case description"
+    )
+    preserve_signature: bool = Field(
+        default=True, 
+        description="Whether to preserve email signature information"
+    )
+    include_metadata: bool = Field(
+        default=True,
+        description="Whether to include customer metadata in description"
+    )
+    truncate_html_fallback: bool = Field(
+        default=True,
+        description="Whether to truncate raw HTML if cleaning fails"
+    )
+    
+    @model_validator(mode="after")
+    def validate_content_format(self) -> "ContentFormattingSettings":
+        """Validate content format setting."""
+        valid_formats = ["raw", "clean_text", "structured"]
+        if self.content_format not in valid_formats:
+            raise ValueError(f"Invalid content format: {self.content_format}. Must be one of {valid_formats}")
+        return self
+
+
 class ScenarioSettings(BaseModel):
     """Scenario-specific configuration settings."""
 
@@ -180,6 +213,7 @@ class AppSettings(BaseModel):
     databricks: DatabricksSettings
     scenarios: ScenarioSettings
     test_mode: TestModeSettings
+    content_formatting: ContentFormattingSettings
     environment: str = Field(default="development", description="Application environment")
     dry_run: bool = Field(default=False, description="Run in dry-run mode (don't move emails)")
 
@@ -244,6 +278,13 @@ def get_settings() -> AppSettings:
             force_scenario=int(os.getenv("TEST_FORCE_SCENARIO"))
             if os.getenv("TEST_FORCE_SCENARIO")
             else None,
+        ),
+        content_formatting=ContentFormattingSettings(
+            content_format=os.getenv("CONTENT_FORMAT", "structured"),
+            max_description_length=int(os.getenv("CONTENT_MAX_DESCRIPTION_LENGTH", "30000")),
+            preserve_signature=os.getenv("CONTENT_PRESERVE_SIGNATURE", "true").lower() == "true",
+            include_metadata=os.getenv("CONTENT_INCLUDE_METADATA", "true").lower() == "true",
+            truncate_html_fallback=os.getenv("CONTENT_TRUNCATE_HTML_FALLBACK", "true").lower() == "true",
         ),
         environment=os.getenv("ENVIRONMENT", "development"),
         dry_run=os.getenv("INBOX_MONITOR_DRY_RUN", "false").lower() == "true",

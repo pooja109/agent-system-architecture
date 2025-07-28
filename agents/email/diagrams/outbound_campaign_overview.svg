@@ -1,0 +1,267 @@
+<svg width="1200" height="800" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#333" />
+    </marker>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="2" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1200" height="800" fill="#f8f9fa"/>
+  
+  <!-- Title -->
+  <text x="600" y="40" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#2c3e50">
+    Outbound Email Campaign Processing Workflow
+  </text>
+  
+  <!-- Phase 1: Research & Setup -->
+  <g>
+    <rect x="50" y="80" width="200" height="120" rx="10" fill="#e1f5fe" stroke="#01579b" stroke-width="2" filter="url(#shadow)"/>
+    <text x="150" y="105" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#01579b">
+      Communication Agent
+    </text>
+    <text x="150" y="125" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#01579b">
+      Completes Research
+    </text>
+    <text x="150" y="145" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#01579b">
+      &amp; Content Generation
+    </text>
+    <text x="150" y="170" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#0277bd">
+      • Customer Research JSON
+    </text>
+    <text x="150" y="185" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#0277bd">
+      • Personalized HTML Email
+    </text>
+  </g>
+  
+  <!-- Phase 2: Blob Storage -->
+  <g>
+    <rect x="320" y="80" width="180" height="120" rx="10" fill="#f1f8e9" stroke="#33691e" stroke-width="2" filter="url(#shadow)"/>
+    <text x="410" y="105" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#33691e">
+      Azure Blob Storage
+    </text>
+    <text x="410" y="125" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#33691e">
+      Content Repository
+    </text>
+    <text x="410" y="150" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#558b2f">
+      📁 {date}/{customer_id}/
+    </text>
+    <text x="410" y="165" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#558b2f">
+      📄 research_output.json
+    </text>
+    <text x="410" y="180" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#558b2f">
+      📧 email.html
+    </text>
+  </g>
+  
+  <!-- Phase 3: Database Monitoring -->
+  <g>
+    <rect x="570" y="80" width="180" height="120" rx="10" fill="#fff3e0" stroke="#e65100" stroke-width="2" filter="url(#shadow)"/>
+    <text x="660" y="105" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#e65100">
+      Databricks Pipeline
+    </text>
+    <text x="660" y="125" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#e65100">
+      Status Monitoring
+    </text>
+    <text x="660" y="150" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#f57c00">
+      📊 agent_name='communication'
+    </text>
+    <text x="660" y="165" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#f57c00">
+      ✅ status='S' (Success)
+    </text>
+    <text x="660" y="180" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#f57c00">
+      📤 is_email_sent IS NULL
+    </text>
+  </g>
+  
+  <!-- Phase 4: Email Agent Processing -->
+  <g>
+    <rect x="820" y="80" width="180" height="120" rx="10" fill="#f3e5f5" stroke="#4a148c" stroke-width="2" filter="url(#shadow)"/>
+    <text x="910" y="105" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#4a148c">
+      Email Agent
+    </text>
+    <text x="910" y="125" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#4a148c">
+      Batch Processor
+    </text>
+    <text x="910" y="150" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#7b1fa2">
+      ⏱️ Every 5 minutes
+    </text>
+    <text x="910" y="165" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#7b1fa2">
+      📦 Batch size: 10 records
+    </text>
+    <text x="910" y="180" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#7b1fa2">
+      🔄 Process pending emails
+    </text>
+  </g>
+  
+  <!-- Processing Steps -->
+  <g>
+    <rect x="200" y="280" width="160" height="80" rx="8" fill="#e8f5e8" stroke="#2e7d32" stroke-width="2" filter="url(#shadow)"/>
+    <text x="280" y="305" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#2e7d32">
+      Content Assembly
+    </text>
+    <text x="280" y="325" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#388e3c">
+      Load Research JSON
+    </text>
+    <text x="280" y="340" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#388e3c">
+      Load Email HTML
+    </text>
+    <text x="280" y="355" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#388e3c">
+      Extract Contact Info
+    </text>
+  </g>
+  
+  <g>
+    <rect x="420" y="280" width="160" height="80" rx="8" fill="#e3f2fd" stroke="#1565c0" stroke-width="2" filter="url(#shadow)"/>
+    <text x="500" y="305" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#1565c0">
+      Test Mode Check
+    </text>
+    <text x="500" y="325" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#1976d2">
+      🧪 Test Mode?
+    </text>
+    <text x="500" y="340" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#1976d2">
+      📧 Override Recipient
+    </text>
+    <text x="500" y="355" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#1976d2">
+      🏷️ Add Test Headers
+    </text>
+  </g>
+  
+  <g>
+    <rect x="640" y="280" width="160" height="80" rx="8" fill="#fff8e1" stroke="#f57f17" stroke-width="2" filter="url(#shadow)"/>
+    <text x="720" y="305" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#f57f17">
+      Email Delivery
+    </text>
+    <text x="720" y="325" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#f9a825">
+      📨 Azure Communication
+    </text>
+    <text x="720" y="340" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#f9a825">
+      Services SMTP
+    </text>
+    <text x="720" y="355" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#f9a825">
+      📬 Customer Receives
+    </text>
+  </g>
+  
+  <g>
+    <rect x="860" y="280" width="160" height="80" rx="8" fill="#e8f5e8" stroke="#2e7d32" stroke-width="2" filter="url(#shadow)"/>
+    <text x="940" y="305" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#2e7d32">
+      Status Update
+    </text>
+    <text x="940" y="325" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#388e3c">
+      ✅ is_email_sent = true
+    </text>
+    <text x="940" y="340" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#388e3c">
+      📊 send_status = 'sent'
+    </text>
+    <text x="940" y="355" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#388e3c">
+      🆔 acs_message_id
+    </text>
+  </g>
+  
+  <!-- Outcomes -->
+  <g>
+    <rect x="300" y="450" width="200" height="100" rx="10" fill="#e8f5e8" stroke="#1b5e20" stroke-width="2" filter="url(#shadow)"/>
+    <text x="400" y="475" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#1b5e20">
+      Success Outcome
+    </text>
+    <text x="400" y="495" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#2e7d32">
+      📧 Customer receives email
+    </text>
+    <text x="400" y="510" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#2e7d32">
+      📊 Complete audit trail
+    </text>
+    <text x="400" y="525" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#2e7d32">
+      🎯 Campaign tracking
+    </text>
+    <text x="400" y="540" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#2e7d32">
+      📈 Analytics enabled
+    </text>
+  </g>
+  
+  <g>
+    <rect x="600" y="450" width="200" height="100" rx="10" fill="#ffebee" stroke="#c62828" stroke-width="2" filter="url(#shadow)"/>
+    <text x="700" y="475" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#c62828">
+      Error Handling
+    </text>
+    <text x="700" y="495" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#d32f2f">
+      🔄 Retry logic (3 attempts)
+    </text>
+    <text x="700" y="510" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#d32f2f">
+      📝 Error logging
+    </text>
+    <text x="700" y="525" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#d32f2f">
+      ⚠️ Failure tracking
+    </text>
+    <text x="700" y="540" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#d32f2f">
+      🔧 Manual intervention
+    </text>
+  </g>
+  
+  <!-- Arrows -->
+  <line x1="250" y1="140" x2="320" y2="140" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <line x1="500" y1="140" x2="570" y2="140" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <line x1="750" y1="140" x2="820" y2="140" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <line x1="280" y1="200" x2="280" y2="280" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <line x1="360" y1="320" x2="420" y2="320" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <line x1="580" y1="320" x2="640" y2="320" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <line x1="800" y1="320" x2="860" y2="320" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <line x1="400" y1="360" x2="400" y2="450" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <line x1="700" y1="360" x2="700" y2="450" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- Key Metrics -->
+  <g>
+    <rect x="50" y="600" width="1100" height="120" rx="10" fill="#f5f5f5" stroke="#666" stroke-width="1" filter="url(#shadow)"/>
+    <text x="600" y="625" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#333">
+      Key Performance Metrics
+    </text>
+    
+    <text x="200" y="650" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#1976d2">
+      Processing Efficiency
+    </text>
+    <text x="200" y="665" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#333">
+      • Batch size: 10 emails/5 min
+    </text>
+    <text x="200" y="680" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#333">
+      • Processing time: &lt;30 sec
+    </text>
+    <text x="200" y="695" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#333">
+      • Success rate: 95%+
+    </text>
+    
+    <text x="500" y="650" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#388e3c">
+      Content Management
+    </text>
+    <text x="500" y="665" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#333">
+      • JSON + HTML assembly
+    </text>
+    <text x="500" y="680" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#333">
+      • Test mode redirection
+    </text>
+    <text x="500" y="695" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#333">
+      • Personalized delivery
+    </text>
+    
+    <text x="800" y="650" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#f57c00">
+      Quality Assurance
+    </text>
+    <text x="800" y="665" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#333">
+      • Complete audit trail
+    </text>
+    <text x="800" y="680" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#333">
+      • Error recovery
+    </text>
+    <text x="800" y="695" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#333">
+      • Status tracking
+    </text>
+  </g>
+  
+  <!-- Footer -->
+  <text x="600" y="770" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#666">
+    🚀 Automated • 📊 Scalable • 🔒 Secure • 🧪 Test-Safe
+  </text>
+</svg>

@@ -190,7 +190,7 @@ class TestSalesforceClient:
     @pytest.mark.asyncio
     async def test_update_contact_invalid_email_success(self, salesforce_client):
         """Test successful contact update."""
-        contact_update = ContactUpdateRequest(contact_id="003000000000000", invalid_email_address="test@example.com")
+        contact_update = ContactUpdateRequest(contact_id="003000000000000", is_email_invalid=True)
 
         mock_response = MagicMock()
         mock_response.status = 204
@@ -208,7 +208,7 @@ class TestSalesforceClient:
     @pytest.mark.asyncio
     async def test_update_contact_invalid_email_failure(self, salesforce_client):
         """Test contact update failure."""
-        contact_update = ContactUpdateRequest(contact_id="003000000000000", invalid_email_address="test@example.com")
+        contact_update = ContactUpdateRequest(contact_id="003000000000000", is_email_invalid=True)
 
         mock_response = MagicMock()
         mock_response.status = 400
