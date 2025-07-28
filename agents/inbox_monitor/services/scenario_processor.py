@@ -25,6 +25,7 @@ try:
     from services.contact_lookup_service import ContactLookupService
     from services.round_robin_service import RoundRobinService
     from services.salesforce_client import SalesforceClient
+    from utils.content_formatter import ContentFormatter, ContentFormattingConfig
 except ImportError:
     from ..config.settings import AppSettings
     from ..models.email import Email
@@ -36,6 +37,7 @@ except ImportError:
     from .contact_lookup_service import ContactLookupService
     from .round_robin_service import RoundRobinService
     from .salesforce_client import SalesforceClient
+    from ..utils.content_formatter import ContentFormatter, ContentFormattingConfig
 
 
 class ScenarioType(Enum):
@@ -66,6 +68,43 @@ class ScenarioResult:
 
 class ScenarioProcessor:
     """Process email scenarios and take appropriate actions."""
+    
+    async def __aenter__(self) -> "ScenarioProcessor":
+        """Async context manager entry - establish service connections."""
+        if not self._services_connected:
+            try:
+                # Connect to databricks services concurrently for better performance
+                await asyncio.gather(
+                    self.round_robin_service.connect(),
+                    self.contact_lookup_service.connect(),
+                    return_exceptions=True
+                )
+                self._services_connected = True
+                self.logger.debug("Scenario processor services connected")
+            except Exception as e:
+                self.logger.warning(
+                    "Some scenario processor services failed to connect",
+                    error=str(e)
+                )
+        return self
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Async context manager exit - cleanup service connections."""
+        if self._services_connected:
+            try:
+                # Disconnect services concurrently
+                await asyncio.gather(
+                    self.round_robin_service.disconnect(),
+                    self.contact_lookup_service.disconnect(),
+                    return_exceptions=True
+                )
+                self._services_connected = False
+                self.logger.debug("Scenario processor services disconnected")
+            except Exception as e:
+                self.logger.warning(
+                    "Error disconnecting scenario processor services",
+                    error=str(e)
+                )
 
     def __init__(self, settings: AppSettings):
         """Initialize scenario processor.
@@ -81,6 +120,18 @@ class ScenarioProcessor:
         self.salesforce_client = SalesforceClient(settings.salesforce)
         self.round_robin_service = RoundRobinService(settings.databricks, settings.test_mode)
         self.contact_lookup_service = ContactLookupService(settings.databricks, settings.test_mode)
+        
+        # Initialize content formatter
+        content_config = ContentFormattingConfig(
+            content_format=settings.content_formatting.content_format,
+            max_description_length=settings.content_formatting.max_description_length,
+            preserve_signature=settings.content_formatting.preserve_signature,
+            include_metadata=settings.content_formatting.include_metadata,
+            truncate_html_fallback=settings.content_formatting.truncate_html_fallback
+        )
+        self.content_formatter = ContentFormatter(content_config)
+        
+        self._services_connected = False
 
     async def process_email_scenario(self, email: Email) -> ScenarioResult:
         """Process an email and determine the appropriate scenario.
@@ -90,7 +141,19 @@ class ScenarioProcessor:
 
         Returns:
             ScenarioResult with processing results
+            
+        Raises:
+            ValueError: If email is invalid
+            RuntimeError: If required services are not available
         """
+        if not email:
+            raise ValueError("Email cannot be None")
+        if not email.sender or not email.sender.email:
+            raise ValueError("Email must have a valid sender")
+            
+        # Ensure services are connected
+        if not self._services_connected:
+            await self.__aenter__()
         try:
             # Check for forced scenario in test mode
             if (
@@ -131,12 +194,50 @@ class ScenarioProcessor:
                 )
 
             else:
-                # Normal AI classification
-                async with self.ai_client as ai_client:
-                    intent_result = await ai_client.classify_email_intent(
-                        subject=email.subject,
-                        body=email.body.content,
-                        sender_email=email.sender.email,
+                # Normal AI classification with timeout and error handling
+                try:
+                    async with self.ai_client as ai_client:
+                        intent_result = await asyncio.wait_for(
+                            ai_client.classify_email_intent(
+                                subject=email.subject,
+                                body=email.body.content if email.body else "",
+                                sender_email=email.sender.email,
+                            ),
+                            timeout=30.0  # 30 second timeout for AI classification
+                        )
+                except asyncio.TimeoutError:
+                    self.logger.error(
+                        "AI classification timed out",
+                        email_id=email.id,
+                        sender=email.sender.email
+                    )
+                    return ScenarioResult(
+                        scenario_type=ScenarioType.UNKNOWN,
+                        success=False,
+                        actions_taken=["AI classification timed out"],
+                        error_message="AI classification timed out after 30 seconds"
+                    )
+                except Exception as e:
+                    self.logger.error(
+                        "AI classification failed",
+                        error=str(e),
+                        email_id=email.id,
+                        sender=email.sender.email
+                    )
+                    return ScenarioResult(
+                        scenario_type=ScenarioType.UNKNOWN,
+                        success=False,
+                        actions_taken=["AI classification failed"],
+                        error_message=f"AI classification failed: {e}"
+                    )
+
+                # Validate classification result
+                if not intent_result:
+                    return ScenarioResult(
+                        scenario_type=ScenarioType.UNKNOWN,
+                        success=False,
+                        actions_taken=["No AI classification result"],
+                        error_message="AI classification returned no result"
                     )
 
                 # Force cleanup of any lingering tasks after AI client usage
@@ -309,13 +410,32 @@ class ScenarioProcessor:
 
             # Step 3: Create Salesforce case assigned to the expert
             from services.salesforce_client import CaseCreateRequest
+            
+            # Format case description using content formatter
+            try:
+                formatted_description = self.content_formatter.format_content(
+                    email=email,
+                    expert_name=expert.expert_name,
+                    account_id=account_id,
+                    contact_id=contact_id
+                )
+                actions_taken.append("Applied content formatting to case description")
+            except Exception as format_error:
+                self.logger.warning(
+                    "Content formatting failed, using fallback description",
+                    error=str(format_error),
+                    email_id=email.id
+                )
+                # Fallback to simple description
+                formatted_description = f"Customer {email.sender.email} responded positively to outreach.\n\nOriginal Subject: {email.subject}\n\nResponse: {email.body.content if email.body else 'No content'}"
+                actions_taken.append("Used fallback description format due to formatting error")
 
             case_request = CaseCreateRequest(
                 account_id=account_id,
                 contact_id=contact_id,
                 owner_id=expert.expert_id,
                 subject=f"Positive Response: {email.subject}",
-                description=f"Customer {email.sender.email} responded positively to outreach.\n\nOriginal Subject: {email.subject}\n\nResponse: {email.body.content}",
+                description=formatted_description,
                 origin="AI Agent",
                 status="New",
                 priority="Medium",
@@ -528,23 +648,23 @@ class ScenarioProcessor:
                 contact_lookup = await lookup_service.lookup_contact_by_email(bounced_email)
 
                 if contact_lookup.found and contact_lookup.sf_contact_id:
-                    # Update Salesforce contact with Invalid_Email__c field
+                    # Update Salesforce contact with Is_Email_Invalid__c field (boolean)
                     from services.salesforce_client import ContactUpdateRequest
 
                     contact_update = ContactUpdateRequest(
                         contact_id=contact_lookup.sf_contact_id, 
-                        invalid_email_address=lookup_email
+                        is_email_invalid=True
                     )
                     success = await self.salesforce_client.update_contact_invalid_email(
                         contact_update
                     )
                     if not success:
                         raise Exception(
-                            f"Failed to update Salesforce Invalid_Email field for {lookup_email} (Contact: {contact_lookup.sf_contact_id})"
+                            f"Failed to update Salesforce Is_Email_Invalid__c field to true for {lookup_email} (Contact: {contact_lookup.sf_contact_id})"
                         )
 
                     actions_taken.append(
-                        f"Updated Salesforce Invalid_Email__c field for {lookup_email} (Contact: {contact_lookup.sf_contact_id})"
+                        f"Updated Salesforce Is_Email_Invalid__c field to true for {lookup_email} (Contact: {contact_lookup.sf_contact_id})"
                     )
                 else:
                     # Contact not found in lookup table - log warning but continue
@@ -706,25 +826,47 @@ Subject: {original_email.subject}
             # Create a simple script to send the email (use raw string for Windows paths)
             email_script = f'''
 import sys
+import os
 sys.path.insert(0, r"{email_dir}")
 
-from services.email_service import EmailService
+# Ensure the subprocess can find the .env file in the root directory
+from dotenv import load_dotenv
+root_env_path = os.path.join(r"{email_dir}", "..", "..", ".env")
+load_dotenv(root_env_path)
+
+from email_clients.azure_email_client import AzureEmailClient
+from services.test_mode_service import TestModeService
 from config.settings import get_settings
+from database.models import EmailContent
 import asyncio
 import json
 
 async def send_email():
     try:
         settings = get_settings()
-        async with EmailService(settings) as email_service:
-            result = await email_service.send_single_email(
-                recipient_email="{recipient_email}",
-                recipient_name="{recipient_name}",
-                subject="{escaped_subject}",
-                body_content="""{escaped_body}""",
-                content_type="text/plain"
-            )
-            print(json.dumps({{"success": True, "result": str(result)}}))
+        azure_client = AzureEmailClient(settings.azure_communication)
+        test_mode_service = TestModeService(settings)
+        
+        # Create email content object
+        email_content = EmailContent(
+            subject="{escaped_subject}",
+            body_html="""{escaped_body}""".replace("\\n", "<br>"),
+            recipient_email="{recipient_email}",
+            customer_id="INBOX_MONITOR",
+            customer_name="{recipient_name}",
+            contact_name="{recipient_name}"
+        )
+        
+        # Apply test mode override if enabled
+        processed_content = test_mode_service.process_email_content(email_content)
+        
+        result = await azure_client.send_email(
+            recipient_email=processed_content.recipient_email,
+            subject=processed_content.subject,
+            body_html=f"<html><body>{{processed_content.body_html}}</body></html>"
+        )
+        
+        print(json.dumps({{"success": result.success, "message_id": result.message_id or "", "error": result.error_message or ""}}))
     except Exception as e:
         print(json.dumps({{"success": False, "error": str(e)}}))
 

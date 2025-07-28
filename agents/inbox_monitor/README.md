@@ -118,7 +118,7 @@ The system processes emails through specific scenarios (5-11) based on AI classi
 ### Scenario 9: Invalid Email
 **Intent**: Email delivery failure or bounce notification
 **Actions**:
-1. Update Salesforce contact's `Invalid_Email__c` field with bounced email
+1. Update Salesforce contact's `Is_Email_Invalid__c` field to `true`
 2. Update assignment status to "email_invalid"
 3. Prevent future email attempts
 
@@ -557,8 +557,8 @@ Some test files you created during development:
 
 **`test_salesforce_fix.py`** (Excluded from git)
 - **Purpose**: Validates Salesforce field fix
-- **Usage**: Tests the Invalid_Email__c field update with email addresses
-- **Note**: Demonstrates the fix for boolean vs email field issue
+- **Usage**: Tests the Is_Email_Invalid__c field update with boolean values
+- **Note**: Demonstrates the updated boolean field approach for invalid emails
 
 ### Test Data Management
 
@@ -575,7 +575,7 @@ After integration tests, you may need to manually clean up:
 
 **Salesforce**:
 1. Search for cases with test identifier in Subject/Description
-2. Check contacts with `Invalid_Email__c` field updates
+2. Check contacts with `Is_Email_Invalid__c` field updates
 3. Review any test assignments created
 
 **Databricks**:
@@ -741,7 +741,7 @@ python main.py check
 
 #### Processing Errors
 - `Contact not found in lookup table`: Customer not in Databricks database
-- `Invalid Email: invalid email address: true`: Salesforce field type mismatch (fixed)
+- `Is_Email_Invalid__c field update errors`: Salesforce boolean field update issues
 - `SSL shutdown timed out`: Network connectivity issues (automatically handled)
 
 ### Debug Mode
@@ -827,7 +827,7 @@ async with SalesforceClient(settings.salesforce) as sf_client:
     # Update contact
     contact_update = ContactUpdateRequest(
         contact_id="contact_id",
-        invalid_email_address="bounced@email.com"
+        is_email_invalid=True
     )
     success = await sf_client.update_contact_invalid_email(contact_update)
 ```

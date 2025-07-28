@@ -560,7 +560,7 @@ This is an automated bounce notification generated for integration testing."""
         # TODO: Implement real cleanup based on your environment
         # This might include:
         # - Querying Salesforce for cases with test identifier in description
-        # - Reverting contact Invalid_Email__c fields that were set during testing
+        # - Reverting contact Is_Email_Invalid__c fields that were set during testing
         # - Updating Databricks assignment records to mark them as test data
         # - Removing any test email artifacts
 
@@ -637,7 +637,7 @@ CONFIGURATION USED:
 CLEANUP REQUIRED:
   Search for "{self.test_identifier}" in:
   • Salesforce cases (Subject/Description)
-  • Salesforce contacts (Invalid_Email__c updates)
+  • Salesforce contacts (Is_Email_Invalid__c updates)
   • Databricks assignment tables
   • Email system logs
 

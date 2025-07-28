@@ -69,7 +69,8 @@ class RoundRobinService:
 
     async def __aenter__(self) -> "RoundRobinService":
         """Async context manager entry."""
-        await self.connect()
+        if not self.connection:
+            await self.connect()
         return self
 
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
@@ -82,11 +83,19 @@ class RoundRobinService:
         Returns:
             True if connection successful, False otherwise
         """
+        if self.connection is not None:
+            return True
+            
         try:
             self.connection = sql.connect(
                 server_hostname=self.settings.server_hostname,
                 http_path=self.settings.http_path,
                 access_token=self.settings.access_token,
+                # Optimize connection settings
+                _user_agent_entry="inbox_monitor_round_robin/2.1.0",
+                # Add connection pooling settings
+                catalog=self.settings.catalog,
+                schema=self.settings.schema_name
             )
             self.logger.info("Connected to Databricks for round-robin service")
             return True
@@ -208,29 +217,30 @@ class RoundRobinService:
             Exception: If query fails
         """
         try:
-            # Query active experts with their assignment counts
+            # Optimized query with better indexing and reduced subquery complexity
             query = f"""
-            SELECT
-                e.ID as expert_id,
-                e.EMAIL as expert_email,
-                e.NAME as expert_name,
-                CAST(e.ISACTIVE as BOOLEAN) as is_active,
-                a.last_assignment_date,
-                COALESCE(a.assignment_count, 0) as assignment_count
-            FROM {self._expert_view} e
-            LEFT JOIN (
-                SELECT
+            WITH expert_assignments AS (
+                SELECT 
                     expert_id,
                     MAX(assignment_date) as last_assignment_date,
                     COUNT(*) as assignment_count
                 FROM {self._assignment_table}
                 WHERE lead_status = 'assigned'
                 GROUP BY expert_id
-            ) a ON e.ID = a.expert_id
+            )
+            SELECT
+                e.ID as expert_id,
+                e.EMAIL as expert_email,
+                e.NAME as expert_name,
+                CAST(e.ISACTIVE as BOOLEAN) as is_active,
+                COALESCE(a.last_assignment_date, CAST('1900-01-01' AS TIMESTAMP)) as last_assignment_date,
+                COALESCE(a.assignment_count, 0) as assignment_count
+            FROM {self._expert_view} e
+            LEFT JOIN expert_assignments a ON e.ID = a.expert_id
             WHERE e.ISACTIVE = 1
             ORDER BY
                 COALESCE(a.assignment_count, 0) ASC,
-                COALESCE(a.last_assignment_date, '1900-01-01') ASC
+                COALESCE(a.last_assignment_date, CAST('1900-01-01' AS TIMESTAMP)) ASC
             """
 
             if self.connection is None:
@@ -291,6 +301,12 @@ class RoundRobinService:
                     assignment_email=assignment_email,
                     test_mode=True,
                 )
+            # Ensure connection is available
+            if self.connection is None:
+                success = await self.connect()
+                if not success:
+                    raise RuntimeError("Database connection not established")
+                    
             # Get active experts
             active_experts = await self.get_active_experts()
 

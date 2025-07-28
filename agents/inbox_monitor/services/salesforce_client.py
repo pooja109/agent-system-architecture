@@ -56,7 +56,8 @@ class ContactUpdateRequest(BaseModel):
     """Request model for updating a contact."""
 
     contact_id: str = Field(..., description="Contact ID to update")
-    invalid_email_address: str = Field(..., description="Invalid email address to record")
+    is_email_invalid: bool = Field(default=True, description="Boolean flag to mark email as invalid")
+
 
 
 class SalesforceClient:
@@ -125,6 +126,7 @@ class SalesforceClient:
                 self.logger.warning("Error closing Salesforce client", error=str(e))
             finally:
                 self.client = None
+
 
     async def _get_access_token(self) -> str:
         """Get a valid access token, refreshing if necessary.
@@ -298,8 +300,8 @@ class SalesforceClient:
                 "Accept": "application/json",
             }
 
-            # Prepare the update data
-            update_data = {"Invalid_Email__c": contact_update.invalid_email_address}
+            # Prepare the update data - using the new boolean field
+            update_data = {"Is_Email_Invalid__c": contact_update.is_email_invalid}
 
             # For Salesforce, we need to use different approach since PATCH isn't supported
             # Use the composite API or REST API with proper method
@@ -319,7 +321,7 @@ class SalesforceClient:
                 self.logger.info(
                     "Successfully updated contact invalid email flag",
                     contact_id=contact_update.contact_id,
-                    invalid_email_address=contact_update.invalid_email_address,
+                    is_email_invalid=contact_update.is_email_invalid,
                 )
                 return True
             else:
