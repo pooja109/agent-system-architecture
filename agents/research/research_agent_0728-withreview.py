@@ -8,6 +8,7 @@ from azure.identity import DefaultAzureCredential
 from azure.ai.projects import AIProjectClient
 from azure.ai.agents.models import MessageRole, BingGroundingTool, ListSortOrder
 from azure.storage.queue import QueueServiceClient, QueueClient
+from azure.ai.agents.models import ListSortOrder, AgentsResponseFormat, RunStatus
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
@@ -33,6 +34,7 @@ RESEARCH_AGENT_NAME = "Research_Agent"  # The agent name to use for the research
 FORMAT_AGENT_NAME = "Markdown_Agent"    # The agent name to use for formatting the content in a markdown format
 AGENT_NAME = "Bing_Search_Assistant"    # The agent name to use for the Bing Search Assistant
 REASONING_MODEL_NAME = os.getenv("REASONING_MODEL_NAME", "o3")  # The reasoning model name to use for the o3 reasoning model
+FORMAT_JSON_AGENT_NAME = "JSON_Agent"
 
 BATCH_ID = datetime.now().strftime("%Y%m%d%H%M%S")              # Batch ID for the run, based on current date and time
 CONTAINER_NAME = os.getenv("AZURE_CONTAINER_NAME")
@@ -209,33 +211,14 @@ async def get_bing_search_results(CUSTOMER_PROFILE: dict, query: str):          
             #logger.info(f"Agent response message ID: {response_message}")
             # convert the response message to a JSON string
             # Create a dictionary from the response message attributes
-            msg_dict = {
-                "id": getattr(response_message, 'id', None),
-                "role": getattr(response_message, 'role', None),
-                "content": getattr(response_message, 'content', None),
-                "created_at": getattr(response_message, 'created_at', None),
-                "thread_id": getattr(response_message, 'thread_id', None),
-                "text_messages": [
-                    {
-                        "text": {"value": text_msg.text.value if hasattr(text_msg, 'text') and hasattr(text_msg.text, 'value') else str(text_msg)}
-                    } for text_msg in (response_message.text_messages if hasattr(response_message, 'text_messages') else [])
-                ],
-                "url_citation_annotations": [
-                    {
-                        "url_citation": {
-                            "title": getattr(annotation.url_citation, 'title', '') if hasattr(annotation, 'url_citation') else '',
-                            "url": getattr(annotation.url_citation, 'url', '') if hasattr(annotation, 'url_citation') else ''
-                        }
-                    } for annotation in (response_message.url_citation_annotations if hasattr(response_message, 'url_citation_annotations') else [])
-                ]
-            }
-            print("Response Message dict:\n", msg_dict)
 
-            msg_json = json.dumps(msg_dict, indent=2)
-            print(msg_json)
+            # pass the response_message to an LLM to format it as a json object
+            response_message_json = await format_response_message_as_json(response_message)
+            print("\n\nFormatted Response Message JSON:\n", response_message_json)
+            print("\n\n")
 
             #review_research_results = await review_research(CUSTOMER_PROFILE, response_message.model_dump_json())           # research reviewer code
-            review_research_results = await review_research(CUSTOMER_PROFILE, msg_json)           # research reviewer code
+            review_research_results = await review_research(CUSTOMER_PROFILE, response_message_json)           # research reviewer code
             for text_message in response_message.text_messages:
                 print(f"Agent response: {text_message.text.value}")
                 #logger.info(f"Agent response: {text_message.text.value}")
@@ -300,6 +283,91 @@ async def update_status_in_databricks(status_cols, status_vals, table_name, stat
     except Exception as e:
         print(f"Error updating execution status into {table_name}: {e}")
         raise e    
+
+
+
+# =================== Function to format content as JSON ====================
+
+async def format_response_message_as_json(response_message) -> json:
+    """
+    Formats the response message from the agent into a JSON string.
+    
+    Args:
+        response_message: The response message object from the agent
+        
+    Returns:
+        str: The formatted JSON string
+    """
+    
+    if not response_message:
+        return "{}"
+    
+    project_client = AIProjectClient(
+            credential=DefaultAzureCredential(), 
+            endpoint=os.getenv("ST_AI_FOUNDRY_ENDPOINT")
+        )
+
+    with project_client:
+        agents_client = project_client.agents
+        # Check for existing agent or create a new one
+        agent_definition = None
+        try:
+            # List existing agents to find if our agent already exists
+            existing_agents = project_client.agents.list_agents()
+            # Look for existing agent with our specific name
+            for agent in existing_agents:
+                if agent.name == FORMAT_JSON_AGENT_NAME:
+                    print(f"Found existing agent: {agent.name} (ID: {agent.id})")
+                    agent_definition = agent
+                    break
+        except Exception as e:
+            print(f"Error listing existing agents: {e}")
+            logger.error(f"❌ Error listing existing agents: {e}")
+
+
+        # Create agent only if it doesn't exist
+        if agent_definition is None:
+            print(f"Creating new agent: {FORMAT_JSON_AGENT_NAME}")
+            # Configure tools if available
+            agent = agents_client.create_agent(
+                    model=os.environ["ST_MODEL_DEPLOYMENT_NAME"],
+                    name=FORMAT_JSON_AGENT_NAME,
+                    instructions="""You are an assistant that formats the response_message into a json format without changing any of the content.""",
+                    response_format=AgentsResponseFormat(type="json_object")
+            )
+            print(f"Created agent, ID: {agent.id}")
+
+
+        # Create thread for communication
+        thread = agents_client.threads.create()
+        print(f"Created thread, ID: {thread.id}")
+
+        message = project_client.agents.messages.create(
+            thread_id=thread.id,
+            role="user",
+            content=response_message)
+
+        run = project_client.agents.runs.create_and_process(
+            thread_id=thread.id,
+            agent_id=agent.id)
+
+        print("Json Formatting agent run status: ", run.status)
+
+        if run.status == "failed":
+            print(f"Run failed: {run.last_error}")
+        else:
+            response_message = project_client.agents.messages.get_last_message_by_role(thread_id=thread.id, role=MessageRole.AGENT, order=ListSortOrder.ASCENDING)
+            if response_message:
+                for text_message in response_message.text_messages:
+                    print(f"Json Formatting agent response: {text_message.text.value}")
+                    formatted_content += text_message.text.value + "\n"
+                
+    return formatted_content
+
+
+
+
+
 
 
 
