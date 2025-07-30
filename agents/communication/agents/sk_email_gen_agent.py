@@ -35,6 +35,7 @@ Website for ordering: [StaplesBusiness.com](https://staplesbusiness.com)
 Signature closing: Best Regards,
 Required footer: [HTML footer as specified]
 
+
 **Rules and Constraints for Email Generation:**
 - Do not over-personalize; keep details general.
 - Avoid negative statements (e.g., sales decline).
@@ -49,7 +50,12 @@ Required footer: [HTML footer as specified]
 - Grammar: 
     - Check for grammar and spelling errors.
     - Ex: Use "Learn more about our services" (not "Learn more on our services").
-- Marketing product categories - Reference the marketing categories associated with the customer or their industry and not the specific primary_category or secondary_category when writing the email.
+- Do not include any numbers from the research data in the email, as these may not be current. For example: number of FTEs, number or percentage of product, price of product, etc.
+- When referencing product categories, always use the corresponding marketing category associated with the customer or their industry, not the primary or secondary category.  
+  For example:  
+    - JanSan or Tissues and Towels → Facilities  
+    - Breakroom or Coffee and Tea → Breakroom  
+    - Office Supplies or Filing, Forms, and Envelopes → Office Supplies
 - When referring to our company, use "Staples Business". Do NOT use "StaplesBusiness.com", "Staples Advantage", "https://staplesbusiness.com/", or "Staples.com".
 
 **Personalization Framework (Maslow’s Hierarchy):**
