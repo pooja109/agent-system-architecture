@@ -21,7 +21,7 @@ from uszipcode import SearchEngine
 load_dotenv()
 
 
-print("\n\nFoundry Endpoint: ", os.getenv("ST_AI_FOUNDRY_ENDPOINT"), "  API Key: ", os.getenv("ST_AI_FOUNDRY_API_KEY"))
+#print("\n\nFoundry Endpoint: ", os.getenv("ST_AI_FOUNDRY_ENDPOINT"), "  API Key: ", os.getenv("ST_AZURE_OPENAI_API_KEY"))
 client = AzureOpenAI(api_version=os.getenv("ST_API_VERSION"),    
                      azure_endpoint=os.getenv("ST_AZURE_OPENAI_ENDPOINT"),    
                      api_key=os.getenv("ST_AZURE_OPENAI_API_KEY"))
@@ -47,8 +47,12 @@ status_table_name = f"{DATABRICKS_STATUS_CATALOG_NAME}.{DATABRICKS_STATUS_SCHEMA
 source_queue_name = os.getenv("AZURE_SRC_QUEUE_NAME")  # Source queue name for the research agent
 queue_name = os.getenv("AZURE_TGT_QUEUE_NAME")  # Target queue name for the research agent
 MAX_MESSAGES = int(os.getenv("MAX_MESSAGES"))  # Maximum number of messages to process at once
-status_cols = ["batch_id", "run_date", "agent_name", "status", "customer_id", "customer_name", "output_file", "blob_date_folder","created_at"]
+status_cols = ["batch_id", "run_date", "agent_name", "status", "customer_id", "customer_name", "output_file", "blob_date_folder", "processed_by", "created_at"]
 #batch_id, run_date, agent_name, status, output_file, customer_id, customer_name, blob_date_folder, created_at
+
+
+MAX_MESSAGES = 3
+
 
 # ===================== Logging Configuration ====================
 
@@ -314,7 +318,8 @@ async def format_content(content: str) -> str:
                         name=FORMAT_AGENT_NAME,
                         instructions="""You are an assistant that formats this markdown better without changing any of the content. The idea is to use this markdown in a presentation to executives. 
                         Need it to be visually appealing and easy to read. Do not change any content or add any new content. 
-                        Do not change the names of Categories. Show them in a single tables.
+                        Do not change FIRST_NAME, LAST_NAME or swap them. 
+                        Show PRIMARY_CAT_1, SECONDARY_CAT_1, PRIMARY_CAT_2, SECONDARY_CAT_2, MARKETING_CAT_1, MARKETING_CAT_2 in a single table. Do not change the Category names. 
                         Just format the content better.""",
                 )
                 print(f"Created agent, ID: {agent.id}")
@@ -429,7 +434,7 @@ async def o3call(prompt, reasoning_effort, tools=None, tool_choice="auto", respo
     
     # Create the base parameters for the API call
     params = {
-        "model": "{REASONING_MODEL_NAME}",
+        "model": REASONING_MODEL_NAME,
         "messages": [
             {
                 "role": "user", 
@@ -611,7 +616,7 @@ async def main() -> None:
     Use only existing Primary and Secondary Categories for the Customers. Do not make up any categories or values or bundles or discounts or rebates or percent off or credit. 
     Only mention categories in the customer dataset. Do not recommend any other products or categories that are not in customer dataset.
     For each customer in the customer dataset, identify target categories by utilizing both Primary and Secondary Categories. 
-    Provide prioritized recommendation for Primary Category 1 and Secondary Category 1 first, followed by Primary Category 2 and Secondary Category 2, and then Primary Category 3 and Secondary Category 3 maintaining this order of importance in the output.
+    Provide prioritized recommendation for Primary Category 1 and Secondary Category 1 first, followed by Primary Category 2 and Secondary Category 2 maintaining this order of importance in the output.
     Use Total Sales Amount for the Primary and Secondary Categories to show the historical sales amount for that Customer.
     **Policy:** All recommendations should be future-facing (after """ + datetime.now().strftime("%Y-%m-%d") + """) and should not reference any past dates or events.
     **Policy:** These customer are B2B customers so reference Staples Business instead of Staples.com or Staplesbusiness.com.
@@ -663,6 +668,9 @@ async def main() -> None:
             except Exception as e:
                 logger.error(f"❌ Error processing message: {e}.")
                 continue
+            
+            #get BATCH_ID from the message
+            MSG_BATCH_ID = data.get("batch_id", BATCH_ID)
             
             # Convert the data to DataFrames
             try:
@@ -746,13 +754,15 @@ async def main() -> None:
                 cat2 = None
                 print("No Primary Category 2 found for this customer.")
 
+            # Commended out the below code to remove Primary Category 3 
+            '''
             if not i2a_data['PRIMARY_CAT_3'].values[0] is None:
                 cat3 = i2a_data['PRIMARY_CAT_3'].values[0]
                 print("Primary Category 3: ", cat3, " and Marketing Category 3: ", i2a_data['MARKETING_CAT_3'].values[0])
             else:
                 cat3 = None
                 print("No Primary Category 3 found for this customer.")
-
+            '''
 
         
             City_code = i2a_data['DIV'].values[0] if not i2a_data.empty else None
@@ -800,9 +810,14 @@ async def main() -> None:
                 logger.info("END: BING SEARCH")
 
             contacts = transactions_data[['SF_ACCOUNT_ID', 'SF_CONTACT_ID', 'FIRST_NAME', 'LAST_NAME','EMAIL']].drop_duplicates()
-            categories = i2a_data[['PRIMARY_CAT_1', 'PRIMARY_CAT_2', 'PRIMARY_CAT_3',
-                                    'SECONDARY_CAT_1', 'SECONDARY_CAT_2', 'SECONDARY_CAT_3',
-                                    'MARKETING_CAT_1', 'MARKETING_CAT_2', 'MARKETING_CAT_3']].drop_duplicates()
+            categories = i2a_data[['PRIMARY_CAT_1', 'PRIMARY_CAT_2', 'SECONDARY_CAT_1', 'SECONDARY_CAT_2', 'MARKETING_CAT_1', 'MARKETING_CAT_2',]].drop_duplicates()
+
+            # Commented out the below code to remove Primary Category 3 and Secondary Category 3
+            #categories = i2a_data[['PRIMARY_CAT_1', 'PRIMARY_CAT_2', 'PRIMARY_CAT_3',
+            #                        'SECONDARY_CAT_1', 'SECONDARY_CAT_2', 'SECONDARY_CAT_3',
+            #                        'MARKETING_CAT_1', 'MARKETING_CAT_2', 'MARKETING_CAT_3']].drop_duplicates()
+
+            
 
             ## Instructions and Tasks
 
@@ -884,11 +899,14 @@ async def main() -> None:
                 markdown_content += "Marketing Categories : \n" + marketing_data.__str__() + "\n\n"
 
                 markdown_content += "Contacts : \n" + contacts.__str__() + "\n\n"
+                #print("\n\nContacts before formatting : ", contacts)
+                #print("Contacts as string : ", contacts.__str__() + "\n\n")
 
                 logger.info("START: FORMATTING CONTENT IN MARKDOWN FORMAT")
                 formatted_content = await format_content(markdown_content)  # Format the content in markdown format
                 logger.info("END: FORMATTING CONTENT IN MARKDOWN FORMAT")
 
+                #print("\n\nFormatted Content : ", formatted_content)
 
                 #cat_string = ';'.join(categories.astype(str))
                 # see the categories referenced in the research report. Values separated by semicolon
@@ -925,7 +943,7 @@ async def main() -> None:
                 run_date = current_datetime.strftime("%Y-%m-%d %H:%M:%S")
                 # Send the research report to the Azure Storage Queue
                 research_msg = {
-                    "batch_id": BATCH_ID,
+                    "batch_id": MSG_BATCH_ID,
                     "run_date": run_date,
                     "agent_name": RESEARCH_AGENT_NAME,
                     "status": "S",
@@ -935,7 +953,7 @@ async def main() -> None:
                 }
 
                 queue_client.send_message(json.dumps(research_msg))                # Uncomment to send message to queue
-                logger.info(f"Message pushed to queue '{queue_name}' : Batch Id : {BATCH_ID} ; AgentName : {RESEARCH_AGENT_NAME} ; Customer Id : {b_cust}")
+                logger.info(f"Message pushed to queue '{queue_name}' : Batch Id : {MSG_BATCH_ID} ; AgentName : {RESEARCH_AGENT_NAME} ; Customer Id : {b_cust}")
                 
                 # Let the service know we're finished with the message and it can be safely deleted.
                 try:
@@ -951,7 +969,7 @@ async def main() -> None:
                 
                 # Update the status in Databricks
                 status_vals = [(
-                    int(BATCH_ID),
+                    int(MSG_BATCH_ID),
                     run_date,
                     RESEARCH_AGENT_NAME,
                     "S",
@@ -959,6 +977,7 @@ async def main() -> None:
                     cust_name,
                     research_file,
                     folder_name,
+                    RESEARCH_AGENT_NAME,
                     datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 )]
 
