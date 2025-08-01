@@ -159,11 +159,11 @@ async def main() -> None:
     logger.info("Getting data from Databricks...")
     try:
         sql_i2a = "select * from " \
-        "(select * from " + i2a_table_name + " WHERE VERTICAL =='Commercial' AND CUST_ID in (select distinct cust_id from " + txn_table_name + ")) Comm " \
+        "(select * from " + i2a_table_name + " WHERE VERTICAL =='Commercial' AND CUST_ID in (select distinct cust_id from " + txn_table_name + ") limit 20) Comm " \
         "UNION " \
-        "select * from (select * from " + i2a_table_name + " WHERE VERTICAL =='Healthcare' AND CUST_ID in (select distinct cust_id from " + txn_table_name + ")) Health " \
+        "select * from (select * from " + i2a_table_name + " WHERE VERTICAL =='Healthcare' AND CUST_ID in (select distinct cust_id from " + txn_table_name + ") limit 5) Health " \
         "UNION " \
-        "SELECT * from (select * from " + i2a_table_name + " WHERE VERTICAL =='Sled' AND CUST_ID in (select distinct cust_id from " + txn_table_name + ")) Sled "
+        "SELECT * from (select * from " + i2a_table_name + " WHERE VERTICAL =='Sled' AND CUST_ID in (select distinct cust_id from " + txn_table_name + ") limit 5) Sled "
         
         sql_txn = "select * from " + txn_table_name + " where cust_id in (select distinct cust_id from " + i2a_table_name + ")"
 
@@ -173,7 +173,7 @@ async def main() -> None:
 
         sql_i2a_marketing = "select * from " + i2a_marketing_table_name
 
-        sql_i2a_no_contact = "select CUST_ID, CUST_NAME from " + i2a_table_name + " WHERE CUST_ID NOT IN (select distinct cust_id from " + txn_table_name + ")"
+        sql_i2a_no_contact = "select CUST_ID, CUST_NAME from " + i2a_table_name + " WHERE CUST_ID NOT IN (select distinct cust_id from " + txn_table_name + ") limit 5"
 
 
         #print("\n\nsql_i2a: ", sql_i2a)

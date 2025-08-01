@@ -83,16 +83,16 @@ async def filter_results_with_llm(
             client = OpenAI(
             api_key=os.getenv("ST_AZURE_OPENAI_API_KEY"),
             default_query={"api-version": "preview"},
-            base_url=os.getenv("ST_AZURE_OPENAI_ENDPOINT"),
+            base_url=os.getenv("OPEN_AI_ENDPOINT"),
             )
 
 
-            client = AzureOpenAI(api_version=os.getenv("ST_API_VERSION"),    
-                     azure_endpoint=os.getenv("ST_AZURE_OPENAI_ENDPOINT"),    
-                     api_key=os.getenv("ST_AZURE_OPENAI_API_KEY"))
+            #client = AzureOpenAI(api_version=os.getenv("ST_API_VERSION"),    
+            #         azure_endpoint=os.getenv("OPEN_AI_ENDPOINT"),    
+            #         api_key=os.getenv("ST_AZURE_OPENAI_API_KEY"))
 
             response = client.responses.parse(
-                model=  "gpt-4o",                                    #"gpt-4.1",
+                model=  "gpt-4.1",                                    #"gpt-4o",
                 input=[
                     {
                         "role": "system",
