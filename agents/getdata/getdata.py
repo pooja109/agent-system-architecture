@@ -144,6 +144,7 @@ async def main() -> None:
     marketing_table_name = f"{DATABRICKS_MKT_CATALOG_NAME}.{DATABRICKS_MKT_SCHEMA_NAME}.{DATABRICKS_MKT_TABLE_NAME}"
     i2a_marketing_table_name = f"{DATABRICKS_I2A_MKT_CATALOG_NAME}.{DATABRICKS_I2A_MKT_SCHEMA_NAME}.{DATABRICKS_I2A_MKT_TABLE_NAME}" 
     status_table_name = f"{DATABRICKS_STATUS_CATALOG_NAME}.{DATABRICKS_STATUS_SCHEMA_NAME}.{DATABRICKS_STATUS_TABLE_NAME}"
+    
 
     '''
     i2a_table_name = f"{DATABRICKS_I2A_CAT_SCHEMA_NAME}.i2a_lowtouch"
@@ -158,12 +159,12 @@ async def main() -> None:
     logger.info("Getting data from Databricks...")
     try:
         sql_i2a = "select * from " \
-        "(select * from " + i2a_table_name + " WHERE VERTICAL =='Commercial' AND CUST_ID in (select distinct cust_id from " + txn_table_name + ") LIMIT 10) Comm " \
+        "(select * from " + i2a_table_name + " WHERE VERTICAL =='Commercial' AND CUST_ID in (select distinct cust_id from " + txn_table_name + ") limit 20) Comm " \
         "UNION " \
-        "select * from (select * from " + i2a_table_name + " WHERE VERTICAL =='Healthcare' AND CUST_ID in (select distinct cust_id from " + txn_table_name + ") LIMIT 5) Health " \
+        "select * from (select * from " + i2a_table_name + " WHERE VERTICAL =='Healthcare' AND CUST_ID in (select distinct cust_id from " + txn_table_name + ") limit 5) Health " \
         "UNION " \
-        "SELECT * from (select * from " + i2a_table_name + " WHERE VERTICAL =='Sled' AND CUST_ID in (select distinct cust_id from " + txn_table_name + ") LIMIT 5) Sled"
-
+        "SELECT * from (select * from " + i2a_table_name + " WHERE VERTICAL =='Sled' AND CUST_ID in (select distinct cust_id from " + txn_table_name + ") limit 5) Sled "
+        
         sql_txn = "select * from " + txn_table_name + " where cust_id in (select distinct cust_id from " + i2a_table_name + ")"
 
         sql_dnb = "select distinct cust_id, business_name, website from " + dnb_table_name + " where cust_id in (select distinct cust_id from " + i2a_table_name + ")"
@@ -172,33 +173,53 @@ async def main() -> None:
 
         sql_i2a_marketing = "select * from " + i2a_marketing_table_name
 
-        #print("sql_i2a: ", sql_i2a)
+        sql_i2a_no_contact = "select CUST_ID, CUST_NAME from " + i2a_table_name + " WHERE CUST_ID NOT IN (select distinct cust_id from " + txn_table_name + ") limit 5"
+
+
+        #print("\n\nsql_i2a: ", sql_i2a)
         #print("sql_txn: ", sql_txn)
         #print("sql_dnb: ", sql_dnb)
         #print("sql_marketing: ", sql_marketing)
         #print("sql_i2a_marketing: ", sql_i2a_marketing)
+        #print("-"*150)
 
-        logger.info("Getting data from :",i2a_table_name)
+        print("Getting data from :",i2a_table_name.__str__())
         df_i2a = await get_data_from_databricks(sql_i2a)
 
-        logger.info("Getting data from :",txn_table_name)
+        print("Getting data from :",txn_table_name.__str__())
         df_txn = await get_data_from_databricks(sql_txn)
         
-        logger.info("Getting data from :",dnb_table_name)
+        print("Getting data from :",dnb_table_name.__str__())
         df_dnb = await get_data_from_databricks(sql_dnb)
 
-        logger.info("Getting data from :",marketing_table_name)
+        print("Getting data from :",marketing_table_name.__str__())
         df_marketing = await get_data_from_databricks(sql_marketing)
 
-        logger.info("Getting data from :",i2a_marketing_table_name)
+        print("Getting data from :",i2a_marketing_table_name.__str__())
         df_i2a_marketing = await get_data_from_databricks(sql_i2a_marketing)
         
+        print("Getting data for no Contacts from :",i2a_table_name.__str__())
+        df_i2a_no_contact = await get_data_from_databricks(sql_i2a_no_contact)
+
         logger.info("Data fetched successfully from Databricks")
 
         #print(df_i2a.head(5))
     except Exception as e:
         logger.error(f"Error fetching data from Databricks: {e}")
         return
+    
+    
+    # Drop 3rd category columns from df_i2a : PRIMARY_CAT_3	PRIMARY_CAT_3_VALUE	SECONDARY_CAT_3	SECONDARY_CAT_3_VALUE
+    df_i2a = df_i2a.drop(columns=['PRIMARY_CAT_3', 'PRIMARY_CAT_3_VALUE', 'SECONDARY_CAT_3', 'SECONDARY_CAT_3_VALUE'], errors='ignore')
+    
+    # Drop 3rd category columns from df_txn : PRIMARY_CAT_3	PRIMARY_CAT_3_VALUE	SECONDARY_CAT_3	SECONDARY_CAT_3_VALUE	PRIMARY_CAT_3_TOTAL_SALES_AMOUNT	SECONDARY_CAT_3_TOTAL_SALES_AMOUNT	PRIMARY_CAT_3_TOTAL_RETURN_AMOUNT	SECONDARY_CAT_3_TOTAL_RETURN_AMOUNT	PRIMARY_CAT_3_TOTAL_ORDERS	SECONDARY_CAT_3_TOTAL_ORDERS
+    df_txn = df_txn.drop(columns=['PRIMARY_CAT_3', 'PRIMARY_CAT_3_VALUE', 'SECONDARY_CAT_3', 'SECONDARY_CAT_3_VALUE', 'PRIMARY_CAT_3_TOTAL_SALES_AMOUNT',
+                                   'SECONDARY_CAT_3_TOTAL_SALES_AMOUNT', 'PRIMARY_CAT_3_TOTAL_RETURN_AMOUNT', 'SECONDARY_CAT_3_TOTAL_RETURN_AMOUNT',
+                                   'PRIMARY_CAT_3_TOTAL_ORDERS', 'SECONDARY_CAT_3_TOTAL_ORDERS'], errors='ignore')
+
+
+
+   
     
     try:
         # Merge the marketing data and i2a marketing data on Marketing Category
@@ -245,6 +266,13 @@ async def main() -> None:
             logger.error(f"❌ Failed to connect to queue '{queue_name}': {e}")
             raise
 
+    
+
+
+    
+    
+    # ==================== Main Execution Loop to process I2A and other datasets and push it in the Research Queue ====================
+    logger.info("Processing customers with contact details...")
     status_cols = [
     "batch_id",
     "run_date",
@@ -252,12 +280,11 @@ async def main() -> None:
     "status",
     "customer_id",
     "customer_name",
+    "is_reviewed",
+    "processed_by",
     "created_at"
     ]
-    
-    
-    
-    # ==================== Main Execution Loop ====================
+
     for cust in df_i2a['CUST_ID']:
         logger.info("PROCESSING CUSTOMER ID: %s", cust)
                 
@@ -292,6 +319,9 @@ async def main() -> None:
             filtered_df['MARKETING_CAT_2'] = None
             #print("No Primary Category 2 found for this customer.")
 
+        '''
+        # Commented out the code for Primary Category 3 as it is not used in the current implementation
+
         if not filtered_df['PRIMARY_CAT_3'].values[0] is None:
             cat3 = filtered_df['PRIMARY_CAT_3'].values[0]
             filtered_df = filtered_df.merge(df_i2a_marketing[['I2A_Primary_Category', 'Marketing_Primary_Category']], left_on='PRIMARY_CAT_3', right_on='I2A_Primary_Category', how='left', suffixes=('', 'M_'))
@@ -308,6 +338,15 @@ async def main() -> None:
             filtered_marketing_df = df_marketing[df_marketing['I2A_Primary_Category'].isnull()]
         else:
             filtered_marketing_df = df_marketing[(df_marketing['I2A_Primary_Category'] == cat1) | (df_marketing['I2A_Primary_Category'] == cat2) | (df_marketing['I2A_Primary_Category'] == cat3)]
+        '''
+
+        # Filter the marketing data for the specific customer based on Primary Categories
+        if cat1 is None and cat2 is None:
+            filtered_marketing_df = df_marketing[df_marketing['I2A_Primary_Category'].isnull()]
+        else:
+            filtered_marketing_df = df_marketing[(df_marketing['I2A_Primary_Category'] == cat1) | (df_marketing['I2A_Primary_Category'] == cat2)]
+
+
 
         # Store only Marketing Secondary Category in the filtered_marketing_df. Remove any duplicate records based on 'Marketing Secondary Category'
         if not filtered_marketing_df.empty:
@@ -319,8 +358,7 @@ async def main() -> None:
 
         current_datetime = datetime.now()
 
-        # convert the DataFrame to a dictionary and then to a JSON string
-        # This is to ensure that the data is in a format that can be sent to the Azure Queue
+        # convert the DataFrame to a dictionary and then to a JSON string. This is to ensure that the data is in a format that can be sent to the Azure Queue
         filtered_df_json = filtered_df.to_json(orient='records') if not filtered_df.empty else "[]"
         filtered_txn_df_json = filtered_txn_df.to_json(orient='records') if not filtered_txn_df.empty else "[]"
         filtered_dnb_df_json = filtered_dnb_df.to_json(orient='records') if not filtered_dnb_df.empty else "[]"
@@ -328,7 +366,8 @@ async def main() -> None:
         #i2a_marketing_json = df_i2a_marketing.to_json(orient='records') if not df_i2a_marketing.empty else "[]"
 
         run_date = current_datetime.strftime("%Y-%m-%d %H:%M:%S")
-        # Create a json object for the customer with details from each DataFrame
+        
+        # Create a json object for the customer with details from each DataFrame, to be passed to the Azure Queue (Research Queue))
         customer_data = {
             "batch_id": BATCH_ID,
             "run_date": run_date,
@@ -356,6 +395,8 @@ async def main() -> None:
             "S",
             b_cust,
             cust_name,
+            True,
+            agent_name,
             datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         )]
         try:
@@ -363,7 +404,59 @@ async def main() -> None:
             logger.info(f"Status updated in Databricks for customer {b_cust}")
         except Exception as e:
             logger.error(f"Error updating status in Databricks for customer {b_cust}: {e}")
+
+
+
+
+
+
+    # ===================== Update Status as N (Not Processed) in Databricks for I2A records which have no contact details ====================
+    logger.info("Updating status as 'N' for customers with no contact details...")
+    
+    status_cols = [
+    "batch_id",
+    "run_date",
+    "agent_name",
+    "status",
+    "customer_id",
+    "customer_name",
+    "is_reviewed",
+    "review_notes",
+    "processed_by",
+    "created_at"
+    ]
+    
+    for cust in df_i2a_no_contact['CUST_ID']:
+                       
+        b_cust = f"{cust}"
+        current_datetime = datetime.now()
+        run_date = current_datetime.strftime("%Y-%m-%d %H:%M:%S")
+        cust_name = df_i2a_no_contact[df_i2a_no_contact['CUST_ID'] == cust]['CUST_NAME'].values[0] if not df_i2a_no_contact[df_i2a_no_contact['CUST_ID'] == cust].empty else None
+
+        # Update the status in Databricks
+        status_vals = [(
+            int(BATCH_ID),
+            run_date,
+            agent_name,
+            "N",
+            b_cust,
+            cust_name,
+            True,
+            "No Contact details found",
+            agent_name,
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        )]
         
+        try:
+            await update_status_in_databricks(status_cols=status_cols, status_vals=status_vals, table_name=status_table_name, status="N")
+        except Exception as e:
+            print(f"Error constructing SQL query for i2a table: {e}")
+            raise e 
+
+
+    logger.info("All customers processed successfully. Exiting...")
+
+
 
 
 

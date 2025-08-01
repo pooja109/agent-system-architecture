@@ -8,6 +8,7 @@ from azure.identity import DefaultAzureCredential
 from azure.ai.projects import AIProjectClient
 from azure.ai.agents.models import MessageRole, BingGroundingTool, ListSortOrder
 from azure.storage.queue import QueueServiceClient, QueueClient
+from azure.ai.agents.models import ListSortOrder, AgentsResponseFormat, RunStatus
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
@@ -15,40 +16,45 @@ from datetime import datetime
 from typing import List, Optional
 from databricks import sql
 from uszipcode import SearchEngine
-
+from researchreviewer import WebSearchResultsExtraction, review_research
 
 # Load environment variables
 load_dotenv()
 
 
-print("\n\nFoundry Endpoint: ", os.getenv("ST_AI_FOUNDRY_ENDPOINT"), "  API Key: ", os.getenv("ST_AI_FOUNDRY_API_KEY"))
-client = AzureOpenAI(api_version=os.getenv("ST_API_VERSION"),    
-                     azure_endpoint=os.getenv("ST_AZURE_OPENAI_ENDPOINT"),    
-                     api_key=os.getenv("ST_AZURE_OPENAI_API_KEY"))
+#print("\n\nFoundry Endpoint: ", os.getenv("ST_AI_FOUNDRY_ENDPOINT"), "  API Key: ", os.getenv("ST_AZURE_OPENAI_API_KEY"))
 
 
 # ===================== Constants ====================
 
 RESEARCH_AGENT_NAME = "Research_Agent"  # The agent name to use for the research agent - chat completion
-FORMAT_AGENT_NAME = "Markdown_Agent"  # The agent name to use for formatting the content in a markdown format
-AGENT_NAME = "Bing_Search_Assistant"  # The agent name to use for the Bing Search Assistant
+FORMAT_AGENT_NAME = "Markdown_Agent"    # The agent name to use for formatting the content in a markdown format
+AGENT_NAME = "Bing_Search_Assistant"    # The agent name to use for the Bing Search Assistant
 REASONING_MODEL_NAME = os.getenv("REASONING_MODEL_NAME", "o3")  # The reasoning model name to use for the o3 reasoning model
+FORMAT_JSON_AGENT_NAME = "JSON_Agent"
 
-BATCH_ID = datetime.now().strftime("%Y%m%d%H%M%S")  # Batch ID for the run, based on current date and time
+BATCH_ID = datetime.now().strftime("%Y%m%d%H%M%S")              # Batch ID for the run, based on current date and time
 CONTAINER_NAME = os.getenv("AZURE_CONTAINER_NAME")
 STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
 AI_FOUNDRY_ENDPOINT = os.getenv("ST_AI_FOUNDRY_ENDPOINT")
 AI_FOUNDRY_API_KEY = os.getenv("ST_AI_FOUNDRY_API_KEY")
-BING_CONNECTION_NAME = os.environ["ST_BING_CONNECTION_NAME"]  # Default connection name for Bing Grounding Tool
+BING_CONNECTION_NAME = os.environ["ST_BING_CONNECTION_NAME"]    # Default connection name for Bing Grounding Tool
 DATABRICKS_STATUS_CATALOG_NAME = os.getenv("DATABRICKS_STATUS_CATALOG_NAME")
 DATABRICKS_STATUS_SCHEMA_NAME = os.getenv("DATABRICKS_STATUS_SCHEMA_NAME")
 DATABRICKS_STATUS_TABLE_NAME = os.getenv("DATABRICKS_STATUS_TABLE_NAME")
 status_table_name = f"{DATABRICKS_STATUS_CATALOG_NAME}.{DATABRICKS_STATUS_SCHEMA_NAME}.{DATABRICKS_STATUS_TABLE_NAME}"
-source_queue_name = os.getenv("AZURE_SRC_QUEUE_NAME")  # Source queue name for the research agent
-queue_name = os.getenv("AZURE_TGT_QUEUE_NAME")  # Target queue name for the research agent
-MAX_MESSAGES = int(os.getenv("MAX_MESSAGES"))  # Maximum number of messages to process at once
-status_cols = ["batch_id", "run_date", "agent_name", "status", "customer_id", "customer_name", "output_file", "blob_date_folder","created_at"]
-#batch_id, run_date, agent_name, status, output_file, customer_id, customer_name, blob_date_folder, created_at
+source_queue_name = os.getenv("AZURE_SRC_QUEUE_NAME")   # Source queue name for the research agent
+queue_name = os.getenv("AZURE_TGT_QUEUE_NAME")          # Target queue name for the research agent
+MAX_MESSAGES = int(os.getenv("MAX_MESSAGES"))           # Maximum number of messages to process at once
+status_cols = ["batch_id", "run_date", "agent_name", "status", "customer_id", "customer_name", "output_file", "blob_date_folder","processed_by", "created_at"]
+client = AzureOpenAI(api_version=os.getenv("ST_API_VERSION"),    
+                     azure_endpoint=os.getenv("ST_AZURE_OPENAI_ENDPOINT"),    
+                     api_key=os.getenv("ST_AZURE_OPENAI_API_KEY"))
+
+
+
+
+MAX_MESSAGES = 5
 
 # ===================== Logging Configuration ====================
 
@@ -58,10 +64,16 @@ logger.setLevel(logging.INFO)
 
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
+log_file = 'research_agent_'+ datetime.now().strftime("%Y%m%d") +'.log'
+file_handler = logging.FileHandler(log_file)
+file_handler.setFormatter(formatter)
+file_handler.setLevel(logging.INFO)
+
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(formatter)
 stream_handler.setLevel(logging.INFO)
 
+logger.addHandler(file_handler)
 logger.addHandler(stream_handler)   
 
 
@@ -71,7 +83,8 @@ logger.addHandler(stream_handler)
 
 # ==================== Function to get results from Grounding with Bing Seach   ====================
 
-async def get_bing_search_results(query: str):
+#async def get_bing_search_results(query: str):
+async def get_bing_search_results(CUSTOMER_PROFILE: dict, query: str):                          # research reviewer code
     """
     Retrieves Bing Search results for a given query using the Bing Grounding Tool.
     
@@ -91,7 +104,7 @@ async def get_bing_search_results(query: str):
     conn_name = BING_CONNECTION_NAME
     search_results = ""
     search_citations = ""
-
+    review_research_results:List[WebSearchResultsExtraction] = []                           # research reviewer code
     
     # Create agent with the bing tool and process agent run
     with project_client:
@@ -122,10 +135,10 @@ async def get_bing_search_results(query: str):
                     break
         except Exception as e:
             logger.error(f"❌ Error listing existing agents: {e}")
+        
+        
+        
         # Create agent only if it doesn't exist
-        
-        
-
         if agent_definition is None:
             logger.info(f"Creating new agent: {AGENT_NAME}")
             # Configure tools if available
@@ -196,18 +209,27 @@ async def get_bing_search_results(query: str):
 
         # Print the Agent's response message with optional citation
         response_message = agents_client.messages.get_last_message_by_role(thread_id=thread.id, role=MessageRole.AGENT)
+    
         if response_message:
             #logger.info(f"Agent response message ID: {response_message}")
+            # convert the response message to a JSON string
+            # pass the response_message to an LLM to format it as a json object
+            response_message_json = await format_response_message_as_json(response_message)
+            #print("\n\nFormatted Response Message JSON:\n", response_message_json)
+            #print("\n\n")
+
+            #review_research_results = await review_research(CUSTOMER_PROFILE, response_message.model_dump_json())           # research reviewer code
+            review_research_results = await review_research(CUSTOMER_PROFILE, response_message_json)                        # research reviewer code
             for text_message in response_message.text_messages:
                 print(f"Agent response: {text_message.text.value}")
                 search_results += text_message.text.value + "\n"
             for annotation in response_message.url_citation_annotations:
                 print(f"URL Citation: [{annotation.url_citation.title}]({annotation.url_citation.url})")
                 search_citations += "\n\nURL Citation:\n" + annotation.url_citation.title + " : " + annotation.url_citation.url
-    
-    
-    return search_results, search_citations
 
+
+    return search_results, search_citations, review_research_results                                        # research reviewer code
+    #return search_results, search_citations
 
 
 # ==================== Function to return State Code based off Zip Code  ====================
@@ -263,6 +285,162 @@ async def update_status_in_databricks(status_cols, status_vals, table_name, stat
 
 
 
+# =================== Function to format content as JSON ====================
+
+async def format_response_message_as_json(response_message):
+    load_dotenv()
+    if not response_message:
+        return "{}"
+    
+    system_prompt = """You are an assistant that formats the response_message into a json format without changing any of the content. Return only valid JSON."""
+    user_prompt = str(response_message)
+    
+    # Use the existing AzureOpenAI client
+    try:
+        response = client.chat.completions.create(
+            model=os.environ["ST_MODEL_DEPLOYMENT_NAME"],  # Use the same model as other parts
+            messages=[
+                {
+                    "role": "system",
+                    "content": system_prompt,
+                },
+                {
+                    "role": "user", 
+                    "content": user_prompt
+                },
+            ],
+            response_format={"type": "json_object"}
+        )
+        
+        # Extract the JSON content from the response
+        json_content = response.choices[0].message.content
+        
+        # Try to parse it to ensure it's valid JSON
+        import json as json_module
+        parsed_json = json_module.loads(json_content)
+        return parsed_json
+        
+    except Exception as e:
+        logger.error(f"Error formatting response message as JSON: {e}")
+        # Fallback to creating a simple JSON structure
+        try:
+            # Create a basic JSON representation of the response message
+            fallback_json = {
+                "id": getattr(response_message, 'id', None),
+                "role": getattr(response_message, 'role', None),
+                "content": str(response_message),
+                "created_at": getattr(response_message, 'created_at', None),
+                "thread_id": getattr(response_message, 'thread_id', None),
+                "text_messages": [
+                    {
+                        "text": {"value": text_msg.text.value if hasattr(text_msg, 'text') and hasattr(text_msg.text, 'value') else str(text_msg)}
+                    } for text_msg in (response_message.text_messages if hasattr(response_message, 'text_messages') else [])
+                ],
+                "url_citation_annotations": [
+                    {
+                        "url_citation": {
+                            "title": getattr(annotation.url_citation, 'title', '') if hasattr(annotation, 'url_citation') else '',
+                            "url": getattr(annotation.url_citation, 'url', '') if hasattr(annotation, 'url_citation') else ''
+                        }
+                    } for annotation in (response_message.url_citation_annotations if hasattr(response_message, 'url_citation_annotations') else [])
+                ],
+                "error": str(e),
+                "message": "Fallback JSON structure created due to formatting error."
+            }
+            return fallback_json
+        except Exception as fallback_error:
+            logger.error(f"Error creating fallback JSON: {fallback_error}")
+            return {
+                "error": str(e),
+                "fallback_error": str(fallback_error),
+                "message": "Failed to format response message as JSON."
+            }
+
+
+'''
+async def format_response_message_as_json(response_message) -> json:
+    """
+    Formats the response message from the agent into a JSON string.
+    
+    Args:
+        response_message: The response message object from the agent
+        
+    Returns:
+        str: The formatted JSON string
+    """
+    load_dotenv()
+    if not response_message:
+        return "{}"
+    
+    project_client = AIProjectClient(
+            credential=DefaultAzureCredential(), 
+            endpoint=os.getenv("ST_AI_FOUNDRY_ENDPOINT")
+        )
+
+    with project_client:
+        agents_client = project_client.agents
+        # Check for existing agent or create a new one
+        agent_definition = None
+        try:
+            # List existing agents to find if our agent already exists
+            existing_agents = project_client.agents.list_agents()
+            # Look for existing agent with our specific name
+            for agent in existing_agents:
+                if agent.name == FORMAT_JSON_AGENT_NAME:
+                    print(f"Found existing agent: {agent.name} (ID: {agent.id})")
+                    agent_definition = agent
+                    break
+        except Exception as e:
+            print(f"Error listing existing agents: {e}")
+            logger.error(f"❌ Error listing existing agents: {e}")
+
+
+        # Create agent only if it doesn't exist
+        if agent_definition is None:
+            print(f"Creating new agent: {FORMAT_JSON_AGENT_NAME}")
+            # Configure tools if available
+            agent = agents_client.create_agent(
+                    model=os.environ["ST_MODEL_DEPLOYMENT_NAME"],
+                    name=FORMAT_JSON_AGENT_NAME,
+                    instructions="""You are an assistant that formats the response_message into a json format without changing any of the content.""",
+                    response_format=AgentsResponseFormat(type="json_object")
+            )
+            print(f"Created agent, ID: {agent.id}")
+
+
+        # Create thread for communication
+        thread = agents_client.threads.create()
+        print(f"Created thread, ID: {thread.id}")
+
+        message = project_client.agents.messages.create(
+            thread_id=thread.id,
+            role="user",
+            content=response_message)
+
+        run = project_client.agents.runs.create_and_process(
+            thread_id=thread.id,
+            agent_id=agent.id)
+
+        print("Json Formatting agent run status: ", run.status)
+
+        if run.status == "failed":
+            print(f"Run failed: {run.last_error}")
+        else:
+            response_message = project_client.agents.messages.get_last_message_by_role(thread_id=thread.id, role=MessageRole.AGENT, order=ListSortOrder.ASCENDING)
+            if response_message:
+                for text_message in response_message.text_messages:
+                    print(f"Json Formatting agent response: {text_message.text.value}")
+                    formatted_content += text_message.text.value + "\n"
+                
+    return formatted_content
+
+'''
+
+
+
+
+
+
 
 # ==================== Function to format content in a markdown format  ====================
 
@@ -314,7 +492,8 @@ async def format_content(content: str) -> str:
                         name=FORMAT_AGENT_NAME,
                         instructions="""You are an assistant that formats this markdown better without changing any of the content. The idea is to use this markdown in a presentation to executives. 
                         Need it to be visually appealing and easy to read. Do not change any content or add any new content. 
-                        Do not change the names of Categories. Show them in a single tables.
+                        Do not change FIRST_NAME, LAST_NAME or swap them. 
+                        Do not change the names of Categories or swap them. Show them in a single table.
                         Just format the content better.""",
                 )
                 print(f"Created agent, ID: {agent.id}")
@@ -429,7 +608,7 @@ async def o3call(prompt, reasoning_effort, tools=None, tool_choice="auto", respo
     
     # Create the base parameters for the API call
     params = {
-        "model": "{REASONING_MODEL_NAME}",
+        "model": REASONING_MODEL_NAME,
         "messages": [
             {
                 "role": "user", 
@@ -611,7 +790,7 @@ async def main() -> None:
     Use only existing Primary and Secondary Categories for the Customers. Do not make up any categories or values or bundles or discounts or rebates or percent off or credit. 
     Only mention categories in the customer dataset. Do not recommend any other products or categories that are not in customer dataset.
     For each customer in the customer dataset, identify target categories by utilizing both Primary and Secondary Categories. 
-    Provide prioritized recommendation for Primary Category 1 and Secondary Category 1 first, followed by Primary Category 2 and Secondary Category 2, and then Primary Category 3 and Secondary Category 3 maintaining this order of importance in the output.
+    Provide prioritized recommendation for Primary Category 1 and Secondary Category 1 first, followed by Primary Category 2 and Secondary Category 2 maintaining this order of importance in the output.
     Use Total Sales Amount for the Primary and Secondary Categories to show the historical sales amount for that Customer.
     **Policy:** All recommendations should be future-facing (after """ + datetime.now().strftime("%Y-%m-%d") + """) and should not reference any past dates or events.
     **Policy:** These customer are B2B customers so reference Staples Business instead of Staples.com or Staplesbusiness.com.
@@ -663,6 +842,9 @@ async def main() -> None:
             except Exception as e:
                 logger.error(f"❌ Error processing message: {e}.")
                 continue
+            
+            #get BATCH_ID from the message
+            MSG_BATCH_ID = data.get("batch_id", BATCH_ID)
             
             # Convert the data to DataFrames
             try:
@@ -746,13 +928,15 @@ async def main() -> None:
                 cat2 = None
                 print("No Primary Category 2 found for this customer.")
 
+            # Commented out the below code to remove Primary Category 3 
+            '''
             if not i2a_data['PRIMARY_CAT_3'].values[0] is None:
                 cat3 = i2a_data['PRIMARY_CAT_3'].values[0]
                 print("Primary Category 3: ", cat3, " and Marketing Category 3: ", i2a_data['MARKETING_CAT_3'].values[0])
             else:
                 cat3 = None
                 print("No Primary Category 3 found for this customer.")
-
+            '''
 
         
             City_code = i2a_data['DIV'].values[0] if not i2a_data.empty else None
@@ -761,6 +945,17 @@ async def main() -> None:
             cust_zip_code = i2a_data['CUST_ZIP'].values[0] if not i2a_data.empty else None
             cust_website = dnb_data['website'].values[0] if not dnb_data.empty else None
             business_name = dnb_data['business_name'].values[0] if not dnb_data.empty else None
+
+
+            # Create CUSTOMER_PROFILE dictionary
+            CUSTOMER_PROFILE = {
+                "name": cust_name,
+                "business_name": business_name,
+                "industry": cust_industry,
+                "location": City_code,  # You may want to use a more descriptive location if available
+                "domain_hint": cust_website
+            }
+
 
             print("Customer Name : ", cust_name, "   and Website: ", cust_website)
             print("Customer Zip Code : ", cust_zip_code)
@@ -778,7 +973,9 @@ async def main() -> None:
             # Added code to use Bing Search data for all customers
             try:
                 msg=""
+                websearch_content = ""
                 curr_date = datetime.now().strftime("%Y-%m-%d")
+
                 if business_name is not None and business_name != "":
                     query = f"Show me the latest news from past 3 months from {curr_date}, for {cust_name} or {business_name}, a company operating in the {cust_industry} industry. "
                 else:
@@ -789,8 +986,42 @@ async def main() -> None:
                 
                 logger.info("START: BING SEARCH")
                 logger.info(f"Querying Bing Search with query: {query}")
-                search_results , search_citations = await get_bing_search_results(query=query)  # Get Bing Search results
+                #search_results , search_citations = await get_bing_search_results(query=query)         # Get Bing Search results
+                review_research_results: List[WebSearchResultsExtraction] = []                                                                  # research reviewer code
+                search_results , search_citations, review_research_results = await get_bing_search_results(CUSTOMER_PROFILE, query=query)       # research reviewer code
+                logger.info(f"Received search results: {search_results}")
+                logger.info(f"Received search citations: {search_citations}")
+                logger.info(f"Received review research results: {review_research_results}")  # research reviewer code
                 
+                # Filter review_research_results for only relevant results
+                relevant_web_results = []
+                
+                if review_research_results:
+                    for res in review_research_results:
+                        # If using Pydantic objects, use res.is_relevant; if dict, use res.get('is_relevant')
+                        # Prefer direct attribute access when `res` is a Pydantic model
+                        try:
+                            is_relevant = res.is_relevant
+                        except AttributeError:
+                            is_relevant = None
+                        if is_relevant is None and isinstance(res, dict):
+                            is_relevant = res.get('is_relevant')
+                        if is_relevant:
+                            # Use the original search result text if available
+                            try:
+                                snippet = res.search_results
+                            except AttributeError:
+                                snippet = ""
+                            relevant_web_results.append(snippet)
+
+                # Only use relevant web results in the prompt
+                if relevant_web_results:
+                    websearch_content = snippet
+                else:
+                    websearch_content = ""
+                
+                logger.info(f"Relevant web search results: {relevant_web_results}")
+
                 logger.info("END: BING SEARCH")
             except Exception as e:
                 logger.error(f"❌ Error during Bing Search: {e}")
@@ -799,10 +1030,15 @@ async def main() -> None:
                 msg = "Bing Search failed, using default message."
                 logger.info("END: BING SEARCH")
 
+            
             contacts = transactions_data[['SF_ACCOUNT_ID', 'SF_CONTACT_ID', 'FIRST_NAME', 'LAST_NAME','EMAIL']].drop_duplicates()
-            categories = i2a_data[['PRIMARY_CAT_1', 'PRIMARY_CAT_2', 'PRIMARY_CAT_3',
-                                    'SECONDARY_CAT_1', 'SECONDARY_CAT_2', 'SECONDARY_CAT_3',
-                                    'MARKETING_CAT_1', 'MARKETING_CAT_2', 'MARKETING_CAT_3']].drop_duplicates()
+            categories = i2a_data[['PRIMARY_CAT_1', 'PRIMARY_CAT_2', 'SECONDARY_CAT_1', 'SECONDARY_CAT_2', 'MARKETING_CAT_1', 'MARKETING_CAT_2',]].drop_duplicates()
+
+            # Commented out the below code to remove Primary Category 3 and Secondary Category 3
+            #categories = i2a_data[['PRIMARY_CAT_1', 'PRIMARY_CAT_2', 'PRIMARY_CAT_3',
+            #                        'SECONDARY_CAT_1', 'SECONDARY_CAT_2', 'SECONDARY_CAT_3',
+            #                        'MARKETING_CAT_1', 'MARKETING_CAT_2', 'MARKETING_CAT_3']].drop_duplicates()
+
 
             ## Instructions and Tasks
 
@@ -820,6 +1056,9 @@ async def main() -> None:
 
             ################     Prompt for the Use Case       ###############
 
+            # removed   <websearch> {search_results} </websearch> from the dataset and added    <websearch> {websearch_content} </websearch> for # research reviewer code
+                
+
             prompt=f"""
 
             You are helping process input data into an output format.
@@ -829,7 +1068,7 @@ async def main() -> None:
                 <customer> {i2a_data} </customer>
                 <transactions> {transactions_data} </transactions>
                 <dnb> {dnb_data} </dnb>
-                <websearch> {search_results} </websearch>
+                <websearch> {websearch_content} </websearch>
                 <marketing> {marketing_data} </marketing>
             </datasets>
 
@@ -873,104 +1112,106 @@ async def main() -> None:
             logger.info("END: CALL REASONING MODEL FOR RESEARCH")
 
             try:
-                # See the model's response to the input task.
-                #logger.info(result.response_to_input_task)
-                markdown_content = result.response_to_input_task.__str__()+ "\n\n"
+                if isinstance(result, Response):
+                    # See the model's response to the input task.
+                    #logger.info(result.response_to_input_task)
+                    markdown_content = result.response_to_input_task.__str__()+ "\n\n" if result.response_to_input_task else result.content
 
-                markdown_content += "\n\nCustomer's State: " + cust_state + "     Zip Code: " + cust_zip_code
+                    markdown_content += "\n\nCustomer's State: " + cust_state + "     Zip Code: " + cust_zip_code
 
-                markdown_content += "\n\nI2A Primary, Secondary Categories and Marketing Primary Categories: \n" + categories.__str__()+ "\n\n"
-                
-                markdown_content += "Marketing Categories : \n" + marketing_data.__str__() + "\n\n"
+                    markdown_content += "\n\nI2A Primary, Secondary Categories and Marketing Primary Categories: \n" + categories.__str__()+ "\n\n"
+                    
+                    #markdown_content += "Mkt : \n" + marketing_data.__str__() + "\n\n"
 
-                markdown_content += "Contacts : \n" + contacts.__str__() + "\n\n"
+                    markdown_content += "Contacts : \n" + contacts.__str__() + "\n\n"
 
-                logger.info("START: FORMATTING CONTENT IN MARKDOWN FORMAT")
-                formatted_content = await format_content(markdown_content)  # Format the content in markdown format
-                logger.info("END: FORMATTING CONTENT IN MARKDOWN FORMAT")
-
-
-                #cat_string = ';'.join(categories.astype(str))
-                # see the categories referenced in the research report. Values separated by semicolon
-                formatted_content += "\nCategories Referenced in the Research Report: \n" + categories.__str__() + "\n\n"
+                    logger.info("START: FORMATTING CONTENT IN MARKDOWN FORMAT")
+                    formatted_content = await format_content(markdown_content)  # Format the content in markdown format
+                    logger.info("END: FORMATTING CONTENT IN MARKDOWN FORMAT")
 
 
-                # See the explanation of why the model made the decision it did. Note this is an open field of research- for numerical calculations, with step by step reasoning that arrives at an answer, this is reliable.
-                #print("\n\nJustification : \n",result.justification)
-                formatted_content += "\n\nJustification : \n" + result.justification.__str__() + "\n\n"
+                    #cat_string = ';'.join(categories.astype(str))
+                    # see the categories referenced in the research report. Values separated by semicolon
+                    formatted_content += "\nCategories Referenced in the Research Report: \n" + categories.__str__() + "\n\n"
 
-                # See the data points the model used to make the decision it did.
-                #print("\n\nCitation : \n",result.citations)
-                formatted_content += "\n\nCitation : \n" + result.citations.__str__() + "\n\n"
+                    #formatted_content += "Marketing Categories referenced : \n" + marketing_data.__str__() + "\n\n"
+                    
+                    # See the explanation of why the model made the decision it did. Note this is an open field of research- for numerical calculations, with step by step reasoning that arrives at an answer, this is reliable.
+                    formatted_content += "\n\nJustification : \n" + result.justification.__str__() + "\n\n"
 
-                formatted_content += "\n\nBing Search Results and Citation : \n" + msg + "\n" + search_results + "\n" + search_citations + "\n\n"
-                
-                #file name and path
-                current_datetime = datetime.now()
-                folder_name = current_datetime.strftime("%Y%m%d")
-                #research_file = "research_output\\" + current_datetime.strftime("%Y%m%d") + "\\" + b_cust + current_datetime.strftime("_%Y-%m-%d_%H-%M-%S")+".md"
-                research_file =  folder_name + "\\" + b_cust + "\\research_output\\" + b_cust + current_datetime.strftime("_%Y-%m-%d_%H-%M-%S")+".md"
+                    # See the data points the model used to make the decision it did.
+                    formatted_content += "\n\nCitation : \n" + result.citations.__str__() + "\n\n"
 
-                logger.info(f"START: SAVING RESEARCH REPORT: {research_file}")
-                
-                await save_research_report(
-                    container_name=CONTAINER_NAME,             # changed from "lowtouch" to "mld01blobcontainerne0"
-                    blob_name=research_file,
-                    file_content=formatted_content                      # changed from markdown_content to formatted_content
-                )
-                logger.info(f"END: SAVING RESEARCH REPORT: {research_file}")
+                    formatted_content += "\n\nBing Search Results and Citation : \n" + msg + "\n" + search_results + "\n" + search_citations + "\n\n"
+                    
+                    #file name and path
+                    current_datetime = datetime.now()
+                    folder_name = current_datetime.strftime("%Y%m%d")
+                    #research_file = "research_output\\" + current_datetime.strftime("%Y%m%d") + "\\" + b_cust + current_datetime.strftime("_%Y-%m-%d_%H-%M-%S")+".md"
+                    research_file =  folder_name + "\\" + b_cust + "\\research_output\\" + b_cust + current_datetime.strftime("_%Y-%m-%d_%H-%M-%S")+".md"
 
-                logger.info("START: PUSHING THE MESSAGE TO QUEUE")
-                
-                run_date = current_datetime.strftime("%Y-%m-%d %H:%M:%S")
-                # Send the research report to the Azure Storage Queue
-                research_msg = {
-                    "batch_id": BATCH_ID,
-                    "run_date": run_date,
-                    "agent_name": RESEARCH_AGENT_NAME,
-                    "status": "S",
-                    "cust_id": b_cust,
-                    "agent_output": formatted_content,
-                    "agent_output_path": research_file
-                }
+                    logger.info(f"START: SAVING RESEARCH REPORT: {research_file}")
+                    
+                    await save_research_report(
+                        container_name=CONTAINER_NAME,             # changed from "lowtouch" to "mld01blobcontainerne0"
+                        blob_name=research_file,
+                        file_content=formatted_content                      # changed from markdown_content to formatted_content
+                    )
+                    logger.info(f"END: SAVING RESEARCH REPORT: {research_file}")
 
-                queue_client.send_message(json.dumps(research_msg))                # Uncomment to send message to queue
-                logger.info(f"Message pushed to queue '{queue_name}' : Batch Id : {BATCH_ID} ; AgentName : {RESEARCH_AGENT_NAME} ; Customer Id : {b_cust}")
-                
-                # Let the service know we're finished with the message and it can be safely deleted.
-                try:
-                    source_queue_client.delete_message(message_to_delete)
-                    logger.info(f"✅ Successfully deleted message for customer {b_cust} from source queue {source_queue_name} after processing.")
-                except Exception as delete_error:
-                    logger.error(f"❌ Failed to delete message for customer {b_cust} from source queue {source_queue_name} : {delete_error}")
-                    # Continue processing anyway since the main work is done
+                    logger.info("START: PUSHING THE MESSAGE TO QUEUE")
+                    
+                    run_date = current_datetime.strftime("%Y-%m-%d %H:%M:%S")
+                    # Send the research report to the Azure Storage Queue
+                    research_msg = {
+                        "batch_id": MSG_BATCH_ID,
+                        "run_date": run_date,
+                        "agent_name": RESEARCH_AGENT_NAME,
+                        "status": "S",
+                        "cust_id": b_cust,
+                        "agent_output": formatted_content,
+                        "agent_output_path": research_file
+                    }
 
-                logger.info("END: PUSHING THE MESSAGE TO QUEUE")
+                    queue_client.send_message(json.dumps(research_msg))                # Uncomment to send message to queue
+                    logger.info(f"Message pushed to queue '{queue_name}' : Batch Id : {MSG_BATCH_ID} ; AgentName : {RESEARCH_AGENT_NAME} ; Customer Id : {b_cust}")
+                    
+                    # Let the service know we're finished with the message and it can be safely deleted.
+                    try:
+                        source_queue_client.delete_message(message_to_delete)
+                        logger.info(f"✅ Successfully deleted message for customer {b_cust} from source queue {source_queue_name} after processing.")
+                    except Exception as delete_error:
+                        logger.error(f"❌ Failed to delete message for customer {b_cust} from source queue {source_queue_name} : {delete_error}")
+                        # Continue processing anyway since the main work is done
 
-                logger.info(f"START: UPDATE STATUS IN DATABRICKS for customer {b_cust}")
-                
-                # Update the status in Databricks
-                status_vals = [(
-                    int(BATCH_ID),
-                    run_date,
-                    RESEARCH_AGENT_NAME,
-                    "S",
-                    b_cust,
-                    cust_name,
-                    research_file,
-                    folder_name,
-                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                )]
+                    logger.info("END: PUSHING THE MESSAGE TO QUEUE")
 
-                #status_cols = ["batch_id", "run_date", "agent_name", "status", "customer_id", "customer_name", "output_file", "blob_date_folder","created_at"]
-                try:
-                    await update_status_in_databricks(status_cols=status_cols, status_vals=status_vals, table_name=status_table_name, status="S")
-                    logger.info(f"END: UPDATE STATUS IN DATABRICKS for customer {b_cust}")
-                except Exception as e:
-                    logger.error(f"Error updating status in Databricks for customer {b_cust}: {e}")
-                
-                
-                
+                    logger.info(f"START: UPDATE STATUS IN DATABRICKS for customer {b_cust}")
+                    
+                    # Update the status in Databricks
+                    status_vals = [(
+                        int(MSG_BATCH_ID),
+                        run_date,
+                        RESEARCH_AGENT_NAME,
+                        "S",
+                        b_cust,
+                        cust_name,
+                        research_file,
+                        folder_name,
+                        RESEARCH_AGENT_NAME,
+                        datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    )]
+
+                    #status_cols = ["batch_id", "run_date", "agent_name", "status", "customer_id", "customer_name", "output_file", "blob_date_folder","created_at"]
+                    try:
+                        await update_status_in_databricks(status_cols=status_cols, status_vals=status_vals, table_name=status_table_name, status="S")
+                        logger.info(f"END: UPDATE STATUS IN DATABRICKS for customer {b_cust}")
+                    except Exception as e:
+                        logger.error(f"Error updating status in Databricks for customer {b_cust}: {e}")
+                    
+                else:    
+                    logger.error(f"❌ Model did not return a valid response for customer {b_cust}.")
+                    logger.info(result)
                 logger.info("END: PROCESSING CUSTOMER ID: %s", cust)
                 logger.info("=" * 100)
             except Exception as e:
