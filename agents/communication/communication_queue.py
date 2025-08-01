@@ -11,7 +11,7 @@ from azure.core.exceptions import AzureError
 from agents.communication.blob_util import BlobUtil
 from agents.communication.config import LoggingConfig
 from utils.azurequeuehelper import AzureQueueHelper
-from utils.agentloghelper import AgentBatchRecord, createRecords, serializeRecords
+from utils.agentloghelper import AgentBatchRecord, createRecords, createListofMessages, serializeRecords
 from agents.communication.communication_manager import CommunicationManager
 
 # Load environment variables from .env file
@@ -32,9 +32,9 @@ class CommunicationQueue:
             dead_letter_queue=os.getenv("AZURE_COMMUNICATION_INPUT_DLQ", None)
         )
 
-    def send_test_message(self, payload: dict):
+    def send_test_message(self):
         # Create and send test agent records to the queue
-        agentRecords = createRecords()
+        agentRecords = createListofMessages()
         for record in agentRecords:
             message = record.model_dump_json(indent=2)
             self.listener_queue.send_message(message)
@@ -65,13 +65,13 @@ class CommunicationQueue:
                 try:
                     self.databricks_client.connect()
                     logging.info("🔄 Processing queue...")
-                    await self.listener_queue.process_queue(handler=self.process_logic, max_retry=100, batch_size=10)
+                    await self.listener_queue.process_queue(handler=self.process_logic, max_retry=10, batch_size=10)
                 except Exception as e:
                     logging.error(f"Error processing queue: {e}")
                 finally:
                     logging.info("⏳ Waiting before next poll...")
                     self.databricks_client.disconnect()# disconnect databricks connection after each batch
-                    await asyncio.sleep(2000)  # 2 seconds
+                    await asyncio.sleep(180)  # 3 mins
         finally:
             try:
                 await self.blob_util.close()                

@@ -1,8 +1,23 @@
-from datetime import date
+from datetime import date, datetime
 from pydantic import BaseModel
 from typing import Optional, List
 import json
+import os
 from utils.models import AgentBatchRecord
+def createListofMessages(input_folder: str = "input") -> List[AgentBatchRecord]:
+    """
+    Reads all JSON files in the specified input folder and returns a list of AgentBatchRecord objects.
+    """
+    messages = []
+    root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    folder_path = os.path.join(root_dir, input_folder)
+    for filename in os.listdir(folder_path):
+        if filename.endswith(".json"):
+            file_path = os.path.join(folder_path, filename)
+            with open(file_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                messages.append(AgentBatchRecord(**data))
+    return messages
 
 
 def createRecords() -> List[AgentBatchRecord]:

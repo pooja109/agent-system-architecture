@@ -7,6 +7,8 @@ import sys
 import os
 from colorama import Fore, Style
 from semantic_kernel.contents import ChatMessageContent
+from semantic_kernel.agents.open_ai.run_polling_options import RunPollingOptions
+from datetime import timedelta
 from semantic_kernel.contents.utils.author_role import AuthorRole
 
 # Add current directory to path for imports
@@ -48,6 +50,12 @@ class CommunicationManager:
                                              self.config.queue_name, 
                                              self.config.dead_letter_queue)
         self.databricks_client = DatabricksClient(self.config.databricks_settings)
+        self.polling_options = RunPollingOptions(
+            run_polling_interval=timedelta(seconds=10),
+            run_polling_backoff=timedelta(seconds=15),  # or whatever backoff you want
+            run_polling_backoff_threshold=2,
+            run_polling_timeout=timedelta(seconds=180) #fix using parallel threads of contact
+        )
 
     @property
     def queue_helper_instance(self):
@@ -155,7 +163,7 @@ class CommunicationManager:
             # Data extraction
             task = ChatMessageContent(role=AuthorRole.USER, content=input_obj.model_dump_json())
             data_extractor_start = time.time()
-            response = await data_extractor_agent.get_response(messages=task, thread=thread)
+            response = await data_extractor_agent.get_response(messages=task, thread=thread, polling_options=self.polling_options)
             data_extractor_duration = time.time() - data_extractor_start
             logger.info("%sData extractor time: %.3f seconds%s", Fore.MAGENTA, data_extractor_duration, Style.RESET_ALL)
             
@@ -169,7 +177,8 @@ class CommunicationManager:
             review_iteration_start = time.time()
             draft_email = Email(subject="", body_html="")
             review_comments = None
-            i = None
+            i = None           
+            
             
             for i in range(self.config.max_iterations):
                 # Generate email draft
@@ -181,10 +190,9 @@ class CommunicationManager:
                     extracted_input=research_output,
                     review_comments=review_comments
                 )
-
                 email_input_task = ChatMessageContent(role=AuthorRole.USER, content=email_input_data.model_dump_json())
                 email_generation_start = time.time()
-                email_agent_response = await email_generator_agent.get_response(messages=email_input_task, thread=thread)
+                email_agent_response = await email_generator_agent.get_response(messages=email_input_task, thread=thread, polling_options=self.polling_options)
                 email_generation_duration = time.time() - email_generation_start
                 logger.info("%sEmail generation time: %.3f seconds%s", Fore.MAGENTA, email_generation_duration, Style.RESET_ALL)
 
@@ -201,7 +209,7 @@ class CommunicationManager:
                 email_input_data.draft_email = draft_email
                 review_start = time.time()
                 email_review_task = ChatMessageContent(role=AuthorRole.USER, content=email_input_data.model_dump_json())
-                email_review_response = await email_review_agent.get_response(messages=email_review_task, thread=thread)
+                email_review_response = await email_review_agent.get_response(messages=email_review_task, thread=thread,polling_options=self.polling_options)
                 review_duration = time.time() - review_start
                 logger.info("%sEmail review time: %.3f seconds%s", Fore.MAGENTA, review_duration, Style.RESET_ALL)
 
@@ -368,7 +376,7 @@ class CommunicationManager:
             )
             per_contact_task = ChatMessageContent(role=AuthorRole.USER, content=multi_contact_input.model_dump_json())
             per_contact_email_start = time.time()
-            per_contact_email_response = await per_contact_email_agent.get_response(messages=per_contact_task, thread=thread)
+            per_contact_email_response = await per_contact_email_agent.get_response(messages=per_contact_task, thread=thread, polling_options=self.polling_options)
             per_contact_email_duration = time.time() - per_contact_email_start
             logger.info("%sContact-specific email generation time: %.3f seconds%s", Fore.MAGENTA, per_contact_email_duration, Style.RESET_ALL)
             

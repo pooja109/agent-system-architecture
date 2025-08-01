@@ -54,12 +54,15 @@ team: Staples Expert Team
 - **Always end with sender details as a signature, then the required footer.**
 - **Output must be valid HTML, ready to send. Do not include any additional text or instructions.**
 - **Wrap all paragraphs in <p> tags.**
-- In the closing, always check if a line break <br> is present after "Best Regards,".
 - Grammar: 
     - Check for grammar and spelling errors.
     - Ex: Use "Learn more about our services" (not "Learn more on our services").
-- Marketing product categories - Reference the marketing categories associated with the customer or their industry and not the specific primary_category or secondary_category.
-- When referring to our company, use "Staples Business". Do NOT use "StaplesBusiness.com", "Staples Advantage", "https://staplesbusiness.com/", or "Staples.com".
+- Do not include any numbers from the research data in the email, as these may not be current. For example: number of FTEs, number or percentage of product, price of product, etc.
+- When referencing product categories, always use the corresponding marketing category associated with the customer or their industry, not the primary or secondary category.  
+    For example:  
+    - JanSan or Tissues and Towels → Facilities  
+    - Breakroom or Coffee and Tea → Breakroom  
+    - Office Supplies or Filing, Forms, and Envelopes → Office Supplies
 
 **Personalization Framework (Maslow’s Hierarchy):**
 1. Physiological – Address by name, reference title, company, and industry.
