@@ -117,15 +117,6 @@ async def main() -> None:
 
     
 
-
-    '''
-    DATABRICKS_STATUS_CAT_SCHEMA_NAME = os.getenv("DATABRICKS_STATUS_CAT_SCHEMA_NAME")
-    DATABRICKS_I2A_CAT_SCHEMA_NAME = os.getenv("DATABRICKS_I2A_CAT_SCHEMA_NAME")
-    DATABRICKS_TXN_CAT_SCHEMA_NAME = os.getenv("DATABRICKS_TXN_CAT_SCHEMA_NAME")
-    DATABRICKS_DNB_CAT_SCHEMA_NAME = os.getenv("DATABRICKS_DNB_CAT_SCHEMA_NAME")
-    DATABRICKS_MKT_CAT_SCHEMA_NAME = os.getenv("DATABRICKS_MKT_CAT_SCHEMA_NAME")
-    '''
-
     # Creating a separate logger for this module
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
@@ -146,24 +137,14 @@ async def main() -> None:
     status_table_name = f"{DATABRICKS_STATUS_CATALOG_NAME}.{DATABRICKS_STATUS_SCHEMA_NAME}.{DATABRICKS_STATUS_TABLE_NAME}"
     
 
-    '''
-    i2a_table_name = f"{DATABRICKS_I2A_CAT_SCHEMA_NAME}.i2a_lowtouch"
-    txn_table_name = f"{DATABRICKS_TXN_CAT_SCHEMA_NAME}.i2a_lowtouch_sls_cnct_lvl_t"
-    dnb_table_name = f"{DATABRICKS_DNB_CAT_SCHEMA_NAME}.i2a_lowtouch_dnb_account_source_t"  
-    marketing_table_name = f"{DATABRICKS_MKT_CAT_SCHEMA_NAME}.marketing_category_hierarchy"
-    i2a_marketing_table_name = f"{DATABRICKS_MKT_CAT_SCHEMA_NAME}.i2a_to_marketing_category_map" 
-    status_table_name = f"{DATABRICKS_STATUS_CAT_SCHEMA_NAME}.email_communication_pipeline_dev"
-    '''
-    #print(i2a_table_name, "\n", txn_table_name, "\n", dnb_table_name, "\n", marketing_table_name, "\n", i2a_marketing_table_name, "\n", status_table_name)
-
     logger.info("Getting data from Databricks...")
     try:
         sql_i2a = "select * from " \
-        "(select * from " + i2a_table_name + " WHERE VERTICAL =='Commercial' AND CUST_ID in (select distinct cust_id from " + txn_table_name + ") limit 20) Comm " \
+        "(select * from " + i2a_table_name + " WHERE VERTICAL =='Commercial' AND CUST_ID in (select distinct cust_id from " + txn_table_name + ")) Comm " \
         "UNION " \
-        "select * from (select * from " + i2a_table_name + " WHERE VERTICAL =='Healthcare' AND CUST_ID in (select distinct cust_id from " + txn_table_name + ") limit 5) Health " \
+        "select * from (select * from " + i2a_table_name + " WHERE VERTICAL =='Healthcare' AND CUST_ID in (select distinct cust_id from " + txn_table_name + ")) Health " \
         "UNION " \
-        "SELECT * from (select * from " + i2a_table_name + " WHERE VERTICAL =='Sled' AND CUST_ID in (select distinct cust_id from " + txn_table_name + ") limit 5) Sled "
+        "SELECT * from (select * from " + i2a_table_name + " WHERE VERTICAL =='Sled' AND CUST_ID in (select distinct cust_id from " + txn_table_name + ")) Sled "
         
         sql_txn = "select * from " + txn_table_name + " where cust_id in (select distinct cust_id from " + i2a_table_name + ")"
 
@@ -173,32 +154,26 @@ async def main() -> None:
 
         sql_i2a_marketing = "select * from " + i2a_marketing_table_name
 
-        sql_i2a_no_contact = "select CUST_ID, CUST_NAME from " + i2a_table_name + " WHERE CUST_ID NOT IN (select distinct cust_id from " + txn_table_name + ") limit 5"
+        sql_i2a_no_contact = "select CUST_ID, CUST_NAME from " + i2a_table_name + " WHERE CUST_ID NOT IN (select distinct cust_id from " + txn_table_name + ")"
 
 
-        #print("\n\nsql_i2a: ", sql_i2a)
-        #print("sql_txn: ", sql_txn)
-        #print("sql_dnb: ", sql_dnb)
-        #print("sql_marketing: ", sql_marketing)
-        #print("sql_i2a_marketing: ", sql_i2a_marketing)
-        #print("-"*150)
 
-        print("Getting data from :",i2a_table_name.__str__())
+        #print("Getting data from :",i2a_table_name.__str__())
         df_i2a = await get_data_from_databricks(sql_i2a)
 
-        print("Getting data from :",txn_table_name.__str__())
+        #print("Getting data from :",txn_table_name.__str__())
         df_txn = await get_data_from_databricks(sql_txn)
         
-        print("Getting data from :",dnb_table_name.__str__())
+        #print("Getting data from :",dnb_table_name.__str__())
         df_dnb = await get_data_from_databricks(sql_dnb)
 
-        print("Getting data from :",marketing_table_name.__str__())
+        #print("Getting data from :",marketing_table_name.__str__())
         df_marketing = await get_data_from_databricks(sql_marketing)
 
-        print("Getting data from :",i2a_marketing_table_name.__str__())
+        #print("Getting data from :",i2a_marketing_table_name.__str__())
         df_i2a_marketing = await get_data_from_databricks(sql_i2a_marketing)
         
-        print("Getting data for no Contacts from :",i2a_table_name.__str__())
+        #print("Getting data for no Contacts from :",i2a_table_name.__str__())
         df_i2a_no_contact = await get_data_from_databricks(sql_i2a_no_contact)
 
         logger.info("Data fetched successfully from Databricks")
@@ -234,18 +209,18 @@ async def main() -> None:
     # This queue will be used to send the research report for each customer to the Azure Storage Communication Queue
 
     # Get connection string and validate
-    connection_string = os.getenv("AZURE_QUEUE_CONNECTION_STRING")
-    
-    if not connection_string:
-        logger.error("❌ AZURE_QUEUE_CONNECTION_STRING environment variable is not set")
-        raise ValueError("AZURE_QUEUE_CONNECTION_STRING environment variable is required")
+    queue_url = os.getenv("AZURE_QUEUE_URL")
+
+    if not queue_url:
+        logger.error("❌ AZURE_QUEUE_URL environment variable is not set")
+        raise ValueError("AZURE_QUEUE_URL environment variable is required")
 
     logger.info(f"Initializing Azure Queue connection for queue: {queue_name}")
 
     try:
 
         credential = DefaultAzureCredential()
-        queue_client = QueueClient(connection_string, queue_name, credential=credential)
+        queue_client = QueueClient(account_url=queue_url, queue_name=queue_name, credential=credential)
 
     # Test the connection
         queue_properties = queue_client.get_queue_properties()
@@ -255,9 +230,9 @@ async def main() -> None:
         # If queue doesn't exist, try to create it
         if "QueueNotFound" in str(e):
             try:
-                queue_service_client = QueueServiceClient.from_connection_string(connection_string)
+                queue_service_client = QueueServiceClient(account_url=queue_url, credential=credential)
                 queue_service_client.create_queue(queue_name)
-                queue_client = QueueClient.from_connection_string(connection_string, queue_name)
+                queue_client = QueueClient(account_url=queue_url, queue_name=queue_name, credential=credential)
                 logger.info(f"✅ Created and connected to new queue '{queue_name}'")
             except Exception as create_error:
                 logger.error(f"❌ Failed to create queue '{queue_name}': {create_error}")
