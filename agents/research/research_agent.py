@@ -54,7 +54,7 @@ client = AzureOpenAI(api_version=os.getenv("ST_API_VERSION"),
 
 
 
-MAX_MESSAGES = 5
+#MAX_MESSAGES = 5
 
 # ===================== Logging Configuration ====================
 
@@ -745,12 +745,12 @@ async def main() -> None:
 
 
     # Get connection string and validate
-    connection_string = os.getenv("AZURE_QUEUE_CONNECTION_STRING")
-    print(f"\n\nQueue Connection String: {connection_string}")
+    queue_url = os.getenv("AZURE_QUEUE_URL")
+    print(f"\n\nQueue Connection String: {queue_url}")
 
-    if not connection_string:
-        logger.error("❌ AZURE_QUEUE_CONNECTION_STRING environment variable is not set")
-        raise ValueError("AZURE_QUEUE_CONNECTION_STRING environment variable is required")
+    if not queue_url:
+        logger.error("❌ AZURE_QUEUE_URL environment variable is not set")
+        raise ValueError("AZURE_QUEUE_URL environment variable is required")
 
     logger.info(f"Initializing Azure Queue connection for queue: {queue_name}")
 
@@ -758,8 +758,8 @@ async def main() -> None:
 
         
         credential = DefaultAzureCredential()
-        queue_client = QueueClient(connection_string, queue_name, credential=credential)
-        source_queue_client = QueueClient(connection_string, source_queue_name, credential=credential)
+        queue_client = QueueClient(queue_url, queue_name, credential=credential)
+        source_queue_client = QueueClient(queue_url, source_queue_name, credential=credential)
 
     # Test the connection
         queue_properties = queue_client.get_queue_properties()
@@ -770,10 +770,10 @@ async def main() -> None:
         # If queue doesn't exist, try to create it
         if "QueueNotFound" in str(e):
             try:
-                queue_service_client = QueueServiceClient.from_connection_string(connection_string)
+                queue_service_client = QueueServiceClient.from_connection_string(queue_url)
                 queue_service_client.create_queue(queue_name)
-                source_queue_client = QueueClient.from_connection_string(connection_string, source_queue_name)
-                queue_client = QueueClient.from_connection_string(connection_string, queue_name)
+                source_queue_client = QueueClient.from_connection_string(queue_url, source_queue_name)
+                queue_client = QueueClient.from_connection_string(queue_url, queue_name)
                 logger.info(f"✅ Created and connected to new queue '{queue_name}'")
             except Exception as create_error:
                 logger.error(f"❌ Failed to create queue '{queue_name}': {create_error}")
@@ -818,406 +818,407 @@ async def main() -> None:
     logger.info("STARTING PROCESSING FOR LOW TOUCH CUSTOMERS from " + source_queue_name + " queue")
 
     # ==================== Main Execution Loop ====================
-    messages = source_queue_client.receive_messages(max_messages=MAX_MESSAGES, visibility_timeout=300)  # Increased timeout to 5 minutes
-    #messages = source_queue_client.receive_messages(max_messages=10, visibility_timeout=300)  # execute for 10 customers at a time
-    
-    for msg_batch in messages.by_page():
-        for msg in msg_batch:
-            # Store the message reference for deletion
-            message_to_delete = msg
-            
-            # "Process" the message
-            try:
-                data = json.loads(msg.content)
-                cust = data.get("customer_id", "Unknown")
-                #print(f"Processing message: {data}")
-            except json.JSONDecodeError:
-                print(f"⚠️ Invalid JSON, deleting: {msg.content}")
+    while True:
+        messages = source_queue_client.receive_messages(max_messages=MAX_MESSAGES, visibility_timeout=300)  # Increased timeout to 5 minutes
+        #messages = source_queue_client.receive_messages(max_messages=10, visibility_timeout=300)  # execute for 10 customers at a time
+        
+        for msg_batch in messages.by_page():
+            for msg in msg_batch:
+                # Store the message reference for deletion
+                message_to_delete = msg
+                
+                # "Process" the message
                 try:
-                    source_queue_client.delete_message(message_to_delete)
-                    logger.error("✅ Deleted invalid JSON message")
-                except Exception as delete_error:
-                    logger.error(f"❌ Failed to delete invalid message: {delete_error}")
-                continue
-            except Exception as e:
-                logger.error(f"❌ Error processing message: {e}.")
-                continue
-            
-            #get BATCH_ID from the message
-            MSG_BATCH_ID = data.get("batch_id", BATCH_ID)
-            
-            # Convert the data to DataFrames
-            try:
-                i2a_data = data.get("i2a_data", "Unknown")
-                #convert i2a data to dataframe
-                if isinstance(i2a_data, str):
-                    i2a_data = json.loads(i2a_data)
-                if isinstance(i2a_data, list):
-                    i2a_data = pd.DataFrame(i2a_data)
-                elif isinstance(i2a_data, dict):
-                    i2a_data = pd.DataFrame([i2a_data])
-                else:
-                    i2a_data = pd.DataFrame()
-
-                transactions_data = data.get("transactions_data", "Unknown")
-                # convert transactions data to dataframe
-                if isinstance(transactions_data, str):
-                    transactions_data = json.loads(transactions_data)
-                if isinstance(transactions_data, list):
-                    transactions_data = pd.DataFrame(transactions_data)
-                elif isinstance(transactions_data, dict):
-                    transactions_data = pd.DataFrame([transactions_data])
-                else:
-                    transactions_data = pd.DataFrame()
-
-                dnb_data = data.get("dnb_data", "Unknown")
-                # convert dnb data to dataframe
-                if isinstance(dnb_data, str):
-                    dnb_data = json.loads(dnb_data)
-                if isinstance(dnb_data, list):  
-                    dnb_data = pd.DataFrame(dnb_data)
-                elif isinstance(dnb_data, dict):
-                    dnb_data = pd.DataFrame([dnb_data])
-                else:
-                    dnb_data = pd.DataFrame()
-
-                marketing_data = data.get("marketing_data", "Unknown")
-                # convert marketing data to dataframe
-                if isinstance(marketing_data, str):
-                    marketing_data = json.loads(marketing_data)
-                if isinstance(marketing_data, list):
-                    marketing_data = pd.DataFrame(marketing_data)
-                elif isinstance(marketing_data, dict):
-                    marketing_data = pd.DataFrame([marketing_data])
-                else:
-                    marketing_data = pd.DataFrame()
-            except Exception as e:
-                logger.error(f"❌ Error converting data to DataFrame: {e}. ")
-                continue
-    
-            # Let the service know we're finished with the message and it can be safely deleted.
-            #source_queue_client.delete_message(msg)
-            #print(f"✅ Processed and deleted message: {data['customer_id']}\n\n")
-
-
-        
-            logger.info("=" * 100)
-            logger.info("START: PROCESSING CUSTOMER ID: %s", cust)
-            logger.info("=" * 100)
-            
-            print("-" * 100)
-            print(f"\n\n****************************         Customer ID: {cust}     ****************************")
-            print("-" * 100)
-            
-            b_cust = f"{cust}"
-            
-            #print("Categories in Filtered I2A Data for the specific customer: ", i2a_data['PRIMARY_CAT_1'].values[0], ";",i2a_data['PRIMARY_CAT_2'].values[0],  ";", i2a_data['PRIMARY_CAT_3'].values[0])
-
-            # check if i2a_data['PRIMARY_CAT_1'].values[0] is not None and i2a_data['PRIMARY_CAT_2'].values[0] is not None and i2a_data['PRIMARY_CAT_3'].values[0] is not None
-            if not i2a_data['PRIMARY_CAT_1'].values[0] is None :
-                cat1 = i2a_data['PRIMARY_CAT_1'].values[0]
-                print("Primary Category 1: ", cat1, " and Marketing Category 1: ", i2a_data['MARKETING_CAT_1'].values[0])
-            else:
-                cat1 = None
-                print("No Primary Category 1 found for this customer.") 
-            
-            if not i2a_data['PRIMARY_CAT_2'].values[0] is None :
-                cat2 = i2a_data['PRIMARY_CAT_2'].values[0]
-                print("Primary Category 2: ", cat2, " and Marketing Category 2: ", i2a_data['MARKETING_CAT_2'].values[0])
-            else:
-                cat2 = None
-                print("No Primary Category 2 found for this customer.")
-
-            # Commented out the below code to remove Primary Category 3 
-            '''
-            if not i2a_data['PRIMARY_CAT_3'].values[0] is None:
-                cat3 = i2a_data['PRIMARY_CAT_3'].values[0]
-                print("Primary Category 3: ", cat3, " and Marketing Category 3: ", i2a_data['MARKETING_CAT_3'].values[0])
-            else:
-                cat3 = None
-                print("No Primary Category 3 found for this customer.")
-            '''
-
-        
-            City_code = i2a_data['DIV'].values[0] if not i2a_data.empty else None
-            cust_name = i2a_data['CUST_NAME'].values[0] if not i2a_data.empty else None
-            cust_industry = i2a_data['INDUSTRY'].values[0] if not i2a_data.empty else None
-            cust_zip_code = i2a_data['CUST_ZIP'].values[0] if not i2a_data.empty else None
-            cust_website = dnb_data['website'].values[0] if not dnb_data.empty else None
-            business_name = dnb_data['business_name'].values[0] if not dnb_data.empty else None
-
-
-            # Create CUSTOMER_PROFILE dictionary
-            CUSTOMER_PROFILE = {
-                "name": cust_name,
-                "business_name": business_name,
-                "industry": cust_industry,
-                "location": City_code,  # You may want to use a more descriptive location if available
-                "domain_hint": cust_website
-            }
-
-
-            print("Customer Name : ", cust_name, "   and Website: ", cust_website)
-            print("Customer Zip Code : ", cust_zip_code)
-            print("Customer Industry : ", cust_industry)
-        
-
-
-
-            logger.info("START: GET STATE FROM ZIP CODE")
-            cust_state = await get_state_from_zip(cust_zip_code)          # Get the state code from the zip code
-            logger.info("END: GET STATE FROM ZIP CODE")
-            cust_state = cust_state.strip().replace(" ", "_").replace("-", "_").replace(".", "_").replace(",", "_").replace("'", "_") # remove any leading or trailing whitespace
-            msg = ""
-                
-            # Added code to use Bing Search data for all customers
-            try:
-                msg=""
-                websearch_content = ""
-                curr_date = datetime.now().strftime("%Y-%m-%d")
-
-                if business_name is not None and business_name != "":
-                    query = f"Show me the latest news from past 3 months from {curr_date}, for {cust_name} or {business_name}, a company operating in the {cust_industry} industry. "
-                else:
-                    query = f"Show me the latest news from past 3 months from {curr_date}, for {cust_name}, a company operating in the {cust_industry} industry. "
-                
-                if cust_website is not None and cust_website != "": 
-                    query += "You could also search their website "+ cust_website + " for the latest news."
-                
-                logger.info("START: BING SEARCH")
-                logger.info(f"Querying Bing Search with query: {query}")
-                #search_results , search_citations = await get_bing_search_results(query=query)         # Get Bing Search results
-                review_research_results: List[WebSearchResultsExtraction] = []                                                                  # research reviewer code
-                search_results , search_citations, review_research_results = await get_bing_search_results(CUSTOMER_PROFILE, query=query)       # research reviewer code
-                logger.info(f"Received search results: {search_results}")
-                logger.info(f"Received search citations: {search_citations}")
-                logger.info(f"Received review research results: {review_research_results}")  # research reviewer code
-                
-                # Filter review_research_results for only relevant results
-                relevant_web_results = []
-                
-                if review_research_results:
-                    for res in review_research_results:
-                        # If using Pydantic objects, use res.is_relevant; if dict, use res.get('is_relevant')
-                        # Prefer direct attribute access when `res` is a Pydantic model
-                        try:
-                            is_relevant = res.is_relevant
-                        except AttributeError:
-                            is_relevant = None
-                        if is_relevant is None and isinstance(res, dict):
-                            is_relevant = res.get('is_relevant')
-                        if is_relevant:
-                            # Use the original search result text if available
-                            try:
-                                snippet = res.search_results
-                            except AttributeError:
-                                snippet = ""
-                            relevant_web_results.append(snippet)
-
-                # Only use relevant web results in the prompt
-                if relevant_web_results:
-                    websearch_content = snippet
-                else:
-                    websearch_content = ""
-                
-                logger.info(f"Relevant web search results: {relevant_web_results}")
-
-                logger.info("END: BING SEARCH")
-            except Exception as e:
-                logger.error(f"❌ Error during Bing Search: {e}")
-                search_results = "No search results found."
-                search_citations = "No citations found."
-                msg = "Bing Search failed, using default message."
-                logger.info("END: BING SEARCH")
-
-            
-            contacts = transactions_data[['SF_ACCOUNT_ID', 'SF_CONTACT_ID', 'FIRST_NAME', 'LAST_NAME','EMAIL']].drop_duplicates()
-            categories = i2a_data[['PRIMARY_CAT_1', 'PRIMARY_CAT_2', 'SECONDARY_CAT_1', 'SECONDARY_CAT_2', 'MARKETING_CAT_1', 'MARKETING_CAT_2',]].drop_duplicates()
-
-            # Commented out the below code to remove Primary Category 3 and Secondary Category 3
-            #categories = i2a_data[['PRIMARY_CAT_1', 'PRIMARY_CAT_2', 'PRIMARY_CAT_3',
-            #                        'SECONDARY_CAT_1', 'SECONDARY_CAT_2', 'SECONDARY_CAT_3',
-            #                        'MARKETING_CAT_1', 'MARKETING_CAT_2', 'MARKETING_CAT_3']].drop_duplicates()
-
-
-            ## Instructions and Tasks
-
-            instructions_and_task="""
-                You are an AI research assistant that helps the Staples B2B team research their low-touch customers and create hyper-personalized outreach report for the contacts. 
-                Specify the priority reason for outreach, which can be either Retention or Growth.
-                Analyze and Research the data for """ + cust_name + """ and create a research report for the customer and their contact details. 
-                The research report and recommendations will be used to create hyper-personalized report for """ + cust_name + """. 
-                Recommendations should be based on the Primary and Secondary Categories in the customer dataset. Use all the Primary categories to target that Customer.
-                Use data from marketing to propose additional products. Use Bing Search to enhance the research report.
-                Provide a contact wise generic report in the output along with your other research output and recommendations. 
-            """
-
-
-
-            ################     Prompt for the Use Case       ###############
-
-            # removed   <websearch> {search_results} </websearch> from the dataset and added    <websearch> {websearch_content} </websearch> for # research reviewer code
-                
-
-            prompt=f"""
-
-            You are helping process input data into an output format.
-
-            Here are the datasets:
-            <datasets>
-                <customer> {i2a_data} </customer>
-                <transactions> {transactions_data} </transactions>
-                <dnb> {dnb_data} </dnb>
-                <websearch> {websearch_content} </websearch>
-                <marketing> {marketing_data} </marketing>
-            </datasets>
-
-            Here are the instructions and tasks to perform:
-            <instructions_and_task>
-            {instructions_and_task}
-            </instructions_and_task>
-
-            This is the context of the task:
-            <context>
-            {context}
-            </context>
-
-
-            Here is background information and rules and policies to follow:
-            <provided_rules_and_policies>
-            {provided_rules_and_policies}
-            </provided_rules_and_policies>
-
-            """
-
-            #logger.info(prompt)
-
-
-
-
-
-
-            ################     PREDICTION       ###############
-
-            # Generate a prediction
-            logger.info("START: CALL REASONING MODEL FOR RESEARCH")
-            result = await o3call(
-                    prompt=prompt,
-                    reasoning_effort="high",
-                    tool_choice="auto",
-                    response_format=Response
-            )
-            
-            #print(result)
-            logger.info("END: CALL REASONING MODEL FOR RESEARCH")
-
-            try:
-                if isinstance(result, Response):
-                    # See the model's response to the input task.
-                    #logger.info(result.response_to_input_task)
-                    markdown_content = result.response_to_input_task.__str__()+ "\n\n" if result.response_to_input_task else result.content
-
-                    markdown_content += "\n\nCustomer's State: " + cust_state + "     Zip Code: " + cust_zip_code
-
-                    markdown_content += "\n\nI2A Primary, Secondary Categories and Marketing Primary Categories: \n" + categories.__str__()+ "\n\n"
-                    
-                    #markdown_content += "Mkt : \n" + marketing_data.__str__() + "\n\n"
-
-                    markdown_content += "Contacts : \n" + contacts.__str__() + "\n\n"
-
-                    logger.info("START: FORMATTING CONTENT IN MARKDOWN FORMAT")
-                    formatted_content = await format_content(markdown_content)  # Format the content in markdown format
-                    logger.info("END: FORMATTING CONTENT IN MARKDOWN FORMAT")
-
-
-                    #cat_string = ';'.join(categories.astype(str))
-                    # see the categories referenced in the research report. Values separated by semicolon
-                    formatted_content += "\nCategories Referenced in the Research Report: \n" + categories.__str__() + "\n\n"
-
-                    #formatted_content += "Marketing Categories referenced : \n" + marketing_data.__str__() + "\n\n"
-                    
-                    # See the explanation of why the model made the decision it did. Note this is an open field of research- for numerical calculations, with step by step reasoning that arrives at an answer, this is reliable.
-                    formatted_content += "\n\nJustification : \n" + result.justification.__str__() + "\n\n"
-
-                    # See the data points the model used to make the decision it did.
-                    formatted_content += "\n\nCitation : \n" + result.citations.__str__() + "\n\n"
-
-                    formatted_content += "\n\nBing Search Results and Citation : \n" + msg + "\n" + search_results + "\n" + search_citations + "\n\n"
-                    
-                    #file name and path
-                    current_datetime = datetime.now()
-                    folder_name = current_datetime.strftime("%Y%m%d")
-                    #research_file = "research_output\\" + current_datetime.strftime("%Y%m%d") + "\\" + b_cust + current_datetime.strftime("_%Y-%m-%d_%H-%M-%S")+".md"
-                    research_file =  folder_name + "\\" + b_cust + "\\research_output\\" + b_cust + current_datetime.strftime("_%Y-%m-%d_%H-%M-%S")+".md"
-
-                    logger.info(f"START: SAVING RESEARCH REPORT: {research_file}")
-                    
-                    await save_research_report(
-                        container_name=CONTAINER_NAME,             # changed from "lowtouch" to "mld01blobcontainerne0"
-                        blob_name=research_file,
-                        file_content=formatted_content                      # changed from markdown_content to formatted_content
-                    )
-                    logger.info(f"END: SAVING RESEARCH REPORT: {research_file}")
-
-                    logger.info("START: PUSHING THE MESSAGE TO QUEUE")
-                    
-                    run_date = current_datetime.strftime("%Y-%m-%d %H:%M:%S")
-                    # Send the research report to the Azure Storage Queue
-                    research_msg = {
-                        "batch_id": MSG_BATCH_ID,
-                        "run_date": run_date,
-                        "agent_name": RESEARCH_AGENT_NAME,
-                        "status": "S",
-                        "cust_id": b_cust,
-                        "agent_output": formatted_content,
-                        "agent_output_path": research_file
-                    }
-
-                    queue_client.send_message(json.dumps(research_msg))                # Uncomment to send message to queue
-                    logger.info(f"Message pushed to queue '{queue_name}' : Batch Id : {MSG_BATCH_ID} ; AgentName : {RESEARCH_AGENT_NAME} ; Customer Id : {b_cust}")
-                    
-                    # Let the service know we're finished with the message and it can be safely deleted.
+                    data = json.loads(msg.content)
+                    cust = data.get("customer_id", "Unknown")
+                    #print(f"Processing message: {data}")
+                except json.JSONDecodeError:
+                    print(f"⚠️ Invalid JSON, deleting: {msg.content}")
                     try:
                         source_queue_client.delete_message(message_to_delete)
-                        logger.info(f"✅ Successfully deleted message for customer {b_cust} from source queue {source_queue_name} after processing.")
+                        logger.error("✅ Deleted invalid JSON message")
                     except Exception as delete_error:
-                        logger.error(f"❌ Failed to delete message for customer {b_cust} from source queue {source_queue_name} : {delete_error}")
-                        # Continue processing anyway since the main work is done
+                        logger.error(f"❌ Failed to delete invalid message: {delete_error}")
+                    continue
+                except Exception as e:
+                    logger.error(f"❌ Error processing message: {e}.")
+                    continue
+                
+                #get BATCH_ID from the message
+                MSG_BATCH_ID = data.get("batch_id", BATCH_ID)
+                
+                # Convert the data to DataFrames
+                try:
+                    i2a_data = data.get("i2a_data", "Unknown")
+                    #convert i2a data to dataframe
+                    if isinstance(i2a_data, str):
+                        i2a_data = json.loads(i2a_data)
+                    if isinstance(i2a_data, list):
+                        i2a_data = pd.DataFrame(i2a_data)
+                    elif isinstance(i2a_data, dict):
+                        i2a_data = pd.DataFrame([i2a_data])
+                    else:
+                        i2a_data = pd.DataFrame()
 
-                    logger.info("END: PUSHING THE MESSAGE TO QUEUE")
+                    transactions_data = data.get("transactions_data", "Unknown")
+                    # convert transactions data to dataframe
+                    if isinstance(transactions_data, str):
+                        transactions_data = json.loads(transactions_data)
+                    if isinstance(transactions_data, list):
+                        transactions_data = pd.DataFrame(transactions_data)
+                    elif isinstance(transactions_data, dict):
+                        transactions_data = pd.DataFrame([transactions_data])
+                    else:
+                        transactions_data = pd.DataFrame()
 
-                    logger.info(f"START: UPDATE STATUS IN DATABRICKS for customer {b_cust}")
-                    
-                    # Update the status in Databricks
-                    status_vals = [(
-                        int(MSG_BATCH_ID),
-                        run_date,
-                        RESEARCH_AGENT_NAME,
-                        "S",
-                        b_cust,
-                        cust_name,
-                        research_file,
-                        folder_name,
-                        RESEARCH_AGENT_NAME,
-                        datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    )]
+                    dnb_data = data.get("dnb_data", "Unknown")
+                    # convert dnb data to dataframe
+                    if isinstance(dnb_data, str):
+                        dnb_data = json.loads(dnb_data)
+                    if isinstance(dnb_data, list):  
+                        dnb_data = pd.DataFrame(dnb_data)
+                    elif isinstance(dnb_data, dict):
+                        dnb_data = pd.DataFrame([dnb_data])
+                    else:
+                        dnb_data = pd.DataFrame()
 
-                    #status_cols = ["batch_id", "run_date", "agent_name", "status", "customer_id", "customer_name", "output_file", "blob_date_folder","created_at"]
-                    try:
-                        await update_status_in_databricks(status_cols=status_cols, status_vals=status_vals, table_name=status_table_name, status="S")
-                        logger.info(f"END: UPDATE STATUS IN DATABRICKS for customer {b_cust}")
-                    except Exception as e:
-                        logger.error(f"Error updating status in Databricks for customer {b_cust}: {e}")
-                    
-                else:    
-                    logger.error(f"❌ Model did not return a valid response for customer {b_cust}.")
-                    logger.info(result)
-                logger.info("END: PROCESSING CUSTOMER ID: %s", cust)
+                    marketing_data = data.get("marketing_data", "Unknown")
+                    # convert marketing data to dataframe
+                    if isinstance(marketing_data, str):
+                        marketing_data = json.loads(marketing_data)
+                    if isinstance(marketing_data, list):
+                        marketing_data = pd.DataFrame(marketing_data)
+                    elif isinstance(marketing_data, dict):
+                        marketing_data = pd.DataFrame([marketing_data])
+                    else:
+                        marketing_data = pd.DataFrame()
+                except Exception as e:
+                    logger.error(f"❌ Error converting data to DataFrame: {e}. ")
+                    continue
+        
+                # Let the service know we're finished with the message and it can be safely deleted.
+                #source_queue_client.delete_message(msg)
+                #print(f"✅ Processed and deleted message: {data['customer_id']}\n\n")
+
+
+            
                 logger.info("=" * 100)
-            except Exception as e:
-                logger.error(f"❌ Error processing customer {cust}: {e}")
-                print(f"❌ Error processing customer {cust}: {e}")
-                continue
+                logger.info("START: PROCESSING CUSTOMER ID: %s", cust)
+                logger.info("=" * 100)
+                
+                print("-" * 100)
+                print(f"\n\n****************************         Customer ID: {cust}     ****************************")
+                print("-" * 100)
+                
+                b_cust = f"{cust}"
+                
+                #print("Categories in Filtered I2A Data for the specific customer: ", i2a_data['PRIMARY_CAT_1'].values[0], ";",i2a_data['PRIMARY_CAT_2'].values[0],  ";", i2a_data['PRIMARY_CAT_3'].values[0])
+
+                # check if i2a_data['PRIMARY_CAT_1'].values[0] is not None and i2a_data['PRIMARY_CAT_2'].values[0] is not None and i2a_data['PRIMARY_CAT_3'].values[0] is not None
+                if not i2a_data['PRIMARY_CAT_1'].values[0] is None :
+                    cat1 = i2a_data['PRIMARY_CAT_1'].values[0]
+                    print("Primary Category 1: ", cat1, " and Marketing Category 1: ", i2a_data['MARKETING_CAT_1'].values[0])
+                else:
+                    cat1 = None
+                    print("No Primary Category 1 found for this customer.") 
+                
+                if not i2a_data['PRIMARY_CAT_2'].values[0] is None :
+                    cat2 = i2a_data['PRIMARY_CAT_2'].values[0]
+                    print("Primary Category 2: ", cat2, " and Marketing Category 2: ", i2a_data['MARKETING_CAT_2'].values[0])
+                else:
+                    cat2 = None
+                    print("No Primary Category 2 found for this customer.")
+
+                # Commented out the below code to remove Primary Category 3 
+                '''
+                if not i2a_data['PRIMARY_CAT_3'].values[0] is None:
+                    cat3 = i2a_data['PRIMARY_CAT_3'].values[0]
+                    print("Primary Category 3: ", cat3, " and Marketing Category 3: ", i2a_data['MARKETING_CAT_3'].values[0])
+                else:
+                    cat3 = None
+                    print("No Primary Category 3 found for this customer.")
+                '''
+
+            
+                City_code = i2a_data['DIV'].values[0] if not i2a_data.empty else None
+                cust_name = i2a_data['CUST_NAME'].values[0] if not i2a_data.empty else None
+                cust_industry = i2a_data['INDUSTRY'].values[0] if not i2a_data.empty else None
+                cust_zip_code = i2a_data['CUST_ZIP'].values[0] if not i2a_data.empty else None
+                cust_website = dnb_data['website'].values[0] if not dnb_data.empty else None
+                business_name = dnb_data['business_name'].values[0] if not dnb_data.empty else None
+
+
+                # Create CUSTOMER_PROFILE dictionary
+                CUSTOMER_PROFILE = {
+                    "name": cust_name,
+                    "business_name": business_name,
+                    "industry": cust_industry,
+                    "location": City_code,  # You may want to use a more descriptive location if available
+                    "domain_hint": cust_website
+                }
+
+
+                print("Customer Name : ", cust_name, "   and Website: ", cust_website)
+                print("Customer Zip Code : ", cust_zip_code)
+                print("Customer Industry : ", cust_industry)
+            
+
+
+
+                logger.info("START: GET STATE FROM ZIP CODE")
+                cust_state = await get_state_from_zip(cust_zip_code)          # Get the state code from the zip code
+                logger.info("END: GET STATE FROM ZIP CODE")
+                cust_state = cust_state.strip().replace(" ", "_").replace("-", "_").replace(".", "_").replace(",", "_").replace("'", "_") # remove any leading or trailing whitespace
+                msg = ""
+                    
+                # Added code to use Bing Search data for all customers
+                try:
+                    msg=""
+                    websearch_content = ""
+                    curr_date = datetime.now().strftime("%Y-%m-%d")
+
+                    if business_name is not None and business_name != "":
+                        query = f"Show me the latest news from past 3 months from {curr_date}, for {cust_name} or {business_name}, a company operating in the {cust_industry} industry. "
+                    else:
+                        query = f"Show me the latest news from past 3 months from {curr_date}, for {cust_name}, a company operating in the {cust_industry} industry. "
+                    
+                    if cust_website is not None and cust_website != "": 
+                        query += "You could also search their website "+ cust_website + " for the latest news."
+                    
+                    logger.info("START: BING SEARCH")
+                    logger.info(f"Querying Bing Search with query: {query}")
+                    #search_results , search_citations = await get_bing_search_results(query=query)         # Get Bing Search results
+                    review_research_results: List[WebSearchResultsExtraction] = []                                                                  # research reviewer code
+                    search_results , search_citations, review_research_results = await get_bing_search_results(CUSTOMER_PROFILE, query=query)       # research reviewer code
+                    logger.info(f"Received search results: {search_results}")
+                    logger.info(f"Received search citations: {search_citations}")
+                    logger.info(f"Received review research results: {review_research_results}")  # research reviewer code
+                    
+                    # Filter review_research_results for only relevant results
+                    relevant_web_results = []
+                    
+                    if review_research_results:
+                        for res in review_research_results:
+                            # If using Pydantic objects, use res.is_relevant; if dict, use res.get('is_relevant')
+                            # Prefer direct attribute access when `res` is a Pydantic model
+                            try:
+                                is_relevant = res.is_relevant
+                            except AttributeError:
+                                is_relevant = None
+                            if is_relevant is None and isinstance(res, dict):
+                                is_relevant = res.get('is_relevant')
+                            if is_relevant:
+                                # Use the original search result text if available
+                                try:
+                                    snippet = res.search_results
+                                except AttributeError:
+                                    snippet = ""
+                                relevant_web_results.append(snippet)
+
+                    # Only use relevant web results in the prompt
+                    if relevant_web_results:
+                        websearch_content = snippet
+                    else:
+                        websearch_content = ""
+                    
+                    logger.info(f"Relevant web search results: {relevant_web_results}")
+
+                    logger.info("END: BING SEARCH")
+                except Exception as e:
+                    logger.error(f"❌ Error during Bing Search: {e}")
+                    search_results = "No search results found."
+                    search_citations = "No citations found."
+                    msg = "Bing Search failed, using default message."
+                    logger.info("END: BING SEARCH")
+
+                
+                contacts = transactions_data[['SF_ACCOUNT_ID', 'SF_CONTACT_ID', 'FIRST_NAME', 'LAST_NAME','EMAIL']].drop_duplicates()
+                categories = i2a_data[['PRIMARY_CAT_1', 'PRIMARY_CAT_2', 'SECONDARY_CAT_1', 'SECONDARY_CAT_2', 'MARKETING_CAT_1', 'MARKETING_CAT_2',]].drop_duplicates()
+
+                # Commented out the below code to remove Primary Category 3 and Secondary Category 3
+                #categories = i2a_data[['PRIMARY_CAT_1', 'PRIMARY_CAT_2', 'PRIMARY_CAT_3',
+                #                        'SECONDARY_CAT_1', 'SECONDARY_CAT_2', 'SECONDARY_CAT_3',
+                #                        'MARKETING_CAT_1', 'MARKETING_CAT_2', 'MARKETING_CAT_3']].drop_duplicates()
+
+
+                ## Instructions and Tasks
+
+                instructions_and_task="""
+                    You are an AI research assistant that helps the Staples B2B team research their low-touch customers and create hyper-personalized outreach report for the contacts. 
+                    Specify the priority reason for outreach, which can be either Retention or Growth.
+                    Analyze and Research the data for """ + cust_name + """ and create a research report for the customer and their contact details. 
+                    The research report and recommendations will be used to create hyper-personalized report for """ + cust_name + """. 
+                    Recommendations should be based on the Primary and Secondary Categories in the customer dataset. Use all the Primary categories to target that Customer.
+                    Use data from marketing to propose additional products. Use Bing Search to enhance the research report.
+                    Provide a contact wise generic report in the output along with your other research output and recommendations. 
+                """
+
+
+
+                ################     Prompt for the Use Case       ###############
+
+                # removed   <websearch> {search_results} </websearch> from the dataset and added    <websearch> {websearch_content} </websearch> for # research reviewer code
+                    
+
+                prompt=f"""
+
+                You are helping process input data into an output format.
+
+                Here are the datasets:
+                <datasets>
+                    <customer> {i2a_data} </customer>
+                    <transactions> {transactions_data} </transactions>
+                    <dnb> {dnb_data} </dnb>
+                    <websearch> {websearch_content} </websearch>
+                    <marketing> {marketing_data} </marketing>
+                </datasets>
+
+                Here are the instructions and tasks to perform:
+                <instructions_and_task>
+                {instructions_and_task}
+                </instructions_and_task>
+
+                This is the context of the task:
+                <context>
+                {context}
+                </context>
+
+
+                Here is background information and rules and policies to follow:
+                <provided_rules_and_policies>
+                {provided_rules_and_policies}
+                </provided_rules_and_policies>
+
+                """
+
+                #logger.info(prompt)
+
+
+
+
+
+
+                ################     PREDICTION       ###############
+
+                # Generate a prediction
+                logger.info("START: CALL REASONING MODEL FOR RESEARCH")
+                result = await o3call(
+                        prompt=prompt,
+                        reasoning_effort="high",
+                        tool_choice="auto",
+                        response_format=Response
+                )
+                
+                #print(result)
+                logger.info("END: CALL REASONING MODEL FOR RESEARCH")
+
+                try:
+                    if isinstance(result, Response):
+                        # See the model's response to the input task.
+                        #logger.info(result.response_to_input_task)
+                        markdown_content = result.response_to_input_task.__str__()+ "\n\n" if result.response_to_input_task else result.content
+
+                        markdown_content += "\n\nCustomer's State: " + cust_state + "     Zip Code: " + cust_zip_code
+
+                        markdown_content += "\n\nI2A Primary, Secondary Categories and Marketing Primary Categories: \n" + categories.__str__()+ "\n\n"
+                        
+                        #markdown_content += "Mkt : \n" + marketing_data.__str__() + "\n\n"
+
+                        markdown_content += "Contacts : \n" + contacts.__str__() + "\n\n"
+
+                        logger.info("START: FORMATTING CONTENT IN MARKDOWN FORMAT")
+                        formatted_content = await format_content(markdown_content)  # Format the content in markdown format
+                        logger.info("END: FORMATTING CONTENT IN MARKDOWN FORMAT")
+
+
+                        #cat_string = ';'.join(categories.astype(str))
+                        # see the categories referenced in the research report. Values separated by semicolon
+                        formatted_content += "\nCategories Referenced in the Research Report: \n" + categories.__str__() + "\n\n"
+
+                        #formatted_content += "Marketing Categories referenced : \n" + marketing_data.__str__() + "\n\n"
+                        
+                        # See the explanation of why the model made the decision it did. Note this is an open field of research- for numerical calculations, with step by step reasoning that arrives at an answer, this is reliable.
+                        formatted_content += "\n\nJustification : \n" + result.justification.__str__() + "\n\n"
+
+                        # See the data points the model used to make the decision it did.
+                        formatted_content += "\n\nCitation : \n" + result.citations.__str__() + "\n\n"
+
+                        formatted_content += "\n\nBing Search Results and Citation : \n" + msg + "\n" + search_results + "\n" + search_citations + "\n\n"
+                        
+                        #file name and path
+                        current_datetime = datetime.now()
+                        folder_name = current_datetime.strftime("%Y%m%d")
+                        #research_file = "research_output\\" + current_datetime.strftime("%Y%m%d") + "\\" + b_cust + current_datetime.strftime("_%Y-%m-%d_%H-%M-%S")+".md"
+                        research_file =  folder_name + "\\" + b_cust + "\\research_output\\" + b_cust + current_datetime.strftime("_%Y-%m-%d_%H-%M-%S")+".md"
+
+                        logger.info(f"START: SAVING RESEARCH REPORT: {research_file}")
+                        
+                        await save_research_report(
+                            container_name=CONTAINER_NAME,             # changed from "lowtouch" to "mld01blobcontainerne0"
+                            blob_name=research_file,
+                            file_content=formatted_content                      # changed from markdown_content to formatted_content
+                        )
+                        logger.info(f"END: SAVING RESEARCH REPORT: {research_file}")
+
+                        logger.info("START: PUSHING THE MESSAGE TO QUEUE")
+                        
+                        run_date = current_datetime.strftime("%Y-%m-%d %H:%M:%S")
+                        # Send the research report to the Azure Storage Queue
+                        research_msg = {
+                            "batch_id": MSG_BATCH_ID,
+                            "run_date": run_date,
+                            "agent_name": RESEARCH_AGENT_NAME,
+                            "status": "S",
+                            "cust_id": b_cust,
+                            "agent_output": formatted_content,
+                            "agent_output_path": research_file
+                        }
+
+                        queue_client.send_message(json.dumps(research_msg))                # Uncomment to send message to queue
+                        logger.info(f"Message pushed to queue '{queue_name}' : Batch Id : {MSG_BATCH_ID} ; AgentName : {RESEARCH_AGENT_NAME} ; Customer Id : {b_cust}")
+                        
+                        # Let the service know we're finished with the message and it can be safely deleted.
+                        try:
+                            source_queue_client.delete_message(message_to_delete)
+                            logger.info(f"✅ Successfully deleted message for customer {b_cust} from source queue {source_queue_name} after processing.")
+                        except Exception as delete_error:
+                            logger.error(f"❌ Failed to delete message for customer {b_cust} from source queue {source_queue_name} : {delete_error}")
+                            # Continue processing anyway since the main work is done
+
+                        logger.info("END: PUSHING THE MESSAGE TO QUEUE")
+
+                        logger.info(f"START: UPDATE STATUS IN DATABRICKS for customer {b_cust}")
+                        
+                        # Update the status in Databricks
+                        status_vals = [(
+                            int(MSG_BATCH_ID),
+                            run_date,
+                            RESEARCH_AGENT_NAME,
+                            "S",
+                            b_cust,
+                            cust_name,
+                            research_file,
+                            folder_name,
+                            RESEARCH_AGENT_NAME,
+                            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        )]
+
+                        #status_cols = ["batch_id", "run_date", "agent_name", "status", "customer_id", "customer_name", "output_file", "blob_date_folder","created_at"]
+                        try:
+                            await update_status_in_databricks(status_cols=status_cols, status_vals=status_vals, table_name=status_table_name, status="S")
+                            logger.info(f"END: UPDATE STATUS IN DATABRICKS for customer {b_cust}")
+                        except Exception as e:
+                            logger.error(f"Error updating status in Databricks for customer {b_cust}: {e}")
+                        
+                    else:    
+                        logger.error(f"❌ Model did not return a valid response for customer {b_cust}.")
+                        logger.info(result)
+                    logger.info("END: PROCESSING CUSTOMER ID: %s", cust)
+                    logger.info("=" * 100)
+                except Exception as e:
+                    logger.error(f"❌ Error processing customer {cust}: {e}")
+                    print(f"❌ Error processing customer {cust}: {e}")
+                    continue
 
 
 
