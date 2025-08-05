@@ -64,16 +64,16 @@ logger.setLevel(logging.INFO)
 
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-log_file = 'research_agent_'+ datetime.now().strftime("%Y%m%d") +'.log'
-file_handler = logging.FileHandler(log_file)
-file_handler.setFormatter(formatter)
-file_handler.setLevel(logging.INFO)
+#log_file = 'research_agent_'+ datetime.now().strftime("%Y%m%d") +'.log'
+#file_handler = logging.FileHandler(log_file)
+#file_handler.setFormatter(formatter)
+#file_handler.setLevel(logging.INFO)
 
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(formatter)
 stream_handler.setLevel(logging.INFO)
 
-logger.addHandler(file_handler)
+#logger.addHandler(file_handler)
 logger.addHandler(stream_handler)   
 
 
