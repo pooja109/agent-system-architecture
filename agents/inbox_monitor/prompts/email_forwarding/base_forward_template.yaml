@@ -1,0 +1,48 @@
+template_version: "1.0.0"
+template: |
+  ${reason}
+
+  Original Email Details:
+  From: ${sender_email} (${sender_name})
+  Sent: ${sent_datetime}
+  Subject: ${original_subject}
+
+  --- Original Message ---
+  ${original_body}
+
+variables:
+  reason:
+    name: "reason"
+    description: "Reason for forwarding the email"
+    type: "string"
+    required: true
+  sender_email:
+    name: "sender_email"
+    description: "Original sender's email address"
+    type: "string"
+    required: true
+  sender_name:
+    name: "sender_name"
+    description: "Original sender's name"
+    type: "string"
+    required: true
+  sent_datetime:
+    name: "sent_datetime"
+    description: "When the original email was sent"
+    type: "string"
+    required: true
+  original_subject:
+    name: "original_subject"
+    description: "Subject line of the original email"
+    type: "string"
+    required: true
+  original_body:
+    name: "original_body"
+    description: "Body content of the original email"
+    type: "string"
+    required: true
+
+metadata:
+  source: "Extracted from scenario_processor.py _forward_email_to_recipient() method"
+  extraction_date: "2025-01-01"
+  original_lines: "950-959"

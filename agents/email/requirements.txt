@@ -4,11 +4,15 @@ azure-communication-email>=1.0.0
 # Azure Identity for authentication
 azure-identity>=1.15.0
 
+# Azure Key Vault integration (Phase 1)
+azure-keyvault-secrets>=4.7.0
+azure-core>=1.29.0
+
 # Azure Storage for blob operations
 azure-storage-blob>=12.19.0
 
-# Databricks connectivity
-databricks-sql-connector>=3.0.0
+# Databricks connectivity (OAuth with SDK)
+databricks-sdk>=0.28.0
 
 # Environment variable management
 python-dotenv>=1.0.0

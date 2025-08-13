@@ -1,0 +1,28 @@
+template_version: "1.0.0"
+
+template: |
+  Test template for {test_variable}:
+  
+  Input: {input_text}
+  Context: {context_info}
+  
+  Please process this test input.
+
+variables:
+  test_variable:
+    description: "Test variable for template"
+    type: "string"
+    required: true
+  input_text:
+    description: "Input text for testing"
+    type: "string"
+    required: true
+  context_info:
+    description: "Context information"
+    type: "string"
+    required: false
+    default_value: "No context provided"
+
+metadata:
+  description: "Test template for unit testing"
+  use_case: "Unit test validation"

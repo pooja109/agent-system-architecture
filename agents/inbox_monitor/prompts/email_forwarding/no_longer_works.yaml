@@ -1,0 +1,23 @@
+template_version: "1.0.0"
+scenario_type: "no_longer_works"
+scenario_number: 10
+description: "Template for forwarding notifications about contacts no longer working"
+
+forwarding_reason: "Contact no longer works at company - requires attention"
+
+subject_template: "FWD: Contact Change - ${original_subject}"
+
+additional_context: |
+  This contact is no longer with their company.
+  Please review and update contact information or remove from lists.
+  
+  Customer Classification: No Longer Works (Scenario 10)
+  Requires: Contact database update
+
+escalation_priority: "low"
+requires_manual_review: true
+
+metadata:
+  target_scenarios: [10]
+  business_impact: "Data quality maintenance"
+  recommended_action: "Update contact database and remove from active lists"

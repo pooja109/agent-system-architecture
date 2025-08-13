@@ -1,0 +1,23 @@
+template_version: "1.0.0"
+scenario_type: "negative_response"
+scenario_number: 6
+description: "Template for forwarding negative customer responses"
+
+forwarding_reason: "Negative customer response requiring attention"
+
+subject_template: "FWD: Negative Response - ${original_subject}"
+
+additional_context: |
+  This customer has expressed a negative response to our outreach.
+  Please review and determine appropriate follow-up actions.
+  
+  Customer Classification: Negative Response (Scenario 6)
+  Requires: Manual review and potential removal from outreach list
+
+escalation_priority: "medium"
+requires_manual_review: true
+
+metadata:
+  target_scenarios: [6]
+  business_impact: "Customer retention risk"
+  recommended_action: "Manual review for potential list removal"

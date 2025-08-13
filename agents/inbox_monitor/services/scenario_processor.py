@@ -8,36 +8,47 @@ expert assignment, and case creation.
 
 import asyncio
 import contextlib
+import json
+import os
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import Any, Optional
 
 import structlog
 
-try:
-    from config.settings import AppSettings
-    from models.email import Email
-    from services.azure_ai_foundry_client import (
-        AzureAIFoundryClient,
-        EmailIntent,
-        IntentClassificationResult,
-    )
-    from services.contact_lookup_service import ContactLookupService
-    from services.round_robin_service import RoundRobinService
-    from services.salesforce_client import SalesforceClient
-    from utils.content_formatter import ContentFormatter, ContentFormattingConfig
-except ImportError:
-    from ..config.settings import AppSettings
-    from ..models.email import Email
-    from .azure_ai_foundry_client import (
-        AzureAIFoundryClient,
-        EmailIntent,
-        IntentClassificationResult,
-    )
-    from .contact_lookup_service import ContactLookupService
-    from .round_robin_service import RoundRobinService
-    from .salesforce_client import SalesforceClient
-    from ..utils.content_formatter import ContentFormatter, ContentFormattingConfig
+# Fix import path by adding the correct directory to sys.path
+import sys
+from pathlib import Path
+
+# Add the parent directory (inbox_monitor) to the path if not already there
+current_dir = Path(__file__).parent.parent  # Go up from services/ to inbox_monitor/
+current_dir_str = str(current_dir.absolute())
+if current_dir_str not in sys.path:
+    sys.path.insert(0, current_dir_str)
+
+from config.settings import AppSettings
+from models.email import Email
+from services.azure_ai_foundry_client import (
+    AzureAIFoundryClient,
+    EmailIntent,
+    IntentClassificationResult,
+)
+from services.contact_lookup_service import ContactLookupService
+from services.round_robin_service import RoundRobinService
+from services.salesforce_client import SalesforceClient
+from services.email_forwarding_manager import EmailForwardingManager
+
+# Import content_formatter from the inbox_monitor utils, not the parent utils
+import importlib.util
+utils_content_formatter_path = current_dir / "utils" / "content_formatter.py"
+spec = importlib.util.spec_from_file_location("inbox_utils.content_formatter", utils_content_formatter_path)
+if spec and spec.loader:
+    content_formatter_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(content_formatter_module)
+    ContentFormatter = content_formatter_module.ContentFormatter
+    ContentFormattingConfig = content_formatter_module.ContentFormattingConfig
+else:
+    raise ImportError(f"Could not load content_formatter from {utils_content_formatter_path}")
 
 
 class ScenarioType(Enum):
@@ -73,37 +84,65 @@ class ScenarioProcessor:
         """Async context manager entry - establish service connections."""
         if not self._services_connected:
             try:
-                # Connect to databricks services concurrently for better performance
-                await asyncio.gather(
-                    self.round_robin_service.connect(),
-                    self.contact_lookup_service.connect(),
-                    return_exceptions=True
-                )
+                # Initialize AI client with Key Vault credentials
+                try:
+                    from services.azure_key_vault_client import AzureKeyVaultClient
+                except ImportError:
+                    from ..services.azure_key_vault_client import AzureKeyVaultClient
+                
+                # Use real Key Vault credentials even when test_mode is enabled for email substitution
+                # The test_mode should only affect email addresses, not credential access
+                kv_test_mode = False  # Always use real credentials for Key Vault
+                async with AzureKeyVaultClient(self.settings.key_vault, test_mode=kv_test_mode) as kv_client:
+                    ai_foundry_credentials = await kv_client.get_ai_foundry_credentials()
+                    # Azure AI Foundry client now only supports live mode - no test mode
+                    self.ai_client = AzureAIFoundryClient(self.settings.azure_ai_foundry, ai_foundry_credentials)
+                
+                # Initialize all clients as async context managers
+                await self.ai_client.__aenter__()
+                await self.salesforce_client.__aenter__()
+                await self.round_robin_service.__aenter__()
+                await self.contact_lookup_service.__aenter__()
+                
                 self._services_connected = True
-                self.logger.debug("Scenario processor services connected")
+                self.logger.debug("Scenario processor initialized with Key Vault credentials")
             except Exception as e:
-                self.logger.warning(
-                    "Some scenario processor services failed to connect",
-                    error=str(e)
+                self.logger.error(
+                    "Failed to initialize scenario processor with Key Vault credentials",
+                    extra={"error_message": str(e)}
                 )
+                raise
         return self
     
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         """Async context manager exit - cleanup service connections."""
         if self._services_connected:
             try:
-                # Disconnect services concurrently
-                await asyncio.gather(
-                    self.round_robin_service.disconnect(),
-                    self.contact_lookup_service.disconnect(),
-                    return_exceptions=True
-                )
+                # Close clients with individual error handling
+                cleanup_errors = []
+
+                for client_name, client in [
+                    ("ai_client", self.ai_client),
+                    ("salesforce_client", self.salesforce_client),
+                    ("round_robin_service", self.round_robin_service),
+                    ("contact_lookup_service", self.contact_lookup_service),
+                ]:
+                    if client:
+                        try:
+                            await client.__aexit__(exc_type, exc_val, exc_tb)
+                        except Exception as e:
+                            cleanup_errors.append(f"{client_name}: {e!s}")
+                            self.logger.warning(f"Error closing {client_name}", extra={"error_message": str(e)})
+
+                if cleanup_errors:
+                    self.logger.warning("Some cleanup errors occurred", extra={"errors": cleanup_errors})
+                
                 self._services_connected = False
-                self.logger.debug("Scenario processor services disconnected")
+                self.logger.debug("Scenario processor cleanup completed")
             except Exception as e:
                 self.logger.warning(
-                    "Error disconnecting scenario processor services",
-                    error=str(e)
+                    "Error during scenario processor cleanup",
+                    extra={"error_message": str(e)}
                 )
 
     def __init__(self, settings: AppSettings):
@@ -114,12 +153,16 @@ class ScenarioProcessor:
         """
         self.settings = settings
         self.logger = structlog.get_logger(__name__)
+        self._services_connected = False
 
-        # Initialize service clients
-        self.ai_client = AzureAIFoundryClient(settings.azure_ai_foundry)
+        # Service clients will be initialized in __aenter__ with Key Vault credentials
+        self.ai_client = None
         self.salesforce_client = SalesforceClient(settings.salesforce)
-        self.round_robin_service = RoundRobinService(settings.databricks, settings.test_mode)
-        self.contact_lookup_service = ContactLookupService(settings.databricks, settings.test_mode)
+        self.round_robin_service = RoundRobinService(settings.test_mode, settings.databricks_oauth)
+        self.contact_lookup_service = ContactLookupService(settings.test_mode)
+        
+        # Initialize email forwarding manager
+        self.email_forwarding_manager = EmailForwardingManager()
         
         # Initialize content formatter
         content_config = ContentFormattingConfig(
@@ -156,18 +199,42 @@ class ScenarioProcessor:
             await self.__aenter__()
         try:
             # Check for forced scenario in test mode
-            if (
+            # Check for scenario forcing - with special handling for Scenario 9
+            force_scenario_9_explicitly = (
+                self.settings.test_mode.enabled
+                and self.settings.test_mode.force_scenario_9
+                and email.sender.email.lower() == self.settings.test_mode.test_sender_email.lower()
+            )
+            
+            force_other_scenario = (
                 self.settings.test_mode.enabled
                 and self.settings.test_mode.force_scenario is not None
+                and self.settings.test_mode.force_scenario != 9  # Don't force scenario 9 via general flag
                 and email.sender.email.lower() == self.settings.test_mode.test_sender_email.lower()
-            ):
-                forced_scenario = self.settings.test_mode.force_scenario
-                self.logger.info(
-                    "Test mode: forcing scenario for testing",
-                    original_email=email.sender.email,
-                    forced_scenario=forced_scenario,
-                    test_mode=True,
-                )
+            )
+            
+            if force_scenario_9_explicitly or force_other_scenario:
+                if force_scenario_9_explicitly:
+                    forced_scenario = 9
+                    self.logger.info(
+                        "Test mode: explicitly forcing Scenario 9 (email invalid)",
+                        extra={
+                            "original_email": email.sender.email,
+                            "forced_scenario": forced_scenario,
+                            "test_mode": True,
+                            "explicit_force_scenario_9": True
+                        }
+                    )
+                else:
+                    forced_scenario = self.settings.test_mode.force_scenario
+                    self.logger.info(
+                        "Test mode: forcing scenario for testing",
+                        extra={
+                            "original_email": email.sender.email,
+                            "forced_scenario": forced_scenario,
+                            "test_mode": True
+                        }
+                    )
 
                 # Map forced scenario number to scenario type
                 scenario_type_map = {
@@ -194,61 +261,120 @@ class ScenarioProcessor:
                 )
 
             else:
+                # Clean HTML content before sending to AI (this was missing!)
+                clean_body = ""
+                if email.body and email.body.content:
+                    try:
+                        # Use content formatter to clean HTML content
+                        clean_body = self.content_formatter.html_to_clean_text(email.body.content)
+                        self.logger.debug(
+                            "HTML content cleaned for AI classification",
+                            email_id=email.id,
+                            original_length=len(email.body.content),
+                            cleaned_length=len(clean_body)
+                        )
+                    except Exception as e:
+                        self.logger.warning(
+                            "Failed to clean HTML content for AI classification, using raw content",
+                            error=str(e),
+                            email_id=email.id
+                        )
+                        clean_body = email.body.content
+
                 # Normal AI classification with timeout and error handling
                 try:
                     async with self.ai_client as ai_client:
                         intent_result = await asyncio.wait_for(
                             ai_client.classify_email_intent(
                                 subject=email.subject,
-                                body=email.body.content if email.body else "",
+                                body=clean_body,
                                 sender_email=email.sender.email,
                             ),
                             timeout=30.0  # 30 second timeout for AI classification
                         )
                 except asyncio.TimeoutError:
                     self.logger.error(
-                        "AI classification timed out",
+                        "AI classification timed out - service may be slow or unavailable",
                         email_id=email.id,
-                        sender=email.sender.email
+                        sender=email.sender.email,
+                        subject=email.subject[:50],
+                        timeout_seconds=30,
+                        body_length=len(clean_body),
+                        ai_client_type=type(self.ai_client).__name__
                     )
                     return ScenarioResult(
                         scenario_type=ScenarioType.UNKNOWN,
                         success=False,
-                        actions_taken=["AI classification timed out"],
+                        actions_taken=["AI classification timed out after 30 seconds"],
                         error_message="AI classification timed out after 30 seconds"
                     )
                 except Exception as e:
+                    error_details = {
+                        "error_type": type(e).__name__,
+                        "error_message": str(e),
+                        "email_id": email.id,
+                        "sender": email.sender.email,
+                        "subject": email.subject[:50] if email.subject else "No Subject",
+                        "body_length": len(clean_body),
+                        "ai_client_initialized": self.ai_client is not None,
+                        "ai_client_type": type(self.ai_client).__name__ if self.ai_client else None
+                    }
+                    
                     self.logger.error(
-                        "AI classification failed",
-                        error=str(e),
-                        email_id=email.id,
-                        sender=email.sender.email
+                        "AI classification service failed with detailed context",
+                        **error_details
                     )
                     return ScenarioResult(
                         scenario_type=ScenarioType.UNKNOWN,
                         success=False,
-                        actions_taken=["AI classification failed"],
+                        actions_taken=[f"AI classification failed: {type(e).__name__}"],
                         error_message=f"AI classification failed: {e}"
                     )
 
                 # Validate classification result
                 if not intent_result:
+                    self.logger.error(
+                        "AI classification returned null/empty result",
+                        email_id=email.id,
+                        sender=email.sender.email,
+                        subject=email.subject[:50] if email.subject else "No Subject",
+                        ai_client_type=type(self.ai_client).__name__ if self.ai_client else None
+                    )
                     return ScenarioResult(
                         scenario_type=ScenarioType.UNKNOWN,
                         success=False,
-                        actions_taken=["No AI classification result"],
+                        actions_taken=["AI classification returned no result"],
                         error_message="AI classification returned no result"
                     )
+
+                # Log successful AI response for debugging
+                self.logger.info(
+                    "AI classification completed successfully",
+                    email_id=email.id,
+                    intent=intent_result.intent.value if hasattr(intent_result.intent, 'value') else str(intent_result.intent),
+                    confidence=intent_result.confidence,
+                    reasoning_preview=intent_result.reasoning[:100] if intent_result.reasoning else "No reasoning provided"
+                )
 
                 # Force cleanup of any lingering tasks after AI client usage
                 await asyncio.sleep(0.01)  # Brief pause to let any background tasks complete
 
                 # Check if classification was successful (confidence > 0 and not UNKNOWN)
                 if intent_result.intent == EmailIntent.UNKNOWN or intent_result.confidence == 0.0:
+                    self.logger.warning(
+                        "AI classification returned low confidence or unknown intent",
+                        email_id=email.id,
+                        sender=email.sender.email,
+                        subject=email.subject[:50] if email.subject else "No Subject",
+                        intent=intent_result.intent.value if hasattr(intent_result.intent, 'value') else str(intent_result.intent),
+                        confidence=intent_result.confidence,
+                        reasoning=intent_result.reasoning[:200] if intent_result.reasoning else "No reasoning provided",
+                        body_preview=clean_body[:100] if clean_body else "No body content"
+                    )
                     return ScenarioResult(
                         scenario_type=ScenarioType.UNKNOWN,
                         success=False,
-                        actions_taken=[],
+                        actions_taken=[f"Low confidence classification: {intent_result.confidence}"],
                         error_message=f"Intent classification failed: {intent_result.reasoning}",
                     )
 
@@ -259,7 +385,7 @@ class ScenarioProcessor:
             return await self._process_scenario(email, scenario_type, intent_result)
 
         except Exception as e:
-            self.logger.error("Error processing email scenario", error=str(e))
+            self.logger.error(f"Error processing email scenario: {e}")
             return ScenarioResult(
                 scenario_type=ScenarioType.UNKNOWN,
                 success=False,
@@ -330,7 +456,11 @@ class ScenarioProcessor:
 
         except Exception as e:
             self.logger.error(
-                "Error processing scenario", scenario_type=scenario_type, error=str(e)
+                "Error processing scenario",
+                extra={
+                    "scenario_type": scenario_type,
+                    "error_message": str(e)
+                }
             )
             return ScenarioResult(
                 scenario_type=scenario_type,
@@ -350,38 +480,34 @@ class ScenarioProcessor:
             ScenarioResult with expert assignment and case creation details
         """
         try:
-            # Step 1: Lookup Salesforce account and contact IDs from Databricks
+            # Step 1: Determine the email address to use for lookups (handle test mode)
+            lookup_email = email.sender.email
+            if (
+                self.settings.test_mode.enabled
+                and email.sender.email.lower() == self.settings.test_mode.test_sender_email.lower()
+            ):
+                lookup_email = self.settings.test_mode.target_salesforce_email
+                actions_taken.append(
+                    f"TEST MODE: Email substituted from {email.sender.email} to {lookup_email} for lookup"
+                )
+
+            # Step 2: Lookup Salesforce account and contact IDs from Databricks (single lookup)
             async with self.contact_lookup_service as lookup_service:
-                contact_lookup = await lookup_service.lookup_contact_by_email(email.sender.email)
+                contact_lookup = await lookup_service.lookup_contact_by_email(lookup_email)
 
-                if contact_lookup.found:
-                    account_id = contact_lookup.sf_account_id or ""
-                    contact_id = contact_lookup.sf_contact_id or ""
-
-                    # Log test mode substitution if it occurred
-                    if (
-                        self.settings.test_mode.enabled
-                        and email.sender.email.lower()
-                        == self.settings.test_mode.test_sender_email.lower()
-                    ):
-                        actions_taken.append(
-                            f"TEST MODE: Email substituted from {email.sender.email} to {self.settings.test_mode.target_salesforce_email} for lookup"
-                        )
-
-                    actions_taken.append(
-                        f"Found contact in Databricks: Account={account_id}, Contact={contact_id}"
-                    )
-                else:
+                if not contact_lookup.found:
                     # Contact not found - cannot assign expert for invalid contact
                     self.logger.warning(
                         "Contact not found in lookup table",
-                        email=email.sender.email,
-                        table="snowflake_ml_dev.mlops.i2a_lowtouch_sls_cnct_lvl_t",
+                        extra={
+                            "email": lookup_email,
+                            "original_email": email.sender.email,
+                            "table": "snowflake_ml_dev.mlops.i2a_lowtouch_sls_cnct_lvl_t",
+                        }
                     )
                     actions_taken.append(
-                        f"Contact not found in Databricks for {email.sender.email}"
+                        f"Contact not found in Databricks for {lookup_email}"
                     )
-                    # Return failure result - don't assign expert or create case for invalid contacts
                     return ScenarioResult(
                         scenario_type=ScenarioType.SCENARIO_5,
                         success=False,
@@ -389,29 +515,42 @@ class ScenarioProcessor:
                         expert_assigned=None,
                         case_created=None,
                         emails_sent=None,
-                        error_message=f"Contact {email.sender.email} not found in lookup table - cannot assign expert",
+                        error_message=f"Contact {lookup_email} not found in lookup table - cannot assign expert",
                     )
 
-            # Step 2: Get next available expert via round-robin (only for valid contacts)
-            # Use the same email that was used for contact lookup (which may be substituted in test mode)
-            assignment_email = email.sender.email
-            if (
-                self.settings.test_mode.enabled
-                and email.sender.email.lower() == self.settings.test_mode.test_sender_email.lower()
-            ):
-                assignment_email = self.settings.test_mode.target_salesforce_email
+                # Contact found - extract account and contact IDs
+                account_id = contact_lookup.sf_account_id or ""
+                contact_id = contact_lookup.sf_contact_id or ""
+                actions_taken.append(
+                    f"Found contact in Databricks: Account={account_id}, Contact={contact_id}"
+                )
 
-            expert = await self.round_robin_service.assign_lead_to_expert(
-                customer_email=assignment_email
-            )
+            # Step 3: Get next available expert via round-robin service
+            async with self.round_robin_service:
+                expert = await self.round_robin_service.assign_lead_to_expert(
+                    customer_email=lookup_email
+                )
+            
             if not expert:
-                raise Exception("No available experts for assignment")
+                error_msg = "No available experts for assignment"
+                self.logger.error("Expert assignment failed", extra={"customer_email": lookup_email})
+                raise Exception(error_msg)
             actions_taken.append(f"Assigned expert via round-robin: {expert.expert_name}")
 
-            # Step 3: Create Salesforce case assigned to the expert
+            # Step 4: Create Salesforce case assigned to the expert (original approach with enhanced fields)
             from services.salesforce_client import CaseCreateRequest
+            # Import subject_formatter from inbox_monitor utils
+            import importlib.util
+            utils_subject_formatter_path = current_dir / "utils" / "subject_formatter.py"
+            spec = importlib.util.spec_from_file_location("inbox_utils.subject_formatter", utils_subject_formatter_path)
+            if spec and spec.loader:
+                subject_formatter_module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(subject_formatter_module)
+                SubjectFormatter = subject_formatter_module.SubjectFormatter
+            else:
+                raise ImportError(f"Could not load subject_formatter from {utils_subject_formatter_path}")
             
-            # Format case description using content formatter
+            # Format case description using content formatter (original working approach)
             try:
                 formatted_description = self.content_formatter.format_content(
                     email=email,
@@ -430,30 +569,64 @@ class ScenarioProcessor:
                 formatted_description = f"Customer {email.sender.email} responded positively to outreach.\n\nOriginal Subject: {email.subject}\n\nResponse: {email.body.content if email.body else 'No content'}"
                 actions_taken.append("Used fallback description format due to formatting error")
 
+            # Create case request with enhanced fields added to original working code
+            formatted_subject = self._format_case_subject(contact_lookup.account_name, email.subject)
+            self.logger.info(
+                "Creating Salesforce case with Low Touch Expert assignment",
+                extra={
+                    "formatted_subject": formatted_subject,
+                    "account_id": account_id,
+                    "contact_id": contact_id,
+                    "expert_id": expert.expert_id,
+                    "expert_name": expert.expert_name,
+                    "expert_email": expert.expert_email,
+                    "case_queue": self.settings.salesforce.case_queue,
+                    "scenario": "5_positive_response"
+                }
+            )
+            
             case_request = CaseCreateRequest(
                 account_id=account_id,
                 contact_id=contact_id,
-                owner_id=expert.expert_id,
-                subject=f"Positive Response: {email.subject}",
-                description=formatted_description,
+                owner_id=expert.expert_id,  # Use the Low Touch Expert's Salesforce User ID
+                subject=formatted_subject,  # Enhanced AI Agent Led INQUIRY format
+                description=formatted_description,  # Original working template
                 origin="AI Agent",
-                status="New",
+                status="Assigned",  # Enhanced field for workflow routing  
                 priority="Medium",
                 case_queue=self.settings.salesforce.case_queue,
+                type="Digital Outreach",  # Enhanced field for categorization
+                request_case_category="AI Agent"  # Enhanced field for tracking
             )
+            
             case_response = await self.salesforce_client.create_case(case_request)
             if not case_response.success:
-                raise Exception(f"Failed to create Salesforce case: {case_response.errors}")
+                error_msg = f"Failed to create Salesforce case: {case_response.errors or 'Unknown error'}"
+                self.logger.error(
+                    "Salesforce case creation failed",
+                    account_id=account_id,
+                    contact_id=contact_id,
+                    expert=expert.expert_name,
+                    errors=case_response.errors
+                )
+                raise Exception(error_msg)
             case_id = case_response.id
-            actions_taken.append(f"Created Salesforce case: {case_id}")
+            actions_taken.append(f"Created Salesforce case with enhanced fields: {case_id}")
 
             self.logger.info(
-                "Scenario 5 completed successfully",
-                expert=expert.expert_name,
-                case_id=case_id,
-                customer_email=email.sender.email,
-                account_id=account_id,
-                contact_id=contact_id,
+                "Scenario 5 completed successfully - Low Touch Expert assigned as Support Request Owner",
+                extra={
+                    "expert_name": expert.expert_name,
+                    "expert_id": expert.expert_id,
+                    "expert_email": expert.expert_email,
+                    "case_id": case_id,
+                    "customer_email": email.sender.email,
+                    "account_id": account_id,
+                    "contact_id": contact_id,
+                    "scenario": "5_positive_response",
+                    "owner_assignment_method": "round_robin_expert_id",
+                    "assignment_rules_disabled": True,
+                }
             )
 
             return ScenarioResult(
@@ -465,9 +638,19 @@ class ScenarioProcessor:
             )
 
         except Exception as e:
-            error_msg = f"Failed to process scenario 5: {e!s}"
+            # Provide better error message formatting
+            error_str = str(e) if str(e) else "Unknown error occurred"
+            error_msg = f"Failed to process scenario 5: {error_str}"
             actions_taken.append(error_msg)
-            self.logger.error(error_msg, error=str(e))
+            
+            self.logger.error(
+                "Scenario 5 processing failed",
+                customer_email=email.sender.email,
+                error_type=type(e).__name__,
+                error_message=error_str,
+                actions_completed=len(actions_taken)
+            )
+            
             return ScenarioResult(
                 scenario_type=ScenarioType.SCENARIO_5,
                 success=False,
@@ -489,14 +672,28 @@ class ScenarioProcessor:
             # Forward email to Victoria Grant
             victoria_email = self.settings.scenarios.victoria_grant_email
 
-            await self._forward_email_to_recipient(
+            forwarding_success = await self._forward_email_to_recipient(
                 original_email=email,
                 recipient_email=victoria_email,
                 recipient_name="Victoria Grant",
                 reason="Negative customer response requiring attention",
             )
 
-            actions_taken.append(f"Forwarded negative response to Victoria Grant: {victoria_email}")
+            if forwarding_success:
+                actions_taken.append(f"Forwarded negative response to Victoria Grant: {victoria_email}")
+            else:
+                actions_taken.append(f"Failed to forward negative response to Victoria Grant: {victoria_email}")
+                self.logger.error(
+                    "Scenario 6 failed due to email forwarding failure",
+                    customer_email=email.sender.email,
+                    victoria_email=victoria_email
+                )
+                return ScenarioResult(
+                    scenario_type=ScenarioType.SCENARIO_6,
+                    success=False,
+                    actions_taken=actions_taken,
+                    error_message="Email forwarding failed"
+                )
 
             self.logger.info(
                 "Scenario 6 completed successfully",
@@ -514,7 +711,7 @@ class ScenarioProcessor:
         except Exception as e:
             error_msg = f"Failed to process scenario 6: {e!s}"
             actions_taken.append(error_msg)
-            self.logger.error(error_msg, error=str(e))
+            self.logger.error(f"{error_msg}: {e}")
             return ScenarioResult(
                 scenario_type=ScenarioType.SCENARIO_6,
                 success=False,
@@ -536,14 +733,28 @@ class ScenarioProcessor:
             # Forward email to account team
             account_team_email = self.settings.scenarios.account_team_email
 
-            await self._forward_email_to_recipient(
+            forwarding_success = await self._forward_email_to_recipient(
                 original_email=email,
                 recipient_email=account_team_email,
                 recipient_name="Account Team",
                 reason="Customer service inquiry requiring assistance",
             )
 
-            actions_taken.append(f"Forwarded service inquiry to account team: {account_team_email}")
+            if forwarding_success:
+                actions_taken.append(f"Forwarded service inquiry to account team: {account_team_email}")
+            else:
+                actions_taken.append(f"Failed to forward service inquiry to account team: {account_team_email}")
+                self.logger.error(
+                    "Scenario 7 failed due to email forwarding failure",
+                    customer_email=email.sender.email,
+                    account_team_email=account_team_email
+                )
+                return ScenarioResult(
+                    scenario_type=ScenarioType.SCENARIO_7,
+                    success=False,
+                    actions_taken=actions_taken,
+                    error_message="Email forwarding failed"
+                )
 
             self.logger.info(
                 "Scenario 7 completed successfully",
@@ -561,7 +772,7 @@ class ScenarioProcessor:
         except Exception as e:
             error_msg = f"Failed to process scenario 7: {e!s}"
             actions_taken.append(error_msg)
-            self.logger.error(error_msg, error=str(e))
+            self.logger.error(f"{error_msg}: {e}")
             return ScenarioResult(
                 scenario_type=ScenarioType.SCENARIO_7,
                 success=False,
@@ -580,14 +791,15 @@ class ScenarioProcessor:
             ScenarioResult with database update details
         """
         try:
-            # Update the assignment status to mark as out of office
-            assignment = await self.round_robin_service.get_assignment_by_customer(
-                email.sender.email
-            )
-            if assignment:
-                await self.round_robin_service.update_assignment_status(
-                    assignment_id=assignment.assignment_id, new_status="out_of_office"
+            # Update the assignment status to mark as out of office using async context manager
+            async with self.round_robin_service:
+                assignment = await self.round_robin_service.get_assignment_by_customer(
+                    email.sender.email
                 )
+                if assignment:
+                    await self.round_robin_service.update_assignment_status(
+                        assignment_id=assignment.assignment_id, new_status="out_of_office"
+                    )
 
             actions_taken.append(
                 f"Updated Databricks table with out-of-office status for {email.sender.email}"
@@ -606,7 +818,7 @@ class ScenarioProcessor:
         except Exception as e:
             error_msg = f"Failed to process scenario 8: {e!s}"
             actions_taken.append(error_msg)
-            self.logger.error(error_msg, error=str(e))
+            self.logger.error(f"{error_msg}: {e}")
             return ScenarioResult(
                 scenario_type=ScenarioType.SCENARIO_8,
                 success=False,
@@ -638,9 +850,11 @@ class ScenarioProcessor:
                 lookup_email = self.settings.test_mode.target_salesforce_email
                 self.logger.info(
                     "Test mode: substituting email for Scenario 9 processing",
-                    original_email=bounced_email,
-                    lookup_email=lookup_email,
-                    test_mode=True,
+                    extra={
+                        "original_email": bounced_email,
+                        "lookup_email": lookup_email,
+                        "test_mode": True,
+                    }
                 )
 
             # Lookup contact ID from Databricks first
@@ -673,16 +887,19 @@ class ScenarioProcessor:
                     )
                     self.logger.warning(
                         "Cannot update Salesforce contact - not found in lookup table",
-                        email=lookup_email,
-                        original_email=bounced_email if lookup_email != bounced_email else None,
+                        extra={
+                            "email": lookup_email,
+                            "original_email": bounced_email if lookup_email != bounced_email else None,
+                        }
                     )
 
-            # Also update assignment status in Databricks to stop future email attempts
-            assignment = await self.round_robin_service.get_assignment_by_customer(bounced_email)
-            if assignment:
-                await self.round_robin_service.update_assignment_status(
-                    assignment_id=assignment.assignment_id, new_status="email_invalid"
-                )
+            # Also update assignment status in Databricks to stop future email attempts using async context manager
+            async with self.round_robin_service:
+                assignment = await self.round_robin_service.get_assignment_by_customer(bounced_email)
+                if assignment:
+                    await self.round_robin_service.update_assignment_status(
+                        assignment_id=assignment.assignment_id, new_status="email_invalid"
+                    )
 
             actions_taken.append(f"Updated Databricks to stop future emails to {bounced_email}")
 
@@ -700,7 +917,7 @@ class ScenarioProcessor:
         except Exception as e:
             error_msg = f"Failed to process scenario 9: {e!s}"
             actions_taken.append(error_msg)
-            self.logger.error(error_msg, error=str(e))
+            self.logger.error(f"{error_msg}: {e}")
             return ScenarioResult(
                 scenario_type=ScenarioType.SCENARIO_9,
                 success=False,
@@ -722,25 +939,42 @@ class ScenarioProcessor:
             # Forward email to Victoria Grant (same as scenario 6)
             victoria_email = self.settings.scenarios.victoria_grant_email
 
-            await self._forward_email_to_recipient(
+            forwarding_success = await self._forward_email_to_recipient(
                 original_email=email,
                 recipient_email=victoria_email,
                 recipient_name="Victoria Grant",
                 reason="Contact no longer works at company - requires attention",
             )
 
-            actions_taken.append(
-                f"Forwarded 'no longer works' notification to Victoria Grant: {victoria_email}"
-            )
-
-            # Update assignment status to stop future email attempts
-            assignment = await self.round_robin_service.get_assignment_by_customer(
-                email.sender.email
-            )
-            if assignment:
-                await self.round_robin_service.update_assignment_status(
-                    assignment_id=assignment.assignment_id, new_status="no_longer_works"
+            if forwarding_success:
+                actions_taken.append(
+                    f"Forwarded 'no longer works' notification to Victoria Grant: {victoria_email}"
                 )
+            else:
+                actions_taken.append(
+                    f"Failed to forward 'no longer works' notification to Victoria Grant: {victoria_email}"
+                )
+                self.logger.error(
+                    "Scenario 10 failed due to email forwarding failure",
+                    customer_email=email.sender.email,
+                    victoria_email=victoria_email
+                )
+                return ScenarioResult(
+                    scenario_type=ScenarioType.SCENARIO_10,
+                    success=False,
+                    actions_taken=actions_taken,
+                    error_message="Email forwarding failed"
+                )
+
+            # Update assignment status to stop future email attempts using async context manager
+            async with self.round_robin_service:
+                assignment = await self.round_robin_service.get_assignment_by_customer(
+                    email.sender.email
+                )
+                if assignment:
+                    await self.round_robin_service.update_assignment_status(
+                        assignment_id=assignment.assignment_id, new_status="no_longer_works"
+                    )
 
             actions_taken.append(
                 f"Updated Databricks to stop future emails to {email.sender.email}"
@@ -762,7 +996,7 @@ class ScenarioProcessor:
         except Exception as e:
             error_msg = f"Failed to process scenario 10: {e!s}"
             actions_taken.append(error_msg)
-            self.logger.error(error_msg, error=str(e))
+            self.logger.error(f"{error_msg}: {e}")
             return ScenarioResult(
                 scenario_type=ScenarioType.SCENARIO_10,
                 success=False,
@@ -779,8 +1013,8 @@ class ScenarioProcessor:
 
     async def _forward_email_to_recipient(
         self, original_email: Email, recipient_email: str, recipient_name: str, reason: str
-    ) -> str:
-        """Forward an email to a specific recipient using the email service.
+    ) -> bool:
+        """Forward an email to a specific recipient using external templates.
 
         Args:
             original_email: The original email to forward
@@ -789,27 +1023,52 @@ class ScenarioProcessor:
             reason: Reason for forwarding
 
         Returns:
-            Email ID or confirmation of the forwarded email
+            True if email forwarding succeeded, False otherwise
 
         Raises:
             Exception: If email forwarding fails
         """
         try:
-            # Simple approach: directly use subprocess to call the email agent
-            import json
-            import os
-            import subprocess
-            import tempfile
-
-            # Get the path to the email agent directory
-            current_dir = os.path.dirname(os.path.abspath(__file__))  # /inbox_monitor/services/
-            inbox_monitor_dir = os.path.dirname(current_dir)  # /inbox_monitor/
-            agents_dir = os.path.dirname(inbox_monitor_dir)  # /agents/
-            email_dir = os.path.join(agents_dir, "email")  # /agents/email/
-
-            # Create forwarded email content
-            forward_subject = f"FWD: {original_email.subject}"
-            forward_body = f"""{reason}
+            # Determine scenario type from reason for scenario-specific templates
+            scenario_type = self._determine_scenario_type_from_reason(reason)
+            
+            # Generate email content using external templates
+            try:
+                email_content = await self.email_forwarding_manager.generate_forwarding_email_content(
+                    original_email=original_email,
+                    recipient_email=recipient_email,
+                    recipient_name=recipient_name,
+                    scenario_type=scenario_type,
+                    reason_override=reason
+                )
+                
+                # Generate subject with scenario-specific template if available
+                if scenario_type:
+                    scenario_config = await self.email_forwarding_manager.get_scenario_forwarding_config(scenario_type)
+                    subject_template = scenario_config.get("subject_template", "FWD: ${original_subject}")
+                    forward_subject = subject_template.replace("${original_subject}", original_email.subject or "No Subject")
+                else:
+                    forward_subject = f"FWD: {original_email.subject}"
+                
+                self.logger.info(
+                    "Email content generated from external templates",
+                    recipient_email=recipient_email,
+                    scenario_type=scenario_type,
+                    content_length=len(email_content)
+                )
+                
+            except Exception as e:
+                self.logger.warning(
+                    "Failed to generate email content from external templates, using fallback",
+                    extra={
+                        "error_message": str(e),
+                        "recipient_email": recipient_email
+                    }
+                )
+                
+                # Fallback to original inline generation
+                forward_subject = f"FWD: {original_email.subject}"
+                email_content = f"""{reason}
 
 Original Email Details:
 From: {original_email.sender.email} ({original_email.sender.name})
@@ -819,12 +1078,42 @@ Subject: {original_email.subject}
 --- Original Message ---
 {original_email.body.content}"""
 
-            # Escape the content for the script
-            escaped_subject = forward_subject.replace('"', '\\"').replace("\n", "\\n")
-            escaped_body = forward_body.replace('"""', '\\"\\"\\"').replace("\\", "\\\\")
+            # Get the path to the email agent directory
+            current_dir = os.path.dirname(os.path.abspath(__file__))  # /inbox_monitor/services/
+            inbox_monitor_dir = os.path.dirname(current_dir)  # /inbox_monitor/
+            agents_dir = os.path.dirname(inbox_monitor_dir)  # /agents/
+            email_dir = os.path.join(agents_dir, "email")  # /agents/email/
 
-            # Create a simple script to send the email (use raw string for Windows paths)
-            email_script = f'''
+            # Generate Python script using external templates
+            try:
+                email_script = await self.email_forwarding_manager.generate_forwarding_script(
+                    email_content=email_content,
+                    subject=forward_subject,
+                    recipient_email=recipient_email,
+                    recipient_name=recipient_name,
+                    email_agent_path=email_dir
+                )
+                
+                self.logger.info(
+                    "Email forwarding script generated from external templates",
+                    recipient_email=recipient_email,
+                    script_length=len(email_script)
+                )
+                
+            except Exception as e:
+                self.logger.warning(
+                    "Failed to generate email script from external templates, using fallback",
+                    extra={
+                        "error_message": str(e),
+                        "recipient_email": recipient_email
+                    }
+                )
+                
+                # Fallback to original inline script generation
+                escaped_subject = forward_subject.replace('"', '\\"').replace("\n", "\\n")
+                escaped_body = email_content.replace('"""', '\\"\\"\\"').replace("\\", "\\\\")
+
+                email_script = f'''
 import sys
 import os
 sys.path.insert(0, r"{email_dir}")
@@ -843,7 +1132,7 @@ import json
 
 async def send_email():
     try:
-        settings = get_settings()
+        settings = await get_settings()
         azure_client = AzureEmailClient(settings.azure_communication)
         test_mode_service = TestModeService(settings)
         
@@ -875,12 +1164,14 @@ if __name__ == "__main__":
 '''
 
             # Write the script to a temporary file
+            import tempfile
             with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
                 f.write(email_script)
                 temp_script_path = f.name
 
             try:
                 # Run the script in the email agent's environment
+                import subprocess
                 result = subprocess.run(
                     ["python", temp_script_path],
                     capture_output=True,
@@ -893,67 +1184,130 @@ if __name__ == "__main__":
 
                 if result.returncode == 0:
                     try:
-                        output = json.loads(result.stdout.strip())
-                        if output.get("success"):
-                            self.logger.info(
-                                "Email forwarded successfully via subprocess",
-                                to_email=recipient_email,
-                            )
-                            return True
+                        # Extract JSON from the output (last line should be the JSON)
+                        stdout_lines = result.stdout.strip().split('\n')
+                        json_line = None
+                        
+                        # Look for the JSON line (starts with { and ends with })
+                        for line in reversed(stdout_lines):
+                            line = line.strip()
+                            if line.startswith('{') and line.endswith('}'):
+                                json_line = line
+                                break
+                        
+                        if json_line:
+                            output = json.loads(json_line)
+                            if output.get("success"):
+                                self.logger.info(
+                                    "Email forwarded successfully via subprocess",
+                                    to_email=recipient_email,
+                                    message_id=output.get("message_id", ""),
+                                    using_external_templates=True
+                                )
+                                return True
+                            else:
+                                self.logger.error(f"Email forwarding failed: {output.get('error')}")
+                                return False
                         else:
-                            self.logger.error("Email forwarding failed", error=output.get("error"))
+                            self.logger.error(
+                                "No JSON output found in email service response",
+                                stdout=result.stdout
+                            )
                             return False
-                    except json.JSONDecodeError:
+                            
+                    except json.JSONDecodeError as e:
                         self.logger.error(
-                            "Failed to parse email service output",
-                            stdout=result.stdout,
-                            stderr=result.stderr,
+                            "Failed to parse email service JSON output",
+                            extra={
+                                "json_line": json_line if 'json_line' in locals() else "not found",
+                                "error_message": str(e),
+                                "stdout": result.stdout
+                            }
                         )
                         return False
                 else:
                     self.logger.error(
                         "Email service subprocess failed",
                         returncode=result.returncode,
-                        stderr=result.stderr,
+                        stderr=result.stderr
                     )
                     return False
             finally:
                 # Clean up the temporary script
+                import contextlib
                 with contextlib.suppress(Exception):
                     os.unlink(temp_script_path)
 
         except Exception as e:
-            self.logger.error(f"Failed to forward email to {recipient_email}", error=str(e))
+            self.logger.error(f"Failed to forward email to {recipient_email}: {e}")
             raise
 
-    async def __aenter__(self):
-        """Async context manager entry."""
-        # Initialize clients
-        await self.ai_client.__aenter__()
-        await self.salesforce_client.__aenter__()
-        await self.round_robin_service.__aenter__()
-        await self.contact_lookup_service.__aenter__()
-        return self
+    def _determine_scenario_type_from_reason(self, reason: str) -> Optional[str]:
+        """Determine scenario type from forwarding reason for template selection."""
+        reason_lower = reason.lower()
+        
+        if "negative" in reason_lower:
+            return "negative_response"
+        elif "service" in reason_lower or "inquiry" in reason_lower:
+            return "service_inquiry"
+        elif "no longer works" in reason_lower:
+            return "no_longer_works"
+        else:
+            return None
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Async context manager exit."""
-        # Close clients with individual error handling
-        cleanup_errors = []
+    def _format_case_subject(self, account_name: str | None, original_subject: str) -> str:
+        """Format case subject using AI Agent Led INQUIRY format with account name.
+        
+        Args:
+            account_name: Account/customer name from contact lookup
+            original_subject: Original email subject
+            
+        Returns:
+            Formatted subject string
+        """
+        try:
+            # Import subject_formatter from inbox_monitor utils
+            import importlib.util
+            utils_subject_formatter_path = current_dir / "utils" / "subject_formatter.py"
+            spec = importlib.util.spec_from_file_location("inbox_utils.subject_formatter", utils_subject_formatter_path)
+            if spec and spec.loader:
+                subject_formatter_module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(subject_formatter_module)
+                SubjectFormatter = subject_formatter_module.SubjectFormatter
+                
+                formatter = SubjectFormatter()
+                
+                if account_name:
+                    return formatter.format_ai_inquiry_subject(account_name, original_subject)
+                else:
+                    # Fallback when no account name available
+                    return formatter.format_ai_inquiry_subject("Unknown Account", original_subject)
+            else:
+                raise ImportError(f"Could not load subject_formatter from {utils_subject_formatter_path}")
+                
+        except ImportError as e:
+            self.logger.warning(
+                "SubjectFormatter not available, using manual formatting",
+                extra={
+                    "account_name": account_name,
+                    "original_subject": original_subject,
+                    "error_message": str(e)
+                }
+            )
+            # Manual fallback formatting
+            account_display = account_name if account_name else "Unknown Account"
+            return f"AI Agent Led INQUIRY | {account_display}"
+            
+        except Exception as e:
+            self.logger.warning(
+                "Subject formatting failed, using fallback",
+                extra={
+                    "account_name": account_name,
+                    "original_subject": original_subject,
+                    "error_message": str(e)
+                }
+            )
+            # Ultimate fallback - manual formatting
+            account_display = account_name if account_name else "Unknown Account"
+            return f"AI Agent Led INQUIRY | {account_display}"
 
-        for client_name, client in [
-            ("ai_client", self.ai_client),
-            ("salesforce_client", self.salesforce_client),
-            ("round_robin_service", self.round_robin_service),
-            ("contact_lookup_service", self.contact_lookup_service),
-        ]:
-            try:
-                await client.__aexit__(exc_type, exc_val, exc_tb)
-            except Exception as e:
-                cleanup_errors.append(f"{client_name}: {e!s}")
-                self.logger.warning(f"Error closing {client_name}", error=str(e))
-
-        if cleanup_errors:
-            self.logger.warning("Some cleanup errors occurred", errors=cleanup_errors)
-
-        # Brief cleanup pause without aggressive delays
-        await asyncio.sleep(0.01)

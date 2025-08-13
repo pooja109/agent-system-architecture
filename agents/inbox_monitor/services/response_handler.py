@@ -12,20 +12,17 @@ This service provides:
 - Structured logging
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
 import structlog
 
-try:
-    # Try absolute imports first (for direct script execution)
-    from config.settings import AppSettings
-    from services.scenario_processor import ScenarioProcessor
-except ImportError:
-    # Fall back to relative imports (for module execution)
-    from ..config.settings import AppSettings
-    from .scenario_processor import ScenarioProcessor
+# Simplified imports without sys.path manipulation
+
+from config.settings import AppSettings
+from services.scenario_processor import ScenarioProcessor
+from services.logging.business_logic_logger import BusinessLogicLoggerMixin
 
 
 class CustomerLookupError(Exception):
@@ -40,7 +37,15 @@ class ResponseHandlerError(Exception):
     pass
 
 
-class ResponseHandler:
+class SchedulingAPIError(Exception):
+    """Exception raised when scheduling API operations fail."""
+    
+    def __init__(self, message: str, status_code: int = None):
+        super().__init__(message)
+        self.status_code = status_code
+
+
+class ResponseHandler(BusinessLogicLoggerMixin):
     """
     Simplified response handler for processing email responses.
 
@@ -67,11 +72,14 @@ class ResponseHandler:
         if not scenario_processor:
             raise ValueError("ScenarioProcessor instance is required")
 
+        # Initialize logging mixin
+        self.__init_logging__("response_handler")
+
         self.settings = settings
         self.scenario_processor = scenario_processor
         self.logger = structlog.get_logger(__name__)
 
-        self.logger.info("ResponseHandler initialized")
+        self.log_user_message("ResponseHandler initialized", "info")
 
     async def process_customer_response(self, email_message: dict[str, Any], scenario: int) -> None:
         """
@@ -92,8 +100,9 @@ class ResponseHandler:
 
         try:
             # Extract customer information from email
-            sender_info = email_message.get("from", {}).get("emailAddress", {})
-            sender_email = sender_info.get("address")
+            from_field = email_message.get("from") or {}
+            sender_info = from_field.get("emailAddress", {}) if from_field else {}
+            sender_email = sender_info.get("address") if sender_info else None
             conversation_id = email_message.get("conversationId")
             received_time = email_message.get("receivedDateTime")
 
@@ -132,7 +141,7 @@ class ResponseHandler:
                 error=str(e),
                 error_type=type(e).__name__,
                 scenario=scenario,
-                sender_email=email_message.get("from", {}).get("emailAddress", {}).get("address"),
+                sender_email=self._safe_get_sender_email(email_message),
             )
             raise
         except Exception as e:
@@ -144,6 +153,28 @@ class ResponseHandler:
                 scenario=scenario,
             )
             raise ResponseHandlerError(f"Unexpected error processing customer response: {e}") from e
+
+    def _safe_get_sender_email(self, email_message: dict) -> str | None:
+        """Safely extract sender email from email message.
+        
+        Args:
+            email_message: Email message from Graph API
+            
+        Returns:
+            Sender email address or None if not found
+        """
+        try:
+            from_field = email_message.get("from")
+            if not from_field:
+                return None
+            
+            sender_info = from_field.get("emailAddress") if from_field else None
+            if not sender_info:
+                return None
+                
+            return sender_info.get("address")
+        except (AttributeError, TypeError):
+            return None
 
     async def _log_response(
         self,
@@ -173,7 +204,7 @@ class ResponseHandler:
 
         try:
             # Parse received_time to datetime for structured logging
-            received_datetime = datetime.utcnow()
+            received_datetime = datetime.now(timezone.utc)
             if received_time:
                 try:
                     # Try parsing ISO format from Graph API
@@ -197,7 +228,7 @@ class ResponseHandler:
                 conversation_id=conversation_id,
                 received_time=received_time,
                 received_datetime=received_datetime.isoformat(),
-                processing_timestamp=datetime.utcnow().isoformat(),
+                processing_timestamp=datetime.now(timezone.utc).isoformat(),
             )
 
         except Exception as e:

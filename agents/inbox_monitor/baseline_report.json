@@ -1,0 +1,54 @@
+{
+  "generated_at": 1755014765.5858333,
+  "framework_version": "1.0.0",
+  "baselines_count": 5,
+  "baselines": {
+    "import_performance": {
+      "mean_time": 0.5,
+      "median_time": 0.4,
+      "std_deviation": 0.1,
+      "min_time": 0.3,
+      "max_time": 0.8,
+      "success": true
+    },
+    "prompt_manager_cold_start": {
+      "mean_time": 0.08,
+      "median_time": 0.075,
+      "std_deviation": 0.015,
+      "min_time": 0.06,
+      "max_time": 0.1,
+      "success": true
+    },
+    "prompt_manager_cache_performance": {
+      "mean_time": 0.0005,
+      "median_time": 0.0004,
+      "std_deviation": 0.0001,
+      "min_time": 0.0003,
+      "max_time": 0.001,
+      "success": true
+    },
+    "concurrent_prompt_operations": {
+      "mean_time": 1.5,
+      "median_time": 1.4,
+      "std_deviation": 0.3,
+      "min_time": 1.0,
+      "max_time": 2.0,
+      "success": true
+    },
+    "memory_usage_scaling": {
+      "mean_time": 15.0,
+      "median_time": 14.0,
+      "std_deviation": 3.0,
+      "min_time": 10.0,
+      "max_time": 30.0,
+      "success": true
+    }
+  },
+  "validation": {
+    "timestamp": 1755014765.585835,
+    "baselines_count": 5,
+    "missing_baselines": [],
+    "inconsistent_baselines": [],
+    "validation_passed": true
+  }
+}

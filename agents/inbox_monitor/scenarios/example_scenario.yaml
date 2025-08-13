@@ -1,0 +1,37 @@
+# Example Custom Scenario
+id: 20
+name: Custom Scenario Example
+description: Template for creating custom scenarios
+category: custom
+tags:
+  - example
+  - template
+
+email:
+  from: sender@example.com
+  to: support@company.com
+  subject: Example Subject
+  body: |
+    This is a multi-line email body.
+    It can contain multiple paragraphs.
+    
+    Use this as a template for your custom scenarios.
+
+expected_outcome: Case created and assigned to support team
+
+validation:
+  required_fields:
+    - from
+    - subject
+    - body
+  success_criteria:
+    - Case ID generated
+    - Assignment completed
+    - Response sent
+
+mock_response:
+  delay: 0.5
+  success_rate: 0.95
+  response_data:
+    case_id: "CASE-12345"
+    assigned_to: "support_team"

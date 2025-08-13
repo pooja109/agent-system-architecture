@@ -4,40 +4,40 @@
 
 ```mermaid
 graph TD
-    A[Email Agent Processing] --> B[Load Research Output JSON]
-    B --> C{JSON File<br/>Found?}
-    C -->|No| D[Log Error: File Not Found<br/>Mark as Failed<br/>Continue to Next Record]
-    C -->|Yes| E[Parse JSON Content]
-    E --> F{Valid JSON<br/>Structure?}
-    F -->|No| G[Log Error: Invalid JSON<br/>Mark as Failed<br/>Continue to Next Record]
-    F -->|Yes| H[Extract Contact Information]
-    H --> I{Valid Email<br/>Address?}
-    I -->|No| J[Log Error: Invalid Email<br/>Mark as Failed<br/>Continue to Next Record]
-    I -->|Yes| K[Load HTML Email Content]
-    K --> L{HTML File<br/>Found?}
-    L -->|No| M[Log Error: HTML Not Found<br/>Mark as Failed<br/>Continue to Next Record]
-    L -->|Yes| N[Process HTML Content]
-    N --> O[Send Email via ACS]
-    O --> P{ACS Send<br/>Successful?}
-    P -->|No| Q[Analyze Error Type]
-    Q --> R{Retryable<br/>Error?}
-    R -->|Yes| S{Retry Attempts<br/>< Max (3)?}
-    S -->|Yes| T[Wait with Exponential Backoff<br/>Increment Retry Count]
+    A["Email Agent Processing"] --> B["Load Research Output JSON"]
+    B --> C{"JSON File<br>Found?"}
+    C -->|No| D["Log Error: File Not Found<br>Mark as Failed<br>Continue to Next Record"]
+    C -->|Yes| E["Parse JSON Content"]
+    E --> F{"Valid JSON<br>Structure?"}
+    F -->|No| G["Log Error: Invalid JSON<br>Mark as Failed<br>Continue to Next Record"]
+    F -->|Yes| H["Extract Contact Information"]
+    H --> I{"Valid Email<br>Address?"}
+    I -->|No| J["Log Error: Invalid Email<br>Mark as Failed<br>Continue to Next Record"]
+    I -->|Yes| K["Load HTML Email Content"]
+    K --> L{"HTML File<br>Found?"}
+    L -->|No| M["Log Error: HTML Not Found<br>Mark as Failed<br>Continue to Next Record"]
+    L -->|Yes| N["Process HTML Content"]
+    N --> O["Send Email via ACS"]
+    O --> P{"ACS Send<br>Successful?"}
+    P -->|No| Q["Analyze Error Type"]
+    Q --> R{"Retryable<br>Error?"}
+    R -->|Yes| S{"Retry Attempts<br>< Max (3)?"}
+    S -->|Yes| T["Wait with Exponential Backoff<br>Increment Retry Count"]
     T --> O
-    S -->|No| U[Mark as Permanently Failed<br/>Log Final Error]
-    R -->|No| V[Mark as Failed<br/>Log Non-Retryable Error]
-    P -->|Yes| W[Mark as Successfully Sent<br/>Update Database]
+    S -->|No| U["Mark as Permanently Failed<br>Log Final Error"]
+    R -->|No| V["Mark as Failed<br>Log Non-Retryable Error"]
+    P -->|Yes| W["Mark as Successfully Sent<br>Update Database"]
     
-    D --> X[Continue Processing Next Record]
+    D --> X["Continue Processing Next Record"]
     G --> X
     J --> X
     M --> X
     U --> X
     V --> X
     W --> X
-    X --> Y{More Records<br/>in Batch?}
-    Y -->|Yes| Z[Process Next Record]
-    Y -->|No| AA[Complete Batch<br/>Generate Error Report]
+    X --> Y{"More Records<br>in Batch?"}
+    Y -->|Yes| Z["Process Next Record"]
+    Y -->|No| AA["Complete Batch<br>Generate Error Report"]
     Z --> B
     
     style D fill:#ffebee

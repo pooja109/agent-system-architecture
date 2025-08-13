@@ -8,7 +8,8 @@ as part of the inbox monitoring scenarios.
 
 import asyncio
 import json
-from datetime import datetime, timedelta
+import time
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import httpx
@@ -17,8 +18,12 @@ from pydantic import BaseModel, Field
 
 try:
     from config.settings import SalesforceSettings
+    from .circuit_breaker import CircuitBreaker
+    from services.logging.api_client_logger import APIClientLoggerMixin
 except ImportError:
     from ..config.settings import SalesforceSettings
+    from .circuit_breaker import CircuitBreaker
+    from services.logging.api_client_logger import APIClientLoggerMixin
 
 
 class SalesforceTokenResponse(BaseModel):
@@ -31,7 +36,7 @@ class SalesforceTokenResponse(BaseModel):
 
 
 class CaseCreateRequest(BaseModel):
-    """Request model for creating a Salesforce case."""
+    """Request model for creating a Salesforce case with additional fields."""
 
     account_id: str = Field(..., description="Salesforce account ID")
     contact_id: str = Field(..., description="Salesforce contact ID")
@@ -39,9 +44,14 @@ class CaseCreateRequest(BaseModel):
     subject: str = Field(..., description="Case subject")
     description: str = Field(..., description="Case description")
     origin: str = Field(default="AI Agent", description="Case origin")
-    status: str = Field(default="New", description="Case status")
+    status: str = Field(default="Assigned", description="Case status")
     priority: str = Field(default="Medium", description="Case priority")
     case_queue: str = Field(..., description="Case queue")
+    # Required fields for proper categorization
+    type: str = Field(default="Digital Outreach", description="Case type")
+    request_case_category: str = Field(default="AI Agent", description="Request Case Category")
+
+
 
 
 class CaseCreateResponse(BaseModel):
@@ -60,20 +70,37 @@ class ContactUpdateRequest(BaseModel):
 
 
 
-class SalesforceClient:
+class SalesforceClient(APIClientLoggerMixin):
     """Client for Salesforce API operations."""
 
-    def __init__(self, settings: SalesforceSettings):
+    def __init__(self, settings: SalesforceSettings, test_mode: bool = True):
         """Initialize the Salesforce client.
 
         Args:
             settings: Salesforce configuration settings
+            test_mode: Whether to run in test mode
         """
         self.settings = settings
+        self.test_mode = test_mode
+        
+        # Keep existing logger for backward compatibility
         self.logger = structlog.get_logger(__name__)
+        
+        # Initialize logging mixin after setting existing logger
+        self.__init_logging__("salesforce_client")
         self.client: httpx.AsyncClient | None = None
         self._access_token: str | None = None
         self._token_expires_at: datetime | None = None
+        
+        # Resilience
+        self.circuit_breaker = CircuitBreaker(
+            failure_threshold=5,
+            recovery_timeout=30.0,
+            expected_exception=(httpx.HTTPError, httpx.TimeoutException)
+        )
+        
+        # Performance tracking
+        self.performance_metrics = {}
 
     async def __aenter__(self) -> "SalesforceClient":
         """Async context manager entry."""
@@ -123,7 +150,7 @@ class SalesforceClient:
                 await asyncio.sleep(0.1)
 
             except Exception as e:
-                self.logger.warning("Error closing Salesforce client", error=str(e))
+                self.logger.warning("Error closing Salesforce client", extra={"error_message": str(e)})
             finally:
                 self.client = None
 
@@ -141,7 +168,7 @@ class SalesforceClient:
         if (
             self._access_token
             and self._token_expires_at
-            and datetime.utcnow() < self._token_expires_at - timedelta(minutes=5)
+            and datetime.now(timezone.utc) < self._token_expires_at - timedelta(minutes=5)
         ):
             return self._access_token
 
@@ -186,19 +213,81 @@ class SalesforceClient:
             token_response = SalesforceTokenResponse(**result)
 
             self._access_token = token_response.access_token
-            self._token_expires_at = datetime.utcnow() + timedelta(
+            self._token_expires_at = datetime.now(timezone.utc) + timedelta(
                 seconds=token_response.expires_in or 3600
             )
 
             self.logger.info(
                 "Successfully refreshed Salesforce access token",
-                expires_in=token_response.expires_in,
+                extra={"expires_in": token_response.expires_in}
             )
 
         except httpx.HTTPError as e:
             raise Exception(f"HTTP client error during token refresh: {e!s}") from e
         except json.JSONDecodeError as e:
             raise Exception(f"Failed to parse token response: {e!s}") from e
+
+    async def authenticate(self) -> str:
+        """Authenticate with Salesforce and return access token."""
+        return await self._get_access_token()
+    
+    async def execute_soql(self, query: str) -> dict:
+        """Execute SOQL query."""
+        return await self.circuit_breaker.call(self._execute_soql_protected, query)
+    
+    async def _execute_soql_protected(self, query: str) -> dict:
+        """Execute SOQL query with circuit breaker protection."""
+        access_token = await self._get_access_token()
+        
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+        }
+        
+        api_url = f"{self.settings.base_url}/services/data/{self.settings.api_version}/query/"
+        
+        if self.client is None:
+            raise RuntimeError("Client not initialized. Use async context manager.")
+        
+        start_time = time.time()
+        response = await self.client.get(api_url, headers=headers, params={"q": query})
+        response_time = time.time() - start_time
+        
+        self.performance_metrics['last_soql_query_time'] = response_time
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            raise Exception(f"SOQL query failed: {response.status_code} - {response.text}")
+    
+    async def get_organization_info(self) -> dict:
+        """Get Salesforce organization information."""
+        return await self.circuit_breaker.call(self._get_organization_info_protected)
+    
+    async def _get_organization_info_protected(self) -> dict:
+        """Get organization info with circuit breaker protection."""
+        access_token = await self._get_access_token()
+        
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/json",
+        }
+        
+        api_url = f"{self.settings.base_url}/services/data/{self.settings.api_version}/sobjects/Organization/describe/"
+        
+        if self.client is None:
+            raise RuntimeError("Client not initialized. Use async context manager.")
+        
+        start_time = time.time()
+        response = await self.client.get(api_url, headers=headers)
+        response_time = time.time() - start_time
+        
+        self.performance_metrics['last_org_info_time'] = response_time
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            raise Exception(f"Organization info request failed: {response.status_code} - {response.text}")
 
     async def create_case(self, case_request: CaseCreateRequest) -> CaseCreateResponse:
         """Create a new case in Salesforce.
@@ -219,9 +308,10 @@ class SalesforceClient:
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {access_token}",
                 "Accept": "application/json",
+                "Sforce-Auto-Assign": "false",  # Prevent assignment rules from overriding OwnerId
             }
 
-            # Prepare the case data
+            # Prepare the case data with Phase 5 enhancements
             case_data = {
                 "AccountId": case_request.account_id,
                 "ContactId": case_request.contact_id,
@@ -234,6 +324,13 @@ class SalesforceClient:
                 "Description": case_request.description,
                 "Case_Queue__c": case_request.case_queue,
             }
+            
+            # Add required fields for proper categorization if available
+            if hasattr(case_request, 'type') and case_request.type:
+                case_data["Type"] = case_request.type
+            
+            if hasattr(case_request, 'request_case_category') and case_request.request_case_category:
+                case_data["Request_Case_Category__c"] = case_request.request_case_category
 
             # Construct API URL
             api_url = (
@@ -249,10 +346,14 @@ class SalesforceClient:
                 # Success
                 case_id = result.get("id")
                 self.logger.info(
-                    "Successfully created Salesforce case",
-                    case_id=case_id,
-                    account_id=case_request.account_id,
-                    contact_id=case_request.contact_id,
+                    "Successfully created Salesforce case with owner assignment",
+                    extra={
+                        "case_id": case_id,
+                        "account_id": case_request.account_id,
+                        "contact_id": case_request.contact_id,
+                        "owner_id": case_request.owner_id,
+                        "auto_assign_disabled": True,
+                    }
                 )
 
                 return CaseCreateResponse(id=case_id, success=True, errors=[])
@@ -262,10 +363,12 @@ class SalesforceClient:
 
                 self.logger.error(
                     "Failed to create Salesforce case",
-                    status=response.status_code,
-                    errors=errors,
-                    account_id=case_request.account_id,
-                    contact_id=case_request.contact_id,
+                    extra={
+                        "status": response.status_code,
+                        "errors": errors,
+                        "account_id": case_request.account_id,
+                        "contact_id": case_request.contact_id,
+                    }
                 )
 
                 return CaseCreateResponse(id="", success=False, errors=errors)
@@ -273,11 +376,14 @@ class SalesforceClient:
         except Exception as e:
             self.logger.error(
                 "Exception during case creation",
-                error=str(e),
-                account_id=case_request.account_id,
-                contact_id=case_request.contact_id,
+                extra={
+                    "error_message": str(e),
+                    "account_id": case_request.account_id,
+                    "contact_id": case_request.contact_id,
+                }
             )
             raise
+
 
     async def update_contact_invalid_email(self, contact_update: ContactUpdateRequest) -> bool:
         """Update a contact's invalid email flag.
@@ -320,8 +426,10 @@ class SalesforceClient:
                 # Success (no content returned)
                 self.logger.info(
                     "Successfully updated contact invalid email flag",
-                    contact_id=contact_update.contact_id,
-                    is_email_invalid=contact_update.is_email_invalid,
+                    extra={
+                        "contact_id": contact_update.contact_id,
+                        "is_email_invalid": contact_update.is_email_invalid,
+                    }
                 )
                 return True
             else:
@@ -329,17 +437,21 @@ class SalesforceClient:
                 error_text = response.text
                 self.logger.error(
                     "Failed to update contact invalid email flag",
-                    status=response.status_code,
-                    error=error_text,
-                    contact_id=contact_update.contact_id,
+                    extra={
+                        "status": response.status_code,
+                        "error_message": error_text,
+                        "contact_id": contact_update.contact_id,
+                    }
                 )
                 return False
 
         except Exception as e:
             self.logger.error(
                 "Exception during contact update",
-                error=str(e),
-                contact_id=contact_update.contact_id,
+                extra={
+                    "error_message": str(e),
+                    "contact_id": contact_update.contact_id,
+                }
             )
             raise
 
@@ -367,12 +479,42 @@ class SalesforceClient:
                 self.logger.info("Salesforce connection test successful")
                 return True
             else:
-                self.logger.error("Salesforce connection test failed", status=response.status_code)
+                self.logger.error("Salesforce connection test failed", extra={"status": response.status_code})
                 return False
 
         except Exception as e:
-            self.logger.error("Salesforce connection test failed", error=str(e))
+            self.logger.error(f"Salesforce connection test failed: {e}")
             return False
+    
+    async def get_health_status(self) -> dict:
+        """Get health status of Salesforce connectivity."""
+        start_time = time.time()
+        
+        try:
+            # Test authentication
+            await self._get_access_token()
+            
+            # Test API connectivity
+            await self.get_organization_info()
+            
+            health_time = time.time() - start_time
+            self.performance_metrics['last_health_check_time'] = health_time
+            
+            return {
+                'status': 'healthy',
+                'response_time': health_time,
+                'last_check': time.time(),
+                'circuit_breaker_state': self.circuit_breaker.state
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Salesforce health check failed: {e}")
+            return {
+                'status': 'unhealthy',
+                'error': str(e),
+                'last_check': time.time(),
+                'circuit_breaker_state': self.circuit_breaker.state
+            }
 
     async def get_contact_details(self, contact_id: str) -> dict[str, Any] | None:
         """Get contact details from Salesforce.
@@ -402,7 +544,7 @@ class SalesforceClient:
                 result = response.json()
                 return result
             elif response.status_code == 404:
-                self.logger.warning("Contact not found", contact_id=contact_id)
+                self.logger.warning("Contact not found", extra={"contact_id": contact_id})
                 return None
             else:
                 raise Exception(
@@ -411,7 +553,11 @@ class SalesforceClient:
 
         except Exception as e:
             self.logger.error(
-                "Exception getting contact details", error=str(e), contact_id=contact_id
+                "Exception getting contact details",
+                extra={
+                    "error_message": str(e),
+                    "contact_id": contact_id
+                }
             )
             raise
 
@@ -437,7 +583,7 @@ class SalesforceClient:
 
                 # Calculate token expiration (default to 1 hour if not provided)
                 expires_in = token_data.get("expires_in", 3600)
-                self._token_expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
+                self._token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
 
                 self.logger.info("Successfully authenticated with Salesforce")
             else:
@@ -446,5 +592,5 @@ class SalesforceClient:
                 )
 
         except Exception as e:
-            self.logger.error("Failed to authenticate with Salesforce", error=str(e))
+            self.logger.error(f"Failed to authenticate with Salesforce: {e}")
             raise

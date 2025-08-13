@@ -8,41 +8,43 @@ Uses MSAL for authentication with client credentials flow.
 
 import asyncio
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import httpx
-import structlog
 from msal import ConfidentialClientApplication
 
-try:
-    # Try absolute imports first (for direct script execution)
-    from config.settings import GraphAPISettings
-    from models.email import (
-        Email,
-        EmailAddress,
-        EmailBody,
-        EmailImportance,
-        EmailRecipients,
-        ProcessingMetadata,
-    )
+# Simplified imports without sys.path manipulation
 
+from config.settings import GraphAPISettings
+from models.email import (
+    Email,
+    EmailAddress,
+    EmailBody,
+    EmailImportance,
+    EmailRecipients,
+    ProcessingMetadata,
+)
+from services.logging.api_client_logger import APIClientLoggerMixin
+# Import retry utilities
+try:
     from utils.retry import retry_with_backoff
 except ImportError:
-    # Fall back to relative imports (for module execution)
-    from ..config.settings import GraphAPISettings
-    from ..models.email import (
-        Email,
-        EmailAddress,
-        EmailBody,
-        EmailImportance,
-        EmailRecipients,
-        ProcessingMetadata,
-    )
-    from ..utils.retry import retry_with_backoff
+    # Fallback for development/testing environments
+    import importlib.util
+    from pathlib import Path
+    current_dir = Path(__file__).parent.parent
+    retry_module_path = current_dir / "utils" / "retry.py"
+    spec = importlib.util.spec_from_file_location("retry", retry_module_path)
+    if spec and spec.loader:
+        retry_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(retry_module)
+        retry_with_backoff = retry_module.retry_with_backoff
+    else:
+        raise ImportError("Could not load retry utilities")
 
 
-class GraphAPIClient:
+class GraphAPIClient(APIClientLoggerMixin):
     """Client for Microsoft Graph API operations."""
 
     def __init__(self, settings: GraphAPISettings):
@@ -51,8 +53,10 @@ class GraphAPIClient:
         Args:
             settings: Graph API configuration settings
         """
+        # Initialize logging first
+        self.__init_logging__("graph_api_client")
+        
         self.settings = settings
-        self.logger = structlog.get_logger(__name__)
 
         # Initialize MSAL application
         self.msal_app = ConfidentialClientApplication(
@@ -121,10 +125,14 @@ class GraphAPIClient:
                 await asyncio.sleep(0.1)
 
             except Exception as e:
-                self.logger.warning("Error closing Graph API client", error=str(e))
+                self.logger.warning("Error closing Graph API client", extra={"error_message": str(e)})
             finally:
                 self._client = None
         self.logger.info("Graph API client cleaned up")
+
+    async def close(self) -> None:
+        """Close the GraphAPI client - alias for cleanup()."""
+        await self.cleanup()
 
     def _get_access_token(self) -> str:
         """Get access token using MSAL.
@@ -138,7 +146,7 @@ class GraphAPIClient:
         # Try to get token from cache
         if (
             self._token_cache
-            and self._token_cache.get("expires_at", 0) > datetime.utcnow().timestamp()
+            and self._token_cache.get("expires_at", 0) > datetime.now(timezone.utc).timestamp()
         ):
             return self._token_cache["access_token"]
 
@@ -147,13 +155,13 @@ class GraphAPIClient:
 
         if "access_token" not in result:
             error_msg = result.get("error_description", "Unknown error acquiring token")
-            self.logger.error("Failed to acquire token", error=error_msg)
+            self.logger.error(f"Failed to acquire token: {error_msg}")
             raise Exception(f"Failed to acquire token: {error_msg}")
 
         # Cache the token
         self._token_cache = {
             "access_token": result["access_token"],
-            "expires_at": datetime.utcnow().timestamp() + result.get("expires_in", 3600),
+            "expires_at": datetime.now(timezone.utc).timestamp() + result.get("expires_in", 3600),
         }
 
         self.logger.debug("Successfully acquired new access token")
@@ -190,7 +198,8 @@ class GraphAPIClient:
         }
 
         self.logger.debug(
-            "Making Graph API request", method=method, endpoint=endpoint, params=params
+            "Making Graph API request", 
+            extra={"method": method, "endpoint": endpoint, "params": params}
         )
 
         response = await self._client.request(
@@ -201,8 +210,7 @@ class GraphAPIClient:
         if response.status_code >= 400:
             self.logger.error(
                 "Graph API request failed",
-                status_code=response.status_code,
-                response=response_text,
+                extra={"status_code": response.status_code, "response": response_text}
             )
             raise Exception(f"Graph API request failed: {response.status_code} - {response_text}")
 
@@ -228,13 +236,14 @@ class GraphAPIClient:
         }
 
         self.logger.info(
-            "Fetching inbox messages", email=self.settings.monitored_email, limit=limit
+            "Fetching inbox messages", 
+            extra={"email": self.settings.monitored_email, "limit": limit}
         )
 
         response = await self._make_request("GET", endpoint, params=params)
         messages = response.get("value", [])
 
-        self.logger.info("Retrieved inbox messages", count=len(messages))
+        self.logger.info("Retrieved inbox messages", extra={"count": len(messages)})
 
         return messages
 
@@ -251,14 +260,13 @@ class GraphAPIClient:
         endpoint = f"/users/{self.settings.monitored_email}/mailFolders"
         data = {"displayName": folder_name}
 
-        self.logger.info("Creating mail folder", folder_name=folder_name)
+        self.logger.info("Creating mail folder", extra={"folder_name": folder_name})
 
         try:
             folder = await self._make_request("POST", endpoint, json_data=data)
             self.logger.info(
                 "Mail folder created",
-                folder_name=folder_name,
-                folder_id=folder.get("id"),
+                extra={"folder_name": folder_name, "folder_id": folder.get("id")}
             )
             return folder
         except Exception as e:
@@ -266,7 +274,7 @@ class GraphAPIClient:
             if "already exists" in str(e).lower():
                 self.logger.info(
                     "Folder already exists, fetching existing folder",
-                    folder_name=folder_name,
+                    extra={"folder_name": folder_name}
                 )
                 return await self.get_folder_by_name(folder_name)
             raise
@@ -306,13 +314,12 @@ class GraphAPIClient:
 
         self.logger.info(
             "Moving message",
-            message_id=message_id,
-            destination_folder_id=destination_folder_id,
+            extra={"message_id": message_id, "destination_folder_id": destination_folder_id}
         )
 
         moved_message = await self._make_request("POST", endpoint, json_data=data)
 
-        self.logger.info("Message moved successfully", message_id=message_id)
+        self.logger.info("Message moved successfully", extra={"message_id": message_id})
 
         return moved_message
 
@@ -326,7 +333,10 @@ class GraphAPIClient:
             EmailAddress model
         """
         email_address = address_data.get("emailAddress", {})
-        return EmailAddress(email=email_address.get("address", ""), name=email_address.get("name"))
+        return EmailAddress(
+            email=email_address.get("address") or "",
+            name=email_address.get("name")
+        )
 
     def _parse_recipients(self, message: dict[str, Any]) -> EmailRecipients:
         """Parse recipients from Graph API message.
@@ -352,6 +362,9 @@ class GraphAPIClient:
         Returns:
             EmailImportance enum value
         """
+        if not importance:
+            return EmailImportance.NORMAL
+            
         importance_map = {
             "low": EmailImportance.LOW,
             "normal": EmailImportance.NORMAL,
@@ -400,7 +413,7 @@ class GraphAPIClient:
         processing_metadata = ProcessingMetadata(
             inbox_monitor_version=version,
             processing_id=processing_id,
-            processing_timestamp=datetime.utcnow(),
+            processing_timestamp=datetime.now(timezone.utc),
         )
 
         return Email(
@@ -448,5 +461,5 @@ class GraphAPIClient:
                 return True, str(uuid.uuid4()), None
 
         except Exception as e:
-            self.logger.error("Failed to send email", error=str(e))
+            self.logger.error(f"Failed to send email: {e}")
             return False, None, str(e)

@@ -1,0 +1,74 @@
+template_version: "1.0.0"
+
+template: |
+  Please analyze this email response and classify the sender's intent:
+
+  EMAIL DETAILS:
+  From: ${sender_email}
+  Subject: ${subject}
+  Body: ${body}
+
+  CONTEXT ANALYSIS:
+  - Sender Domain: ${sender_domain} (${domain_type})
+  - Content Length: ${content_length} characters
+  - Sender Format: ${sender_format}
+
+  IMPORTANT CLASSIFICATION NOTES:
+  - This email is from a ${domain_classification}
+  - Content length is ${length_classification}
+  - For corporate domain emails with minimal content, consider SERVICE_INQUIRY rather than EMAIL_INVALID
+  - Only classify EMAIL_INVALID if you see actual bounce/error messages, not legitimate minimal emails
+
+  Analyze the overall context, tone, and meaning to determine the sender's true intent. Provide your classification in the JSON format specified in your instructions with an appropriate confidence score based on the clarity of the intent.
+
+variables:
+  sender_email:
+    name: "sender_email"
+    description: "Email address of the sender"
+    type: "string"
+    required: true
+  subject:
+    name: "subject"
+    description: "Subject line of the email"
+    type: "string"
+    required: true
+  body:
+    name: "body"
+    description: "Body content of the email"
+    type: "string"
+    required: true
+  sender_domain:
+    name: "sender_domain"
+    description: "Domain extracted from sender email"
+    type: "string"
+    required: true
+  domain_type:
+    name: "domain_type"
+    description: "Classification of the domain (Corporate/Legitimate or Non-standard)"
+    type: "string"
+    required: true
+  sender_format:
+    name: "sender_format"
+    description: "Format analysis of sender email"
+    type: "string"
+    required: true
+  domain_classification:
+    name: "domain_classification"
+    description: "Detailed domain classification"
+    type: "string"
+    required: true
+  length_classification:
+    name: "length_classification"
+    description: "Human-readable content length classification"
+    type: "string"
+    required: true
+  content_length:
+    name: "content_length"
+    description: "Character count of email body"
+    type: "integer"
+    required: true
+
+metadata:
+  description: "Template for email intent classification with context analysis"
+  use_case: "Standardized prompt generation for email classification requests"
+  last_updated: "2025-08-05T20:00:00Z"

@@ -7,12 +7,16 @@ Loads settings from environment variables with validation.
 """
 
 import os
+from typing import List
 
 from dotenv import load_dotenv
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, SecretStr
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from the main repo directory
+import pathlib
+repo_root = pathlib.Path(__file__).parent.parent.parent.parent
+env_file = repo_root / ".env"
+load_dotenv(env_file)
 
 
 class GraphAPISettings(BaseModel):
@@ -34,6 +38,42 @@ class GraphAPISettings(BaseModel):
         default_factory=lambda: ["https://graph.microsoft.com/.default"],
         description="OAuth2 scopes for Graph API",
     )
+    
+    @classmethod
+    async def from_key_vault(cls, key_vault_client, monitored_email: str) -> "GraphAPISettings":
+        """Create GraphAPISettings from Azure Key Vault credentials.
+        
+        Args:
+            key_vault_client: Initialized AzureKeyVaultClient instance
+            monitored_email: Email address to monitor (from environment variable)
+            
+        Returns:
+            GraphAPISettings with credentials from Key Vault
+            
+        Raises:
+            KeyVaultException: If credential retrieval fails
+        """
+        try:
+            from ..services.azure_key_vault_client import KeyVaultException
+        except ImportError:
+            from services.azure_key_vault_client import KeyVaultException
+        
+        try:
+            # Retrieve Graph API credentials from Key Vault
+            graph_credentials = await key_vault_client.get_graph_api_credentials()
+            
+            return cls(
+                tenant_id=graph_credentials.tenant_id,
+                client_id=graph_credentials.client_id,
+                client_secret=graph_credentials.client_secret.get_secret_value(),
+                monitored_email=monitored_email,
+                authority_url="https://login.microsoftonline.com",
+                graph_api_endpoint="https://graph.microsoft.com/v1.0",
+                scopes=["https://graph.microsoft.com/.default"]
+            )
+            
+        except Exception as e:
+            raise KeyVaultException(f"Failed to create GraphAPISettings from Key Vault: {e}") from e
 
 
 class ProcessingSettings(BaseModel):
@@ -100,6 +140,36 @@ class AzureAIFoundrySettings(BaseModel):
 
     endpoint: str = Field(..., description="Azure AI Foundry endpoint")
     connection_string: str = Field(..., description="Azure AI Foundry connection string")
+    
+    @classmethod
+    async def from_key_vault(cls, key_vault_client) -> "AzureAIFoundrySettings":
+        """Create AzureAIFoundrySettings from Azure Key Vault credentials.
+        
+        Args:
+            key_vault_client: Initialized AzureKeyVaultClient instance
+            
+        Returns:
+            AzureAIFoundrySettings with credentials from Key Vault
+            
+        Raises:
+            KeyVaultException: If credential retrieval fails
+        """
+        try:
+            from ..services.azure_key_vault_client import KeyVaultException
+        except ImportError:
+            from services.azure_key_vault_client import KeyVaultException
+        
+        try:
+            # Retrieve AI Foundry credentials from Key Vault
+            ai_foundry_credentials = await key_vault_client.get_ai_foundry_credentials()
+            
+            return cls(
+                endpoint=ai_foundry_credentials.endpoint,
+                connection_string=""  # No longer used with Service Principal authentication
+            )
+            
+        except Exception as e:
+            raise KeyVaultException(f"Failed to create AzureAIFoundrySettings from Key Vault: {e}") from e
 
 
 class SalesforceSettings(BaseModel):
@@ -112,23 +182,155 @@ class SalesforceSettings(BaseModel):
     api_version: str = Field(default="v64.0", description="Salesforce API version")
     case_record_type_id: str = Field(..., description="Case record type ID")
     case_queue: str = Field(..., description="Case queue name")
+    
+    @classmethod
+    async def from_key_vault(cls, key_vault_client) -> "SalesforceSettings":
+        """Create SalesforceSettings from Azure Key Vault credentials.
+        
+        Args:
+            key_vault_client: Initialized AzureKeyVaultClient instance
+            
+        Returns:
+            SalesforceSettings with credentials from Key Vault
+            
+        Raises:
+            KeyVaultException: If credential retrieval fails
+        """
+        try:
+            from ..services.azure_key_vault_client import KeyVaultException
+        except ImportError:
+            from services.azure_key_vault_client import KeyVaultException
+        
+        try:
+            # Retrieve Salesforce credentials from Key Vault
+            salesforce_credentials = await key_vault_client.get_salesforce_credentials()
+            
+            return cls(
+                base_url=salesforce_credentials.base_url,
+                client_id=salesforce_credentials.client_id,
+                client_secret=salesforce_credentials.client_secret.get_secret_value(),
+                token_endpoint=salesforce_credentials.token_endpoint,
+                api_version=salesforce_credentials.api_version,
+                case_record_type_id=salesforce_credentials.case_record_type_id,
+                case_queue=salesforce_credentials.case_queue
+            )
+            
+        except Exception as e:
+            raise KeyVaultException(f"Failed to create SalesforceSettings from Key Vault: {e}") from e
 
 
-class DatabricksSettings(BaseModel):
-    """Databricks configuration settings."""
+class KeyVaultSettings(BaseModel):
+    """Azure Key Vault configuration settings."""
+    
+    key_vault_url: str = Field(..., description="Azure Key Vault URL")
+    azure_tenant_id: str = Field(..., description="Azure AD tenant ID for Key Vault access")
+    azure_client_id: str = Field(..., description="Service principal client ID for Key Vault access")
+    azure_client_secret: SecretStr = Field(..., description="Service principal client secret for Key Vault access")
+    
+    # Secret names in Key Vault
+    tenant_id_secret_name: str = Field(
+        default="sales-engagement-service-principal-tenantid",
+        description="Key Vault secret name for Databricks tenant ID"
+    )
+    client_id_secret_name: str = Field(
+        default="sales-engagement-service-principal-clientid", 
+        description="Key Vault secret name for Databricks client ID"
+    )
+    client_secret_secret_name: str = Field(
+        default="sales-engagement-service-principal-secretid",
+        description="Key Vault secret name for Databricks client secret"
+    )
+    
+    # Azure AI Foundry secret names in Key Vault
+    azure_ai_foundry_endpoint_secret_name: str = Field(
+        default="azure-ai-foundry-endpoint",
+        description="Key Vault secret name for Azure AI Foundry endpoint"
+    )
+    azure_ai_foundry_tenant_id_secret_name: str = Field(
+        default="azure-ai-foundry-tenant-id",
+        description="Key Vault secret name for Azure AI Foundry tenant ID"
+    )
+    azure_ai_foundry_client_id_secret_name: str = Field(
+        default="azure-ai-foundry-client-id", 
+        description="Key Vault secret name for Azure AI Foundry client ID"
+    )
+    azure_ai_foundry_client_secret_secret_name: str = Field(
+        default="azure-ai-foundry-client-secret",
+        description="Key Vault secret name for Azure AI Foundry client secret"
+    )
+    
+    # Graph API secret names in Key Vault
+    graph_api_tenant_id_secret_name: str = Field(
+        default="graph-api-tenant-id",
+        description="Key Vault secret name for Graph API tenant ID"
+    )
+    graph_api_client_id_secret_name: str = Field(
+        default="graph-api-client-id",
+        description="Key Vault secret name for Graph API client ID"
+    )
+    graph_api_client_secret_secret_name: str = Field(
+        default="graph-api-client-secret", 
+        description="Key Vault secret name for Graph API client secret"
+    )
+    
+    # Salesforce secret names in Key Vault
+    salesforce_base_url_secret_name: str = Field(
+        default="sf-base-url",
+        description="Key Vault secret name for Salesforce base URL"
+    )
+    salesforce_client_id_secret_name: str = Field(
+        default="sf-client-id",
+        description="Key Vault secret name for Salesforce client ID"
+    )
+    salesforce_client_secret_secret_name: str = Field(
+        default="sf-client-secret",
+        description="Key Vault secret name for Salesforce client secret"
+    )
+    salesforce_token_endpoint_secret_name: str = Field(
+        default="sf-token-endpoint",
+        description="Key Vault secret name for Salesforce token endpoint"
+    )
+    salesforce_api_version_secret_name: str = Field(
+        default="sf-api-version",
+        description="Key Vault secret name for Salesforce API version"
+    )
+    salesforce_case_record_type_id_secret_name: str = Field(
+        default="sf-case-record-type-id",
+        description="Key Vault secret name for Salesforce case record type ID"
+    )
+    salesforce_case_queue_secret_name: str = Field(
+        default="sf-case-queue",
+        description="Key Vault secret name for Salesforce case queue"
+    )
+    
+    # Caching settings
+    credential_cache_hours: int = Field(
+        default=1,
+        description="Hours to cache retrieved credentials"
+    )
 
+
+
+class DatabricksOAuthSettings(BaseModel):
+    """Databricks OAuth configuration settings (replaces DatabricksSettings)."""
+    
     server_hostname: str = Field(..., description="Databricks server hostname")
     http_path: str = Field(..., description="Databricks HTTP path")
-    access_token: str = Field(..., description="Databricks access token")
     catalog: str = Field(..., description="Databricks catalog name")
     schema_name: str = Field(..., description="Databricks schema name")
     table_suffix: str = Field(default="", description="Table suffix for environments")
+    
+    # OAuth will be handled by Key Vault retrieved credentials
+    # No access_token field needed anymore
+
+
 
 
 class TestModeSettings(BaseModel):
     """Test mode configuration settings."""
 
-    enabled: bool = Field(default=False, description="Enable test mode for email substitution")
+    enabled: bool = Field(default=False, description="Enable test mode for all services")
+    email_test_mode: bool = Field(default=False, description="Enable test mode specifically for email functionality")
     test_sender_email: str = Field(
         default="", description="Your test email address that sends emails"
     )
@@ -138,6 +340,10 @@ class TestModeSettings(BaseModel):
     force_scenario: int | None = Field(
         default=None,
         description="Force a specific scenario for testing (e.g., 9 for email invalid)",
+    )
+    force_scenario_9: bool = Field(
+        default=False,
+        description="Explicit flag to force Scenario 9 (email invalid) - must be True to activate",
     )
 
     @model_validator(mode="after")
@@ -201,6 +407,78 @@ class ScenarioSettings(BaseModel):
     account_team_email: str = Field(..., description="Account team email address")
 
 
+class MonitoringSettings(BaseModel):
+    """Health monitoring and operational settings."""
+    
+    health_check_port: int = Field(
+        default=8080,
+        description="Port for health check HTTP server"
+    )
+    health_check_enabled: bool = Field(
+        default=True,
+        description="Enable health check endpoints"
+    )
+    metrics_collection_interval_seconds: int = Field(
+        default=60,
+        description="Interval for collecting performance metrics in seconds"
+    )
+    connection_pool_health_check_interval_seconds: int = Field(
+        default=30,
+        description="Interval for connection pool health checks in seconds"
+    )
+    oauth_health_check_interval_seconds: int = Field(
+        default=120,
+        description="Interval for OAuth authentication health checks in seconds"
+    )
+    performance_alert_thresholds: dict = Field(
+        default_factory=lambda: {
+            "connection_acquisition_p95_ms": 500,
+            "query_execution_avg_ms": 2000,
+            "throughput_ops_per_sec": 20,
+            "pool_utilization_percent": 80,
+            "error_rate_percent": 5
+        },
+        description="Performance alert thresholds for monitoring"
+    )
+
+
+class PromptManagementSettings(BaseModel):
+    """External prompt management configuration settings."""
+    
+    prompts_base_path: str = Field(
+        default="prompts",
+        description="Base path for external prompt files (relative to application root)"
+    )
+    cache_ttl_seconds: int = Field(
+        default=300,
+        description="Time-to-live for prompt cache entries in seconds"
+    )
+    enable_hot_reload: bool = Field(
+        default=False,
+        description="Enable hot reloading of prompt files in development"
+    )
+    schema_validation: bool = Field(
+        default=True,
+        description="Enable schema validation for prompt files"
+    )
+    max_cache_size: int = Field(
+        default=100,
+        description="Maximum number of cached prompt entries"
+    )
+    preload_prompts: List[str] = Field(
+        default_factory=lambda: ["email_classification", "email_forwarding"],
+        description="List of prompt categories to preload on startup"
+    )
+    performance_monitoring: bool = Field(
+        default=True,
+        description="Enable performance monitoring for prompt operations"
+    )
+    fallback_enabled: bool = Field(
+        default=True,
+        description="Enable fallback to hardcoded prompts when external prompts fail"
+    )
+
+
 class AppSettings(BaseModel):
     """Main application settings."""
 
@@ -210,25 +488,124 @@ class AppSettings(BaseModel):
     output: OutputSettings
     azure_ai_foundry: AzureAIFoundrySettings
     salesforce: SalesforceSettings
-    databricks: DatabricksSettings
+    databricks_oauth: DatabricksOAuthSettings
+    key_vault: KeyVaultSettings
     scenarios: ScenarioSettings
     test_mode: TestModeSettings
     content_formatting: ContentFormattingSettings
+    monitoring: MonitoringSettings
+    prompt_management: PromptManagementSettings
     environment: str = Field(default="development", description="Application environment")
     dry_run: bool = Field(default=False, description="Run in dry-run mode (don't move emails)")
 
 
-def get_settings() -> AppSettings:
-    """Get application settings from environment variables."""
-    return AppSettings(
-        graph_api=GraphAPISettings(
-            tenant_id=os.getenv("GRAPH_API_TENANT_ID", ""),
-            client_id=os.getenv("GRAPH_API_CLIENT_ID", ""),
-            client_secret=os.getenv("GRAPH_API_CLIENT_SECRET", ""),
-            monitored_email=os.getenv("GRAPH_API_MONITORED_EMAIL", ""),
-            authority_url=os.getenv("GRAPH_API_AUTHORITY_URL", "https://login.microsoftonline.com"),
-            graph_api_endpoint=os.getenv("GRAPH_API_ENDPOINT", "https://graph.microsoft.com/v1.0"),
+async def get_settings(test_mode: bool = False) -> AppSettings:
+    """Get application settings from environment variables and Key Vault.
+    
+    Args:
+        test_mode: Whether to use mock services (True) or real services (False)
+    """
+    # Initialize Key Vault client first
+    try:
+        from services.azure_key_vault_client import AzureKeyVaultClient
+    except ImportError:
+        try:
+            from ..services.azure_key_vault_client import AzureKeyVaultClient
+        except ImportError:
+            import sys
+            sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+            from services.azure_key_vault_client import AzureKeyVaultClient
+    
+    key_vault_settings = KeyVaultSettings(
+        key_vault_url=os.getenv("AZURE_KEY_VAULT_URL", ""),
+        azure_tenant_id=os.getenv("AZURE_TENANT_ID", ""),
+        azure_client_id=os.getenv("AZURE_CLIENT_ID", ""),
+        azure_client_secret=SecretStr(os.getenv("AZURE_CLIENT_SECRET", "")),
+        # Make secret names configurable via environment variables
+        tenant_id_secret_name=os.getenv(
+            "KEY_VAULT_TENANT_ID_SECRET", 
+            "sales-engagement-service-principal-tenantid"
         ),
+        client_id_secret_name=os.getenv(
+            "KEY_VAULT_CLIENT_ID_SECRET",
+            "sales-engagement-service-principal-clientid"
+        ),
+        client_secret_secret_name=os.getenv(
+            "KEY_VAULT_CLIENT_SECRET_SECRET",
+            "sales-engagement-service-principal-secretid"
+        ),
+        # Azure AI Foundry secret names from environment variables or defaults
+        azure_ai_foundry_endpoint_secret_name=os.getenv(
+            "KEY_VAULT_AZURE_AI_FOUNDRY_ENDPOINT_SECRET",
+            "azure-ai-foundry-endpoint"
+        ),
+        azure_ai_foundry_tenant_id_secret_name=os.getenv(
+            "KEY_VAULT_AZURE_AI_FOUNDRY_TENANT_ID_SECRET",
+            "azure-ai-foundry-tenant-id"
+        ),
+        azure_ai_foundry_client_id_secret_name=os.getenv(
+            "KEY_VAULT_AZURE_AI_FOUNDRY_CLIENT_ID_SECRET",
+            "azure-ai-foundry-client-id"
+        ),
+        azure_ai_foundry_client_secret_secret_name=os.getenv(
+            "KEY_VAULT_AZURE_AI_FOUNDRY_CLIENT_SECRET_SECRET",
+            "azure-ai-foundry-client-secret"
+        ),
+        # Graph API secret names from environment variables or defaults
+        graph_api_tenant_id_secret_name=os.getenv(
+            "KEY_VAULT_GRAPH_API_TENANT_ID_SECRET",
+            "graph-api-tenant-id"
+        ),
+        graph_api_client_id_secret_name=os.getenv(
+            "KEY_VAULT_GRAPH_API_CLIENT_ID_SECRET",
+            "graph-api-client-id"
+        ),
+        graph_api_client_secret_secret_name=os.getenv(
+            "KEY_VAULT_GRAPH_API_CLIENT_SECRET_SECRET",
+            "graph-api-client-secret"
+        ),
+        # Salesforce secret names from environment variables or defaults
+        salesforce_base_url_secret_name=os.getenv(
+            "KEY_VAULT_SALESFORCE_BASE_URL_SECRET",
+            "sf-base-url"
+        ),
+        salesforce_client_id_secret_name=os.getenv(
+            "KEY_VAULT_SALESFORCE_CLIENT_ID_SECRET",
+            "sf-client-id"
+        ),
+        salesforce_client_secret_secret_name=os.getenv(
+            "KEY_VAULT_SALESFORCE_CLIENT_SECRET_SECRET",
+            "sf-client-secret"
+        ),
+        salesforce_token_endpoint_secret_name=os.getenv(
+            "KEY_VAULT_SALESFORCE_TOKEN_ENDPOINT_SECRET",
+            "sf-token-endpoint"
+        ),
+        salesforce_api_version_secret_name=os.getenv(
+            "KEY_VAULT_SALESFORCE_API_VERSION_SECRET",
+            "sf-api-version"
+        ),
+        salesforce_case_record_type_id_secret_name=os.getenv(
+            "KEY_VAULT_SALESFORCE_CASE_RECORD_TYPE_ID_SECRET",
+            "sf-case-record-type-id"
+        ),
+        salesforce_case_queue_secret_name=os.getenv(
+            "KEY_VAULT_SALESFORCE_CASE_QUEUE_SECRET",
+            "sf-case-queue"
+        ),
+    )
+    
+    # Initialize Key Vault client and retrieve credentials
+    async with AzureKeyVaultClient(key_vault_settings, test_mode=test_mode) as key_vault_client:
+        graph_api = await GraphAPISettings.from_key_vault(
+            key_vault_client, 
+            os.getenv("GRAPH_API_MONITORED_EMAIL", "")
+        )
+        azure_ai_foundry = await AzureAIFoundrySettings.from_key_vault(key_vault_client)
+        salesforce = await SalesforceSettings.from_key_vault(key_vault_client)
+    
+    return AppSettings(
+        graph_api=graph_api,
         processing=ProcessingSettings(
             polling_interval_seconds=int(os.getenv("INBOX_MONITOR_POLLING_INTERVAL", "300")),
             batch_size=int(os.getenv("INBOX_MONITOR_BATCH_SIZE", "10")),
@@ -245,39 +622,30 @@ def get_settings() -> AppSettings:
             api_endpoint=os.getenv("INBOX_MONITOR_API_ENDPOINT"),
             api_key=os.getenv("INBOX_MONITOR_API_KEY"),
         ),
-        azure_ai_foundry=AzureAIFoundrySettings(
-            endpoint=os.getenv("AZURE_AI_ENDPOINT", ""),
-            connection_string=os.getenv("AZURE_AI_CONNECTION_STRING", ""),
-        ),
-        salesforce=SalesforceSettings(
-            base_url=os.getenv("SALESFORCE_BASE_URL", ""),
-            client_id=os.getenv("SALESFORCE_CLIENT_ID", ""),
-            client_secret=os.getenv("SALESFORCE_CLIENT_SECRET", ""),
-            token_endpoint=os.getenv("SALESFORCE_TOKEN_ENDPOINT", ""),
-            api_version=os.getenv("SALESFORCE_API_VERSION", "v64.0"),
-            case_record_type_id=os.getenv("SALESFORCE_CASE_RECORD_TYPE_ID", ""),
-            case_queue=os.getenv("SALESFORCE_CASE_QUEUE", ""),
-        ),
-        databricks=DatabricksSettings(
+        azure_ai_foundry=azure_ai_foundry,
+        salesforce=salesforce,
+        databricks_oauth=DatabricksOAuthSettings(
             server_hostname=os.getenv("DATABRICKS_SERVER_HOSTNAME", ""),
             http_path=os.getenv("DATABRICKS_HTTP_PATH", ""),
-            access_token=os.getenv("DATABRICKS_ACCESS_TOKEN", ""),
             catalog=os.getenv("DATABRICKS_CATALOG", ""),
             schema_name=os.getenv("DATABRICKS_SCHEMA", ""),
             table_suffix=os.getenv("DATABRICKS_TABLE_SUFFIX", ""),
         ),
+        key_vault=key_vault_settings,
         scenarios=ScenarioSettings(
             test_email=os.getenv("INBOX_MONITOR_TEST_EMAIL", ""),
             victoria_grant_email=os.getenv("SCENARIO_VICTORIA_GRANT_EMAIL", ""),
             account_team_email=os.getenv("SCENARIO_ACCOUNT_TEAM_EMAIL", ""),
         ),
         test_mode=TestModeSettings(
-            enabled=os.getenv("TEST_MODE", "false").lower() == "true",
+            enabled=test_mode,  # Use the parameter passed to get_settings() - controls service mocking
+            email_test_mode=os.getenv("TEST_MODE_EMAIL", "false").lower() == "true",  # Controls email substitution only
             test_sender_email=os.getenv("TEST_EMAIL_SENDER", ""),
             target_salesforce_email=os.getenv("TEST_SALESFORCE_EMAIL", ""),
             force_scenario=int(os.getenv("TEST_FORCE_SCENARIO"))
             if os.getenv("TEST_FORCE_SCENARIO")
             else None,
+            force_scenario_9=os.getenv("FORCE_SCENARIO_9", "false").lower() == "true",
         ),
         content_formatting=ContentFormattingSettings(
             content_format=os.getenv("CONTENT_FORMAT", "structured"),
@@ -285,6 +653,23 @@ def get_settings() -> AppSettings:
             preserve_signature=os.getenv("CONTENT_PRESERVE_SIGNATURE", "true").lower() == "true",
             include_metadata=os.getenv("CONTENT_INCLUDE_METADATA", "true").lower() == "true",
             truncate_html_fallback=os.getenv("CONTENT_TRUNCATE_HTML_FALLBACK", "true").lower() == "true",
+        ),
+        monitoring=MonitoringSettings(
+            health_check_port=int(os.getenv("HEALTH_CHECK_PORT", "8080")),
+            health_check_enabled=os.getenv("HEALTH_CHECK_ENABLED", "true").lower() == "true",
+            metrics_collection_interval_seconds=int(os.getenv("METRICS_COLLECTION_INTERVAL", "60")),
+            connection_pool_health_check_interval_seconds=int(os.getenv("CONNECTION_POOL_HEALTH_CHECK_INTERVAL", "30")),
+            oauth_health_check_interval_seconds=int(os.getenv("OAUTH_HEALTH_CHECK_INTERVAL", "120")),
+        ),
+        prompt_management=PromptManagementSettings(
+            prompts_base_path=os.getenv("PROMPTS_BASE_PATH", "prompts"),
+            cache_ttl_seconds=int(os.getenv("PROMPT_CACHE_TTL_SECONDS", "300")),
+            enable_hot_reload=os.getenv("PROMPT_ENABLE_HOT_RELOAD", "false").lower() == "true",
+            schema_validation=os.getenv("PROMPT_SCHEMA_VALIDATION", "true").lower() == "true",
+            max_cache_size=int(os.getenv("PROMPT_MAX_CACHE_SIZE", "100")),
+            preload_prompts=os.getenv("PROMPT_PRELOAD_LIST", "email_classification,email_forwarding").split(","),
+            performance_monitoring=os.getenv("PROMPT_PERFORMANCE_MONITORING", "true").lower() == "true",
+            fallback_enabled=os.getenv("PROMPT_FALLBACK_ENABLED", "true").lower() == "true",
         ),
         environment=os.getenv("ENVIRONMENT", "development"),
         dry_run=os.getenv("INBOX_MONITOR_DRY_RUN", "false").lower() == "true",
@@ -295,46 +680,22 @@ def validate_settings(settings: AppSettings) -> bool:
     """Validate that all required settings are present."""
     missing_fields = []
 
-    # Validate Graph API settings
-    if not settings.graph_api.tenant_id:
-        missing_fields.append("GRAPH_API_TENANT_ID")
-    if not settings.graph_api.client_id:
-        missing_fields.append("GRAPH_API_CLIENT_ID")
-    if not settings.graph_api.client_secret:
-        missing_fields.append("GRAPH_API_CLIENT_SECRET")
+    # Graph API and Azure AI Foundry validation removed - now handled by Key Vault
+    
+    # Validate monitored email is still required from environment
     if not settings.graph_api.monitored_email:
         missing_fields.append("GRAPH_API_MONITORED_EMAIL")
 
-    # Validate Azure AI Foundry settings
-    if not settings.azure_ai_foundry.endpoint:
-        missing_fields.append("AZURE_AI_ENDPOINT")
-    if not settings.azure_ai_foundry.connection_string:
-        missing_fields.append("AZURE_AI_CONNECTION_STRING")
+    # Salesforce validation removed - now handled by Key Vault
 
-    # Validate Salesforce settings
-    if not settings.salesforce.base_url:
-        missing_fields.append("SALESFORCE_BASE_URL")
-    if not settings.salesforce.client_id:
-        missing_fields.append("SALESFORCE_CLIENT_ID")
-    if not settings.salesforce.client_secret:
-        missing_fields.append("SALESFORCE_CLIENT_SECRET")
-    if not settings.salesforce.token_endpoint:
-        missing_fields.append("SALESFORCE_TOKEN_ENDPOINT")
-    if not settings.salesforce.case_record_type_id:
-        missing_fields.append("SALESFORCE_CASE_RECORD_TYPE_ID")
-    if not settings.salesforce.case_queue:
-        missing_fields.append("SALESFORCE_CASE_QUEUE")
-
-    # Validate Databricks settings
-    if not settings.databricks.server_hostname:
+    # Validate Databricks OAuth settings
+    if not settings.databricks_oauth.server_hostname:
         missing_fields.append("DATABRICKS_SERVER_HOSTNAME")
-    if not settings.databricks.http_path:
+    if not settings.databricks_oauth.http_path:
         missing_fields.append("DATABRICKS_HTTP_PATH")
-    if not settings.databricks.access_token:
-        missing_fields.append("DATABRICKS_ACCESS_TOKEN")
-    if not settings.databricks.catalog:
+    if not settings.databricks_oauth.catalog:
         missing_fields.append("DATABRICKS_CATALOG")
-    if not settings.databricks.schema_name:
+    if not settings.databricks_oauth.schema_name:
         missing_fields.append("DATABRICKS_SCHEMA")
 
     # Validate scenario settings
@@ -344,6 +705,16 @@ def validate_settings(settings: AppSettings) -> bool:
         missing_fields.append("SCENARIO_VICTORIA_GRANT_EMAIL")
     if not settings.scenarios.account_team_email:
         missing_fields.append("SCENARIO_ACCOUNT_TEAM_EMAIL")
+
+    # Validate Key Vault settings
+    if not settings.key_vault.key_vault_url:
+        missing_fields.append("AZURE_KEY_VAULT_URL")
+    if not settings.key_vault.azure_tenant_id:
+        missing_fields.append("AZURE_TENANT_ID")
+    if not settings.key_vault.azure_client_id:
+        missing_fields.append("AZURE_CLIENT_ID")
+    if not settings.key_vault.azure_client_secret.get_secret_value():
+        missing_fields.append("AZURE_CLIENT_SECRET")
 
     # Validate output settings for API type
     if settings.output.storage_type == "api" and not settings.output.api_endpoint:

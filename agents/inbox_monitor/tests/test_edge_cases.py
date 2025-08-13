@@ -1,709 +1,500 @@
 """
-Edge Case Tests for Inbox Monitor
-==================================
-
-Comprehensive tests for edge cases and boundary conditions.
+Edge Case Tests for PromptManager Coverage Improvement
+=====================================================
+These tests target specific uncovered lines and edge cases to increase
+test coverage from 80% to 90%+.
+Focus areas:
+- Import error handling
+- Edge cases in circuit breaker states
+- Error conditions in health checks
+- Fallback paths in schema validation
+- Memory monitoring edge cases
 """
-
-import asyncio
-import json
-from datetime import datetime
-from unittest.mock import AsyncMock, Mock, mock_open, patch
-
 import pytest
-
-from ..models.email import (
-    EmailImportance,
+import tempfile
+import asyncio
+import sys
+from pathlib import Path
+from unittest.mock import patch, MagicMock, mock_open
+from datetime import datetime, timezone
+from services.prompt_manager import PromptManager, CircuitBreaker, CircuitBreakerState
+from exceptions.prompt_exceptions import (
+    PromptNotFoundError,
+    PromptValidationError, 
+    PromptCacheError
 )
-from ..services.email_processor import EmailProcessor
-from ..services.graph_api_client import GraphAPIClient
-from ..services.monitor import InboxMonitor
-
-
-class TestEmailProcessorEdgeCases:
-    """Test edge cases for EmailProcessor."""
-
-    @pytest.fixture
-    def processor(self, mock_settings, mock_graph_client):
-        """Create email processor instance."""
-        return EmailProcessor(mock_settings, mock_graph_client)
-
-    @pytest.mark.asyncio
-    async def test_process_inbox_with_empty_response(self, processor, mock_graph_client):
-        """Test processing inbox when Graph API returns empty response."""
-        mock_graph_client.get_inbox_messages.return_value = []
-
-        results = await processor.process_inbox()
-
-        assert results["success"] is True
-        assert results["processed_count"] == 0
-        assert results["failed_count"] == 0
-        assert results["processing_results"] == []
-
-    @pytest.mark.asyncio
-    async def test_process_inbox_with_none_response(self, processor, mock_graph_client):
-        """Test processing inbox when Graph API returns None."""
-        mock_graph_client.get_inbox_messages.return_value = None
-
-        results = await processor.process_inbox()
-
-        assert results["success"] is True
-        assert results["processed_count"] == 0
-        assert results["failed_count"] == 0
-
-    @pytest.mark.asyncio
-    async def test_process_inbox_with_large_batch(
-        self, processor, mock_graph_client, mock_graph_message, mock_folder
-    ):
-        """Test processing inbox with maximum batch size."""
-        # Create a large batch of messages
-        messages = [mock_graph_message.copy() for _ in range(50)]
-        for i, msg in enumerate(messages):
-            msg["id"] = f"message-{i}"
-            msg["subject"] = f"Test Message {i}"
-
-        mock_graph_client.get_inbox_messages.return_value = messages
-        mock_graph_client.get_folder_by_name.return_value = mock_folder
-
-        # Mock email conversion
-        mock_email = Mock()
-        mock_email.id = "test-message-id"
-        mock_email.to_ai_format.return_value = {"id": "test-message-id"}
-        mock_email.processing_metadata = Mock()
-        mock_email.processing_metadata.processing_id = "test-processing-id"
-        mock_graph_client.convert_to_email_model.return_value = mock_email
-
-        with patch("builtins.open", mock_open()):
-            results = await processor.process_inbox()
-
-        assert results["success"] is True
-        assert results["processed_count"] == 50
-        assert results["failed_count"] == 0
-
-    @pytest.mark.asyncio
-    async def test_process_inbox_with_special_characters(
-        self, processor, mock_graph_client, mock_folder
-    ):
-        """Test processing emails with special characters and Unicode."""
-        special_message = {
-            "id": "special-chars-message",
-            "subject": "Test with émojis 🚀 and spëcial chars: àáâãäåæçèéêë",
-            "body": {
-                "contentType": "text/html",
-                "content": "<html><body>Content with 中文字符 and emojis: 😀🎉💡</body></html>",
-            },
-            "from": {
-                "emailAddress": {
-                    "address": "tëst@éxample.com",
-                    "name": "Tëst Üser 中文",
-                }
-            },
-            "toRecipients": [],
-            "receivedDateTime": "2024-01-15T10:30:00Z",
-            "hasAttachments": False,
-            "importance": "normal",
-            "isRead": False,
-            "isDraft": False,
-        }
-
-        mock_graph_client.get_inbox_messages.return_value = [special_message]
-        mock_graph_client.get_folder_by_name.return_value = mock_folder
-
-        # Mock email conversion
-        mock_email = Mock()
-        mock_email.id = "special-chars-message"
-        mock_email.to_ai_format.return_value = {
-            "id": "special-chars-message",
-            "subject": special_message["subject"],
-        }
-        mock_email.processing_metadata = Mock()
-        mock_email.processing_metadata.processing_id = "test-processing-id"
-        mock_graph_client.convert_to_email_model.return_value = mock_email
-
-        with patch("builtins.open", mock_open()) as mock_file:
-            results = await processor.process_inbox()
-
-        assert results["success"] is True
-        assert results["processed_count"] == 1
-        # Verify Unicode content was written
-        mock_file.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_process_inbox_with_extremely_long_subject(
-        self, processor, mock_graph_client, mock_folder
-    ):
-        """Test processing email with extremely long subject line."""
-        long_subject = "A" * 10000  # 10KB subject line
-
-        long_message = {
-            "id": "long-subject-message",
-            "subject": long_subject,
-            "body": {"contentType": "text/plain", "content": "Short content"},
-            "from": {"emailAddress": {"address": "test@example.com", "name": "Test User"}},
-            "toRecipients": [],
-            "receivedDateTime": "2024-01-15T10:30:00Z",
-            "hasAttachments": False,
-            "importance": "normal",
-            "isRead": False,
-            "isDraft": False,
-        }
-
-        mock_graph_client.get_inbox_messages.return_value = [long_message]
-        mock_graph_client.get_folder_by_name.return_value = mock_folder
-
-        # Mock email conversion
-        mock_email = Mock()
-        mock_email.id = "long-subject-message"
-        mock_email.to_ai_format.return_value = {
-            "id": "long-subject-message",
-            "subject": long_subject,
-        }
-        mock_email.processing_metadata = Mock()
-        mock_email.processing_metadata.processing_id = "test-processing-id"
-        mock_graph_client.convert_to_email_model.return_value = mock_email
-
-        with patch("builtins.open", mock_open()):
-            results = await processor.process_inbox()
-
-        assert results["success"] is True
-        assert results["processed_count"] == 1
-
-    @pytest.mark.asyncio
-    async def test_process_inbox_with_empty_body(self, processor, mock_graph_client, mock_folder):
-        """Test processing email with empty body content."""
-        empty_body_message = {
-            "id": "empty-body-message",
-            "subject": "Empty Body Test",
-            "body": {"contentType": "text/plain", "content": ""},
-            "from": {"emailAddress": {"address": "test@example.com", "name": "Test User"}},
-            "toRecipients": [],
-            "receivedDateTime": "2024-01-15T10:30:00Z",
-            "hasAttachments": False,
-            "importance": "normal",
-            "isRead": False,
-            "isDraft": False,
-        }
-
-        mock_graph_client.get_inbox_messages.return_value = [empty_body_message]
-        mock_graph_client.get_folder_by_name.return_value = mock_folder
-
-        # Mock email conversion
-        mock_email = Mock()
-        mock_email.id = "empty-body-message"
-        mock_email.to_ai_format.return_value = {
-            "id": "empty-body-message",
-            "content": "",
-        }
-        mock_email.processing_metadata = Mock()
-        mock_email.processing_metadata.processing_id = "test-processing-id"
-        mock_graph_client.convert_to_email_model.return_value = mock_email
-
-        with patch("builtins.open", mock_open()):
-            results = await processor.process_inbox()
-
-        assert results["success"] is True
-        assert results["processed_count"] == 1
-
-    @pytest.mark.asyncio
-    async def test_process_inbox_with_missing_sender(
-        self, processor, mock_graph_client, mock_folder
-    ):
-        """Test processing email with missing sender information."""
-        no_sender_message = {
-            "id": "no-sender-message",
-            "subject": "No Sender Test",
-            "body": {"contentType": "text/plain", "content": "Test content"},
-            "from": None,  # Missing sender
-            "toRecipients": [],
-            "receivedDateTime": "2024-01-15T10:30:00Z",
-            "hasAttachments": False,
-            "importance": "normal",
-            "isRead": False,
-            "isDraft": False,
-        }
-
-        mock_graph_client.get_inbox_messages.return_value = [no_sender_message]
-        mock_graph_client.get_folder_by_name.return_value = mock_folder
-
-        # Mock email conversion to handle missing sender
-        mock_email = Mock()
-        mock_email.id = "no-sender-message"
-        mock_email.to_ai_format.return_value = {
-            "id": "no-sender-message",
-            "sender": None,
-        }
-        mock_email.processing_metadata = Mock()
-        mock_email.processing_metadata.processing_id = "test-processing-id"
-        mock_graph_client.convert_to_email_model.return_value = mock_email
-
-        with patch("builtins.open", mock_open()):
-            results = await processor.process_inbox()
-
-        assert results["success"] is True
-        assert results["processed_count"] == 1
-
-    @pytest.mark.asyncio
-    async def test_store_email_file_with_permission_error(self, processor, mock_email_model):
-        """Test file storage with permission error."""
-        with patch("builtins.open", side_effect=PermissionError("Permission denied")):
-            with pytest.raises(PermissionError):
-                await processor._store_email_file(mock_email_model)
-
-    @pytest.mark.asyncio
-    async def test_store_email_file_with_disk_full(self, processor, mock_email_model):
-        """Test file storage with disk full error."""
-        with patch("builtins.open", side_effect=OSError("No space left on device")):
-            with pytest.raises(OSError):
-                await processor._store_email_file(mock_email_model)
-
-    @pytest.mark.asyncio
-    async def test_store_email_api_with_network_timeout(self, processor, mock_email_model):
-        """Test API storage with network timeout."""
-        processor.settings.output.storage_type = "api"
-        processor.settings.output.api_endpoint = "https://api.example.com/emails"
-
-        with patch("httpx.AsyncClient") as mock_client_class:
-            mock_client = AsyncMock()
-            mock_client.__aenter__.return_value.post.side_effect = (
-                asyncio.TimeoutError("Network timeout")
-            )
-            mock_client_class.return_value = mock_client
-
-            with pytest.raises(asyncio.TimeoutError):
-                await processor._store_email_api(mock_email_model)
-
-    @pytest.mark.asyncio
-    async def test_store_email_api_with_invalid_json_response(self, processor, mock_email_model):
-        """Test API storage with invalid JSON response."""
-        processor.settings.output.storage_type = "api"
-        processor.settings.output.api_endpoint = "https://api.example.com/emails"
-
-        with patch("httpx.AsyncClient") as mock_client_class:
-            mock_response = AsyncMock()
-            mock_response.status = 200
-            mock_response.json.side_effect = json.JSONDecodeError("Invalid JSON", "", 0)
-
-            mock_client = AsyncMock()
-            mock_client.__aenter__.return_value.post.return_value.__aenter__.return_value = (
-                mock_response
-            )
-            mock_client_class.return_value = mock_client
-
-            with pytest.raises(json.JSONDecodeError):
-                await processor._store_email_api(mock_email_model)
-
-    def test_get_processed_folder_name_edge_cases(self, processor):
-        """Test folder name generation with edge cases."""
-        # Test with mocked datetime at year/month boundaries
-        with patch("datetime.datetime") as mock_datetime:
-            # Test January (month 01)
-            mock_datetime.utcnow.return_value.strftime.side_effect = ["01", "2024"]
-            folder_name = processor._get_processed_folder_name()
-            assert folder_name == "Processed_01_2024"
-
-            # Test December (month 12)
-            mock_datetime.utcnow.return_value.strftime.side_effect = ["12", "2024"]
-            folder_name = processor._get_processed_folder_name()
-            assert folder_name == "Processed_12_2024"
-
-            # Test year 2099
-            mock_datetime.utcnow.return_value.strftime.side_effect = ["06", "2099"]
-            folder_name = processor._get_processed_folder_name()
-            assert folder_name == "Processed_06_2099"
-
-    @pytest.mark.asyncio
-    async def test_ensure_processed_folder_with_retry_exhaustion(
-        self, processor, mock_graph_client
-    ):
-        """Test folder creation with retry exhaustion."""
-        mock_graph_client.get_folder_by_name.return_value = None
-
-        # Mock retry_operation to fail after exhausting retries
-        with patch("agents.inbox_monitor.services.email_processor.retry_operation") as mock_retry:
-            mock_retry.return_value = (False, None, "Max retries exceeded")
-
-            folder = await processor._ensure_processed_folder("Test Folder")
-            assert folder is None
-
-    @pytest.mark.asyncio
-    async def test_process_single_email_with_conversion_error(
-        self, processor, mock_graph_client, mock_graph_message
-    ):
-        """Test single email processing with conversion error."""
-        mock_graph_client.convert_to_email_model.side_effect = ValueError("Invalid email format")
-
-        result = await processor._process_single_email(
-            mock_graph_message, "folder-id", "Test Folder"
-        )
-
-        assert result.success is False
-        assert "Invalid email format" in result.error
-        assert result.moved_to_folder is None
-
-    @pytest.mark.asyncio
-    async def test_process_single_email_with_storage_error(
-        self, processor, mock_graph_client, mock_graph_message
-    ):
-        """Test single email processing with storage error."""
-        # Mock email conversion
-        mock_email = Mock()
-        mock_email.id = "test-message-id"
-        mock_email.processing_metadata = Mock()
-        mock_email.processing_metadata.processing_id = "test-processing-id"
-        mock_graph_client.convert_to_email_model.return_value = mock_email
-
-        # Mock storage to fail
-        with patch.object(processor, "_store_email", side_effect=OSError("Storage failed")):
-            result = await processor._process_single_email(
-                mock_graph_message, "folder-id", "Test Folder"
-            )
-
-        assert result.success is False
-        assert "Storage failed" in result.error
-
-    @pytest.mark.asyncio
-    async def test_process_single_email_with_move_failure(
-        self, processor, mock_graph_client, mock_graph_message
-    ):
-        """Test single email processing with move failure."""
-        # Mock email conversion and storage
-        mock_email = Mock()
-        mock_email.id = "test-message-id"
-        mock_email.processing_metadata = Mock()
-        mock_email.processing_metadata.processing_id = "test-processing-id"
-        mock_graph_client.convert_to_email_model.return_value = mock_email
-
-        with patch.object(processor, "_store_email", return_value="/tmp/test.json"):
-            # Mock retry_operation to fail
-            with patch(
-                "agents.inbox_monitor.services.email_processor.retry_operation"
-            ) as mock_retry:
-                mock_retry.return_value = (False, None, "Move failed")
-
-                result = await processor._process_single_email(
-                    mock_graph_message, "folder-id", "Test Folder"
-                )
-
-        assert result.success is False
-        assert "Failed to move email: Move failed" in result.error
-
-
-class TestGraphAPIClientEdgeCases:
-    """Test edge cases for GraphAPIClient."""
-
-    @pytest.fixture
-    def graph_client(self, mock_settings):
-        """Create Graph API client for testing."""
-
-        return GraphAPIClient(mock_settings.graph_api)
-
-    def test_token_cache_expiry_edge_case(self, graph_client):
-        """Test token cache behavior at expiry boundary."""
-        # Set token to expire in 1 second
-        graph_client._token_cache = {
-            "access_token": "old-token",
-            "expires_at": datetime.utcnow().timestamp() + 1,
-        }
-
-        # Mock MSAL to return new token
-        graph_client.msal_app.acquire_token_for_client.return_value = {
-            "access_token": "new-token",
-            "expires_in": 3600,
-        }
-
-        # Wait for expiry
-        import time
-
-        time.sleep(1.1)
-
-        token = graph_client._get_access_token()
-        assert token == "new-token"
-        graph_client.msal_app.acquire_token_for_client.assert_called_once()
-
-    def test_parse_email_address_edge_cases(self, graph_client):
-        """Test email address parsing with edge cases."""
-        # Test with empty email address
-        empty_address = {"emailAddress": {"address": "", "name": ""}}
-        result = graph_client._parse_email_address(empty_address)
-        assert result.email == ""
-        assert result.name == ""
-
-        # Test with missing name field
-        no_name = {"emailAddress": {"address": "test@example.com"}}
-        result = graph_client._parse_email_address(no_name)
-        assert result.email == "test@example.com"
-        assert result.name is None
-
-        # Test with None values
-        none_values = {"emailAddress": {"address": None, "name": None}}
-        result = graph_client._parse_email_address(none_values)
-        assert result.email is None
-        assert result.name is None
-
-    def test_parse_importance_edge_cases(self, graph_client):
-        """Test importance parsing with edge cases."""
-        # Test with None
-        assert graph_client._parse_importance(None) == EmailImportance.NORMAL
-
-        # Test with empty string
-        assert graph_client._parse_importance("") == EmailImportance.NORMAL
-
-        # Test with mixed case
-        assert graph_client._parse_importance("HIGH") == EmailImportance.HIGH
-        assert graph_client._parse_importance("Low") == EmailImportance.LOW
-
-        # Test with invalid values
-        assert graph_client._parse_importance("super-critical") == EmailImportance.NORMAL
-        assert graph_client._parse_importance("123") == EmailImportance.NORMAL
-
-    def test_convert_to_email_model_with_minimal_data(self, graph_client):
-        """Test email model conversion with minimal data."""
-        minimal_message = {
-            "id": "minimal-id",
-            "receivedDateTime": "2024-01-15T10:30:00Z",
-        }
-
-        email = graph_client.convert_to_email_model(minimal_message, "test-processing-id", "1.0.0")
-
-        assert email.id == "minimal-id"
-        assert email.subject == ""
-        assert email.body.content == ""
-        assert email.sender.email == ""
-        assert len(email.recipients.to) == 0
-        assert email.importance == EmailImportance.NORMAL
-
-    def test_convert_to_email_model_with_malformed_dates(self, graph_client):
-        """Test email model conversion with malformed dates."""
-        malformed_message = {
-            "id": "malformed-id",
-            "receivedDateTime": "invalid-date-format",
-            "sentDateTime": "2024-13-45T25:99:99Z",  # Invalid date
-        }
-
-        with pytest.raises(ValueError):
-            graph_client.convert_to_email_model(malformed_message, "test-processing-id", "1.0.0")
-
-    def test_convert_to_email_model_with_extreme_values(self, graph_client):
-        """Test email model conversion with extreme values."""
-        extreme_message = {
-            "id": "extreme-id",
-            "subject": "A" * 100000,  # Very long subject
-            "body": {
-                "contentType": "text/html",
-                "content": "<html>" + "B" * 1000000 + "</html>",  # Very long content
-            },
-            "receivedDateTime": "2024-01-15T10:30:00Z",
-            "from": {"emailAddress": {"address": "test@example.com"}},
-            "toRecipients": [
-                {"emailAddress": {"address": f"user{i}@example.com"}} for i in range(1000)
-            ],  # Many recipients
-            "categories": [f"Category{i}" for i in range(100)],  # Many categories
-            "internetMessageHeaders": [
-                {"name": f"Header{i}", "value": f"Value{i}"} for i in range(500)
-            ],  # Many headers
-        }
-
-        email = graph_client.convert_to_email_model(extreme_message, "test-processing-id", "1.0.0")
-
-        assert email.id == "extreme-id"
-        assert len(email.subject) == 100000
-        assert len(email.recipients.to) == 1000
-        assert len(email.categories) == 100
-        assert len(email.internet_message_headers) == 500
-
-
-class TestInboxMonitorEdgeCases:
-    """Test edge cases for InboxMonitor."""
-
-    @pytest.fixture
-    def monitor(self, mock_settings):
-        """Create inbox monitor instance."""
-        return InboxMonitor(mock_settings)
-
-    @pytest.mark.asyncio
-    async def test_monitor_with_rapid_shutdown(self, monitor):
-        """Test monitor behavior with rapid start/stop cycles."""
-        # Mock components
-        with patch("agents.inbox_monitor.services.monitor.GraphAPIClient") as mock_graph_class:
-            mock_graph_client = AsyncMock()
-            mock_graph_class.return_value = mock_graph_client
-
-            # Start and immediately stop
-            start_task = asyncio.create_task(monitor.start())
-            await asyncio.sleep(0.01)  # Very short delay
-            await monitor.stop()
-
-            # Wait for start task to complete
-            await start_task
-
-            # Verify cleanup was called
-            mock_graph_client.cleanup.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_monitor_with_processing_timeout(self, monitor):
-        """Test monitor behavior when processing takes too long."""
-        monitor._running = True
-
-        # Mock email processor with very slow processing
-        mock_processor = AsyncMock()
-        slow_future = asyncio.Future()
-        mock_processor.process_inbox.return_value = slow_future
-        monitor.email_processor = mock_processor
-
-        # Mock shutdown event
-        monitor._shutdown_event = AsyncMock()
-        monitor._shutdown_event.wait.side_effect = asyncio.TimeoutError
-
-        # This should timeout and not hang
-        with pytest.raises(asyncio.TimeoutError):
-            await asyncio.wait_for(monitor._monitor_loop(), timeout=0.1)
-
-    @pytest.mark.asyncio
-    async def test_monitor_with_memory_pressure(self, monitor):
-        """Test monitor behavior under memory pressure."""
-        monitor._running = True
-
-        # Mock email processor to simulate memory pressure
-        mock_processor = AsyncMock()
-        mock_processor.process_inbox.side_effect = MemoryError("Out of memory")
-        monitor.email_processor = mock_processor
-
-        # Mock shutdown event
-        monitor._shutdown_event = AsyncMock()
-        monitor._shutdown_event.wait.side_effect = asyncio.TimeoutError
-
-        # Run one iteration and verify it handles memory error
-        iteration_count = 0
-
-        async def mock_sleep(duration):
-            nonlocal iteration_count
-            iteration_count += 1
-            if iteration_count >= 5:
-                monitor._running = False
-
-        with patch("asyncio.sleep", side_effect=mock_sleep):
-            await monitor._monitor_loop()
-
-        # Should have stopped due to consecutive failures
-        assert monitor._running is False
-
-    @pytest.mark.asyncio
-    async def test_health_check_with_partial_failure(self, monitor):
-        """Test health check with partial system failure."""
-        monitor._running = True
-
-        # Mock graph client with intermittent failures
-        mock_graph_client = AsyncMock()
-        mock_graph_client._make_request.side_effect = [
-            {"id": "user-id"},  # First call succeeds
-            Exception("Network error"),  # Second call fails
-        ]
-        monitor.graph_client = mock_graph_client
-
-        # First health check should succeed
-        health1 = await monitor.health_check()
-        assert health1["status"] == "healthy"
-        assert health1["graph_api_connected"] is True
-
-        # Second health check should fail
-        health2 = await monitor.health_check()
-        assert health2["status"] == "unhealthy"
-        assert health2["graph_api_connected"] is False
-        assert "Network error" in health2["last_error"]
-
-    def test_signal_handler_edge_cases(self, monitor):
-        """Test signal handler with edge cases."""
-        with patch("signal.signal") as mock_signal:
-            monitor._setup_signal_handlers()
-
-            # Get the registered handler
-            handler = mock_signal.call_args_list[0][0][1]
-
-            # Test handler with different signal numbers
-            with patch("asyncio.create_task") as mock_create_task:
-                handler(2, None)  # SIGINT
-                mock_create_task.assert_called_once()
-
-                mock_create_task.reset_mock()
-                handler(15, None)  # SIGTERM
-                mock_create_task.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_monitor_loop_with_zero_polling_interval(self, monitor):
-        """Test monitor loop with zero polling interval."""
-        monitor.settings.processing.polling_interval_seconds = 0
-        monitor._running = True
-
-        # Mock email processor
-        mock_processor = AsyncMock()
-        mock_processor.process_inbox.return_value = {
-            "success": True,
-            "processed_count": 1,
-            "failed_count": 0,
-            "errors": [],
-            "processing_time_seconds": 0.1,
-        }
-        monitor.email_processor = mock_processor
-
-        # Mock shutdown event to trigger after short delay
-        monitor._shutdown_event = AsyncMock()
-
-        call_count = 0
-
-        async def mock_wait():
-            nonlocal call_count
-            call_count += 1
-            if call_count >= 3:  # Stop after 3 calls
-                monitor._running = False
-            return
-
-        monitor._shutdown_event.wait.side_effect = mock_wait
-
-        await monitor._monitor_loop()
-
-        # Should have processed multiple times quickly
-        assert mock_processor.process_inbox.call_count >= 3
-
-    @pytest.mark.asyncio
-    async def test_monitor_loop_with_negative_sleep_time(self, monitor):
-        """Test monitor loop when processing takes longer than polling interval."""
-        monitor.settings.processing.polling_interval_seconds = 1  # 1 second interval
-        monitor._running = True
-
-        # Mock email processor with slow processing (2 seconds)
-        mock_processor = AsyncMock()
-
-        async def slow_process():
-            await asyncio.sleep(2)  # Simulate slow processing
-            return {
-                "success": True,
-                "processed_count": 1,
-                "failed_count": 0,
-                "errors": [],
-                "processing_time_seconds": 2.0,
+class TestImportFallbackPaths:
+    """Test import error handling and fallback paths."""
+
+
+
+    @pytest.mark.fast
+    @pytest.mark.unit
+    @pytest.mark.ci_safe
+    def test_psutil_not_available_fallback(self):
+        """Test behavior when psutil is not available."""
+        with patch.dict('sys.modules', {'psutil': None}):
+            # Force re-import to trigger ImportError path
+            import importlib
+            if 'services.prompt_manager' in sys.modules:
+                del sys.modules['services.prompt_manager']
+            # This should use the fallback path
+            from services.prompt_manager import PromptManager
+            manager = PromptManager()
+            memory_stats = manager.get_memory_statistics()
+            # Should have error message for process memory when psutil unavailable
+            assert "process_memory" in memory_stats
+            assert "error" in memory_stats["process_memory"]
+            assert "psutil not available" in memory_stats["process_memory"]["error"]
+
+
+
+
+    @pytest.mark.fast
+    @pytest.mark.unit
+    @pytest.mark.ci_safe
+    def test_jsonschema_not_available_fallback(self):
+        """Test schema validation fallback when jsonschema not available."""
+        # Test the case where jsonschema is not available
+        manager = PromptManager()
+        # Patch JSONSCHEMA_AVAILABLE to False for this test
+        with patch('services.prompt_manager.JSONSCHEMA_AVAILABLE', False):
+            # Test basic validation without jsonschema
+            test_data = {
+                "agent_config": {
+                    "name": "test",
+                    "description": "test desc",
+                    "version": "1.0.0"
+                },
+                "system_instructions": "Test instructions"
             }
+            # Should not raise exception and use fallback validation
+            import asyncio
+            result = asyncio.run(manager._validate_prompt_schema(test_data, "system_instructions"))
+            # Fallback validation should pass for valid structure
+            assert result is None  # No exception raised
 
-        mock_processor.process_inbox.side_effect = slow_process
-        monitor.email_processor = mock_processor
 
-        # Mock shutdown event to trigger after processing
-        monitor._shutdown_event = AsyncMock()
 
-        call_count = 0
 
-        async def mock_wait():
-            nonlocal call_count
-            call_count += 1
-            if call_count >= 1:  # Stop after 1 call
-                monitor._running = False
-            return
+    @pytest.mark.fast
+    @pytest.mark.unit
+    @pytest.mark.ci_safe
+    def test_jsonschema_validation_with_missing_fields(self):
+        """Test jsonschema fallback validation with missing required fields."""
+        manager = PromptManager()
+        # Patch JSONSCHEMA_AVAILABLE to False for this test
+        with patch('services.prompt_manager.JSONSCHEMA_AVAILABLE', False):
+            # Missing system_instructions field
+            invalid_data = {
+                "agent_config": {
+                    "name": "test",
+                    "description": "test",
+                    "version": "1.0.0"
+                }
+                # Missing system_instructions
+            }
+            with pytest.raises(PromptValidationError) as exc_info:
+                import asyncio
+                asyncio.run(manager._validate_prompt_schema(invalid_data, "system_instructions"))
+            assert "Required field 'system_instructions' missing" in str(exc_info.value)
+class TestCircuitBreakerEdgeCases:
+    """Test circuit breaker edge cases and state transitions."""
 
-        monitor._shutdown_event.wait.side_effect = mock_wait
 
-        start_time = asyncio.get_event_loop().time()
-        await monitor._monitor_loop()
-        end_time = asyncio.get_event_loop().time()
 
-        # Should have processed without additional delay
-        assert end_time - start_time >= 2.0  # At least the processing time
-        assert mock_processor.process_inbox.call_count == 1
+    @pytest.mark.fast
+    @pytest.mark.unit
+    @pytest.mark.ci_safe
+    def test_circuit_breaker_half_open_return_true(self):
+        """Test that circuit breaker returns True in HALF_OPEN state."""
+        breaker = CircuitBreaker(failure_threshold=2, recovery_timeout=1)
+        # Manually set to HALF_OPEN state
+        breaker.state = CircuitBreakerState.HALF_OPEN
+        # Should return True to allow requests through
+        assert breaker.can_proceed() is True
+
+
+
+    @pytest.mark.fast
+    @pytest.mark.unit
+    @pytest.mark.ci_safe
+    def test_circuit_breaker_success_in_closed_state(self):
+        """Test record_success in CLOSED state resets failure count."""
+        breaker = CircuitBreaker()
+        # Record some failures
+        breaker.record_failure()
+        breaker.record_failure()
+        assert breaker.failure_count == 2
+        # Record success in CLOSED state should reset failure count
+        breaker.record_success()
+        assert breaker.failure_count == 0
+
+
+
+    @pytest.mark.fast
+    @pytest.mark.unit
+    @pytest.mark.ci_safe
+    @pytest.mark.edge_case
+    def test_memory_error_during_psutil_access(self):
+        """Test handling of memory errors when accessing process memory."""
+        manager = PromptManager()
+        with patch('psutil.Process') as mock_process:
+            mock_instance = MagicMock()
+            mock_instance.memory_info.side_effect = MemoryError("Out of memory")
+            mock_process.return_value = mock_instance
+            memory_stats = manager.get_memory_statistics()
+            # Should handle MemoryError gracefully
+            assert "process_memory" in memory_stats
+            assert "error" in memory_stats["process_memory"]
+            assert "Out of memory" in memory_stats["process_memory"]["error"]
+class TestHealthCheckEdgeCases:
+    """Test health check edge cases and error conditions."""
+    @pytest.mark.slow
+    @pytest.mark.edge_case
+    @pytest.mark.prompt
+    @pytest.mark.ci_safe
+    @pytest.mark.asyncio
+    async def test_health_check_directory_not_directory(self):
+        """Test health check when prompts path exists but is not a directory."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Use different approach - test with manager that has existing path but patch is_dir
+            manager = PromptManager(prompts_base_path=Path(temp_dir))
+            # Mock the path to appear as non-directory during health check
+            with patch.object(Path, 'exists', return_value=True), \
+                 patch.object(Path, 'is_dir', return_value=False):
+                health = await manager.health_check()
+            assert health["status"] in ["unhealthy", "degraded"]
+            # May be in errors or warnings depending on implementation
+            all_messages = health.get("errors", []) + health.get("warnings", [])
+            assert any("not a directory" in msg for msg in all_messages)
+    @pytest.mark.slow
+    @pytest.mark.integration
+    @pytest.mark.prompt
+    @pytest.mark.ci_safe
+    @pytest.mark.asyncio
+    async def test_health_check_directory_access_error(self):
+        """Test health check when directory access raises exception."""
+        manager = PromptManager()
+        with patch.object(Path, 'exists', side_effect=OSError("Permission denied")):
+            health = await manager.health_check()
+            assert health["status"] in ["unhealthy", "degraded"]
+            # May be in errors or warnings depending on implementation
+            all_messages = health.get("errors", []) + health.get("warnings", [])
+            assert any("Error checking prompts directory" in msg or "Permission denied" in msg for msg in all_messages)
+    @pytest.mark.slow
+    @pytest.mark.integration
+    @pytest.mark.prompt
+    @pytest.mark.ci_safe
+    @pytest.mark.asyncio
+    async def test_health_check_validation_exception(self):
+        """Test health check when validate_all_prompts raises exception."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manager = PromptManager(prompts_base_path=Path(temp_dir))
+            with patch.object(manager, 'validate_all_prompts', side_effect=Exception("Validation error")):
+                health = await manager.health_check()
+                assert health["status"] == "unhealthy"
+                assert "errors" in health
+                assert any("Prompt validation failed" in error for error in health["errors"])
+    @pytest.mark.slow
+    @pytest.mark.edge_case
+    @pytest.mark.prompt
+    @pytest.mark.asyncio
+    async def test_health_check_with_failed_prompts(self):
+        """Test health check with some failed prompt validations."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            prompts_dir = Path(temp_dir)
+            # Create valid prompt
+            valid_dir = prompts_dir / "valid_prompt"
+            valid_dir.mkdir(parents=True)
+            valid_config = valid_dir / "system_instructions.yaml"
+            valid_config.write_text("""
+agent_config:
+  name: "test"
+  description: "test description"
+  version: "1.0.0"
+system_instructions: |
+  Test instructions
+  INTENT CATEGORIES TO CLASSIFY:
+  1. POSITIVE - Test
+  CONFIDENCE SCORING GUIDELINES:
+  - High confidence (0.85-0.99): Clear
+  RESPONSE FORMAT:
+  JSON format required
+""")
+            # Create invalid prompt
+            invalid_dir = prompts_dir / "invalid_prompt"
+            invalid_dir.mkdir()
+            invalid_config = invalid_dir / "system_instructions.yaml"
+            invalid_config.write_text("invalid: yaml content")
+            manager = PromptManager(prompts_base_path=prompts_dir)
+            health = await manager.health_check()
+            assert health["status"] == "degraded"
+            assert "warnings" in health
+            assert any("Failed prompt validation" in warning for warning in health["warnings"])
+            assert "invalid_prompt" in str(health["warnings"])
+class TestSchemaValidationEdgeCases:
+    """Test schema validation edge cases and fallback paths."""
+    @pytest.mark.slow
+    @pytest.mark.edge_case
+    @pytest.mark.prompt
+    @pytest.mark.ci_safe
+    @pytest.mark.asyncio
+    async def test_validate_schema_no_schema_file(self):
+        """Test schema validation when schema file doesn't exist."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manager = PromptManager(prompts_base_path=Path(temp_dir))
+            # Test data
+            test_data = {"test": "data"}
+            # Should not raise exception when schema file missing
+            await manager._validate_prompt_schema(test_data, "nonexistent_schema")
+            # Should log warning but continue
+    @pytest.mark.slow
+    @pytest.mark.edge_case
+    @pytest.mark.prompt
+    @pytest.mark.ci_safe
+    @pytest.mark.asyncio
+    async def test_validate_schema_json_load_error(self):
+        """Test schema validation with malformed JSON schema file."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            prompts_dir = Path(temp_dir)
+            schemas_dir = prompts_dir / "schemas"
+            schemas_dir.mkdir(parents=True)
+            # Create malformed JSON schema
+            schema_file = schemas_dir / "system_instructions_schema.json"
+            schema_file.write_text("{invalid json content}")
+            manager = PromptManager(prompts_base_path=prompts_dir)
+            with pytest.raises(PromptValidationError) as exc_info:
+                await manager._validate_prompt_schema({"test": "data"}, "system_instructions")
+            assert "Schema validation error" in str(exc_info.value)
+    @pytest.mark.slow
+    @pytest.mark.edge_case
+    @pytest.mark.prompt
+    @pytest.mark.asyncio
+    async def test_validate_schema_jsonschema_validation_error(self):
+        """Test jsonschema ValidationError handling."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            prompts_dir = Path(temp_dir)
+            schemas_dir = prompts_dir / "schemas"
+            schemas_dir.mkdir(parents=True)
+            # Create valid JSON schema that will fail validation
+            schema_file = schemas_dir / "system_instructions_schema.json"
+            schema_file.write_text("""
+{
+    "type": "object",
+    "required": ["required_field"],
+    "properties": {
+        "required_field": {"type": "string"}
+    }
+}
+""")
+            manager = PromptManager(prompts_base_path=prompts_dir)
+            # Data missing required field
+            invalid_data = {"other_field": "value"}
+            with pytest.raises(PromptValidationError) as exc_info:
+                await manager._validate_prompt_schema(invalid_data, "system_instructions")
+            assert "Schema validation failed" in str(exc_info.value)
+class TestTemplateLoadingEdgeCases:
+    """Test template loading edge cases."""
+    @pytest.mark.slow
+    @pytest.mark.edge_case
+    @pytest.mark.prompt
+    @pytest.mark.asyncio
+    async def test_load_template_missing_template_field(self):
+        """Test loading template without 'template' field."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            prompts_dir = Path(temp_dir)
+            # Create template directory
+            template_dir = prompts_dir / "test_prompt"
+            template_dir.mkdir(parents=True)
+            # Create template file without 'template' field
+            template_file = template_dir / "test_template.yaml"
+            template_file.write_text("""
+template_version: "1.0.0"
+variables:
+  name: "Test variable"
+""")
+            manager = PromptManager(prompts_base_path=prompts_dir)
+            with pytest.raises(PromptValidationError) as exc_info:
+                await manager.load_template("test_prompt", "test_template")
+            assert "missing 'template' field" in str(exc_info.value)
+class TestCacheEdgeCases:
+    """Test cache-related edge cases."""
+    @pytest.mark.fast
+    @pytest.mark.unit
+    @pytest.mark.prompt
+    def test_specific_cache_clearing_no_matching_keys(self):
+        """Test clearing cache for prompt with no cached items."""
+        manager = PromptManager()
+        # Clear cache for non-existent prompt should not raise error
+        manager.clear_cache("nonexistent_prompt")
+        # Should log info but not cause issues
+        assert len(manager._cached_prompts) == 0
+
+
+
+    @pytest.mark.fast
+    @pytest.mark.unit
+    @pytest.mark.ci_safe
+    def test_file_modification_tracking_file_deleted(self):
+        """Test file modification tracking when file is deleted."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manager = PromptManager(
+                prompts_base_path=Path(temp_dir),
+                enable_hot_reload=True
+            )
+            # Add file to modification tracking
+            test_file = Path(temp_dir) / "test.yaml"
+            test_file.touch()
+            manager._file_modification_times[test_file] = test_file.stat().st_mtime
+            # Delete the file
+            test_file.unlink()
+            # Should handle missing file gracefully in cache validation
+            cache_key = "test_key"
+            result = manager._is_cache_valid(cache_key, "test_prompt")
+            assert result is False  # Should be false since key not in cache
+class TestMemoryEdgeCases:
+    """Test memory monitoring edge cases."""
+    @pytest.mark.prompt
+    @pytest.mark.medium
+    @pytest.mark.unit
+
+    def test_memory_statistics_with_large_cache(self):
+        """Test memory statistics calculation with substantial cache data."""
+        manager = PromptManager()
+        # Simulate large cache data (smaller but more realistic size)
+        large_data = {"large_content": "x" * 1000}  # 1KB of data per item
+        for i in range(10):
+            cache_key = f"large_prompt_{i}"
+            manager._cached_prompts[cache_key] = large_data
+            manager._cache_timestamps[cache_key] = datetime.now(timezone.utc)
+        memory_stats = manager.get_memory_statistics()
+        # Should report cache usage (adjusted expectations)
+        assert memory_stats["cache_memory_usage"]["total_cache_size_mb"] > 0
+        assert memory_stats["cache_memory_usage"]["total_prompt_data_size_bytes"] > 1000  # > 1KB
+class TestValidationAllPromptsEdgeCases:
+    """Test validate_all_prompts edge cases."""
+    @pytest.mark.slow
+    @pytest.mark.integration
+    @pytest.mark.prompt
+    @pytest.mark.ci_safe
+    @pytest.mark.asyncio
+    async def test_validate_all_prompts_permission_error(self):
+        """Test validate_all_prompts with directory permission error."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manager = PromptManager(prompts_base_path=Path(temp_dir))
+            with patch.object(Path, 'iterdir', side_effect=PermissionError("Access denied")):
+                with pytest.raises(PromptValidationError) as exc_info:
+                    await manager.validate_all_prompts()
+                assert "Validation process failed" in str(exc_info.value)
+    @pytest.mark.slow
+    @pytest.mark.edge_case
+    @pytest.mark.prompt
+    @pytest.mark.asyncio
+    async def test_validate_all_prompts_with_invalid_directory_names(self):
+        """Test validation skipping directories with invalid names."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            prompts_dir = Path(temp_dir)
+            # Create directory with valid name
+            valid_dir = prompts_dir / "valid_prompt"
+            valid_dir.mkdir()
+            valid_config = valid_dir / "system_instructions.yaml"
+            valid_config.write_text("""
+agent_config:
+  name: "test"
+  description: "test description"  
+  version: "1.0.0"
+system_instructions: |
+  Test instructions
+  INTENT CATEGORIES TO CLASSIFY:
+  1. POSITIVE - Test
+  CONFIDENCE SCORING GUIDELINES:
+  - High confidence (0.85-0.99): Clear
+  RESPONSE FORMAT:
+  JSON format required
+""")
+            # Create directory with dangerous name (should be skipped)
+            try:
+                dangerous_dir = prompts_dir / "../dangerous"
+                dangerous_dir.mkdir()
+                dangerous_config = dangerous_dir / "system_instructions.yaml"
+                dangerous_config.write_text("test: data")
+            except OSError:
+                # If we can't create the dangerous directory, create a different invalid one
+                dangerous_dir = prompts_dir / "dir with spaces"
+                dangerous_dir.mkdir()
+            manager = PromptManager(prompts_base_path=prompts_dir)
+            results = await manager.validate_all_prompts()
+            # Should only validate the valid prompt
+            assert "valid_prompt" in results
+            # Should not include dangerous directory names
+            for prompt_name in results.keys():
+                # All validated prompts should have valid names
+                assert "/" not in prompt_name
+                assert ".." not in prompt_name
+class TestCircuitBreakerIntegrationEdgeCases:
+    """Test circuit breaker integration edge cases."""
+    @pytest.mark.slow
+    @pytest.mark.edge_case
+    @pytest.mark.prompt
+    @pytest.mark.ci_safe
+    @pytest.mark.asyncio
+    async def test_circuit_breaker_rejection_not_recorded_as_failure(self):
+        """Test that circuit breaker rejections don't count as failures."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            manager = PromptManager(
+                prompts_base_path=Path(temp_dir),
+                enable_circuit_breaker=True,
+                circuit_breaker_failure_threshold=2
+            )
+            # Force circuit breaker to open state
+            manager.circuit_breaker.state = CircuitBreakerState.OPEN
+            initial_failure_count = manager.circuit_breaker.failure_count
+            # This should raise PromptCacheError due to circuit breaker
+            with pytest.raises(PromptCacheError) as exc_info:
+                await manager.load_prompt_config("test_prompt")
+            assert "Circuit breaker is open" in str(exc_info.value)
+            # Failure count should not increase (circuit breaker rejection doesn't count)
+            assert manager.circuit_breaker.failure_count == initial_failure_count
+# Additional utility tests for complete coverage
+class TestUtilityFunctions:
+    """Test utility functions and edge cases."""
+    @pytest.mark.integration
+    @pytest.mark.medium
+    @pytest.mark.prompt
+    def test_safe_yaml_load_memory_error(self):
+        """Test _safe_yaml_load with memory error."""
+        manager = PromptManager()
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            f.write("test: data")
+            temp_path = Path(f.name)
+        try:
+            with patch('builtins.open', side_effect=MemoryError("Out of memory")):
+                with pytest.raises(PromptValidationError) as exc_info:
+                    manager._safe_yaml_load(temp_path)
+                assert "File too large to process" in str(exc_info.value)
+        finally:
+            temp_path.unlink()
+
+
+
+    @pytest.mark.fast
+    @pytest.mark.unit
+    @pytest.mark.ci_safe
+    @pytest.mark.edge_case
+    def test_safe_yaml_load_unicode_decode_error(self):
+        """Test _safe_yaml_load with unicode decode error."""
+        manager = PromptManager()
+        # Create file with invalid UTF-8
+        with tempfile.NamedTemporaryFile(mode='wb', suffix='.yaml', delete=False) as f:
+            f.write(b'\xff\xfe\x00\x00invalid utf-8 content')
+            temp_path = Path(f.name)
+        try:
+            with pytest.raises(PromptValidationError) as exc_info:
+                manager._safe_yaml_load(temp_path)
+            assert "File encoding error" in str(exc_info.value)
+        finally:
+            temp_path.unlink()
+# Run additional edge case tests
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

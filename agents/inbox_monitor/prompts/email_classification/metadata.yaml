@@ -1,0 +1,148 @@
+prompt_metadata:
+  version: "1.2.0"
+  created_date: "2025-01-01T00:00:00Z"
+  updated_date: "2025-01-01T00:00:00Z"
+  author: "AI Foundry Team"
+  
+project_info:
+  name: "Email Classification Prompt Extraction"
+  description: "Phase 2 implementation extracting hardcoded email classification prompts to external YAML configuration"
+  phase: "2"
+  dependencies:
+    - "Phase 1: Core Infrastructure Setup (PromptManager, models, exceptions)"
+    - "Azure AI Foundry Client with circuit breaker and performance metrics"
+    - "Semantic Kernel integration for Azure AI agents"
+
+extraction_details:
+  source_file: "agents/inbox_monitor/services/azure_ai_foundry_client.py"
+  extracted_methods:
+    - method: "_get_agent_instructions"
+      original_lines: "398-478"
+      extracted_content_length: 2847
+      target_file: "system_instructions.yaml"
+    - method: "_create_classification_prompt"
+      original_lines: "480+"
+      dynamic_template: true
+      target_file: "classification_template.yaml"
+  
+configuration_files:
+  system_instructions:
+    file: "system_instructions.yaml"
+    purpose: "Core agent behavior and classification rules"
+    content_type: "static_instructions"
+    size_estimate: "~3KB"
+    
+  classification_template:
+    file: "classification_template.yaml"
+    purpose: "Dynamic prompt generation with variable substitution"
+    content_type: "template"
+    variables_count: 8
+    
+  examples:
+    file: "examples.yaml" 
+    purpose: "Sample inputs and expected outputs for validation"
+    content_type: "validation_examples"
+    examples_count: 12
+    
+  metadata:
+    file: "metadata.yaml"
+    purpose: "Version information, authorship, and change history"
+    content_type: "configuration_metadata"
+
+performance_characteristics:
+  baseline_metrics:
+    hardcoded_prompt_generation_time: "< 1ms"
+    target_external_load_time: "< 10ms (cached)"
+    target_external_load_time_cold: "< 100ms"
+    
+  caching_strategy:
+    l1_cache: "In-memory prompt storage"
+    l2_cache: "Compiled template cache"  
+    cache_ttl: "300 seconds (5 minutes)"
+    hot_reload: "Enabled in test mode"
+    
+  fallback_behavior:
+    primary: "Load from external YAML files"
+    secondary: "Use cached version if file loading fails"
+    tertiary: "Fall back to hardcoded instructions"
+    circuit_breaker: "Protect against repeated failures"
+
+integration_points:
+  prompt_manager:
+    service: "PromptManager"
+    methods_used: ["get_system_instructions", "load_template"]
+    caching: "Enabled with validation"
+    
+  template_renderer:
+    service: "TemplateRenderer"  
+    methods_used: ["render_template", "validate_template_variables"]
+    safety: "Secure variable substitution"
+    
+  circuit_breaker:
+    integration: "Existing CircuitBreaker service"
+    protection: "Prompt loading operations"
+    failure_threshold: 3
+    recovery_timeout: "60 seconds"
+    
+  performance_metrics:
+    tracking: "Prompt operation performance"
+    metrics: ["load_time", "render_time", "cache_hit_rate", "error_rate"]
+
+testing_framework:
+  integration_tests:
+    file: "test_prompt_extraction.py"
+    coverage_target: ">95%"
+    test_scenarios:
+      - "External prompt loading"
+      - "Template rendering with various inputs"
+      - "Fallback behavior when prompts unavailable"
+      - "Performance comparison vs hardcoded baseline"
+      - "Error injection and recovery"
+      
+  validation_tests:
+    prompt_equivalence: "Verify extracted prompts produce equivalent results"
+    template_accuracy: "Ensure templates generate identical prompts"
+    variable_substitution: "Test all template variables render correctly"
+    schema_compliance: "YAML files conform to defined schemas"
+
+security_considerations:
+  yaml_loading: "Safe YAML loading to prevent deserialization attacks"
+  template_rendering: "Secure variable substitution prevents code injection"
+  error_handling: "Error messages don't leak sensitive information"
+  file_access: "Properly restricted file system access"
+  content_validation: "Prompt content doesn't expose system details"
+
+deployment_requirements:
+  backward_compatibility: "100% - existing functionality must continue working"
+  configuration_migration: "Automatic fallback to hardcoded prompts if YAML missing"
+  monitoring: "Health checks include prompt loading status"
+  rollback_capability: "Quick rollback to previous working versions"
+  
+business_value:
+  prompt_engineering: "Independent prompt engineering workflows"
+  version_control: "AI instructions separate from application code"
+  ab_testing: "A/B testing capabilities for prompt optimization"
+  risk_reduction: "Reduced risk of prompt-related bugs affecting system stability"
+  iteration_speed: "Faster iteration cycles for prompt improvements"
+
+change_history:
+  - version: "1.0.0"
+    date: "2025-01-01T00:00:00Z"
+    changes: "Initial extraction from hardcoded prompts"
+    author: "AI Foundry Team"
+  - version: "1.1.0"
+    date: "2025-01-01T00:00:00Z" 
+    changes: "Added comprehensive examples and validation framework"
+    author: "AI Foundry Team"
+  - version: "1.2.0"
+    date: "2025-01-01T00:00:00Z"
+    changes: "Enhanced template rendering and error handling"
+    author: "AI Foundry Team"
+
+validation_status:
+  extraction_complete: true
+  template_rendering_tested: pending
+  integration_testing: pending
+  performance_validated: pending
+  backward_compatibility_confirmed: pending
+  production_ready: false

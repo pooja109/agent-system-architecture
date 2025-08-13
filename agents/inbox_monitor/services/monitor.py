@@ -7,27 +7,37 @@ Main monitoring service that continuously polls the inbox for new emails.
 
 import asyncio
 import signal
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import structlog
 
-try:
-    # Try absolute imports first (for direct script execution)
-    from config.settings import AppSettings
-    from services.email_processor import EmailProcessor
-    from services.graph_api_client import GraphAPIClient
+import importlib.util
+from pathlib import Path
 
+from config.settings import AppSettings
+from services.email_processor import EmailProcessor
+from services.graph_api_client import GraphAPIClient
+from services.logging.service_logger_mixin import ServiceLoggerMixin
+
+# Import async cleanup utilities
+try:
     from utils.async_cleanup import graceful_shutdown, suppress_future_warnings
 except ImportError:
-    # Fall back to relative imports (for module execution)
-    from ..config.settings import AppSettings
-    from ..utils.async_cleanup import graceful_shutdown, suppress_future_warnings
-    from .email_processor import EmailProcessor
-    from .graph_api_client import GraphAPIClient
+    # Fallback for development/testing environments
+    current_dir = Path(__file__).parent.parent
+    utils_async_cleanup_path = current_dir / "utils" / "async_cleanup.py"
+    spec = importlib.util.spec_from_file_location("inbox_utils.async_cleanup", utils_async_cleanup_path)
+    if spec and spec.loader:
+        async_cleanup_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(async_cleanup_module)
+        graceful_shutdown = async_cleanup_module.graceful_shutdown
+        suppress_future_warnings = async_cleanup_module.suppress_future_warnings
+    else:
+        raise ImportError("Could not load async cleanup utilities")
 
 
-class InboxMonitor:
+class InboxMonitor(ServiceLoggerMixin):
     """Continuous inbox monitoring service."""
 
     def __init__(self, settings: AppSettings):
@@ -36,6 +46,9 @@ class InboxMonitor:
         Args:
             settings: Application settings
         """
+        # Initialize logging mixin
+        self.__init_logging__("inbox_monitor")
+        
         self.settings = settings
         self.logger = structlog.get_logger(__name__)
         self._running = False
@@ -76,7 +89,10 @@ class InboxMonitor:
 
         # Cleanup resources
         if self.graph_client:
-            await self.graph_client.cleanup()
+            try:
+                await self.graph_client.cleanup()
+            except Exception as e:
+                self.logger.warning("Error during graph client cleanup", extra={"error_message": str(e)})
 
         # Perform graceful shutdown
         await graceful_shutdown(timeout=5.0)
@@ -88,7 +104,7 @@ class InboxMonitor:
 
         while self._running:
             try:
-                start_time = datetime.utcnow()
+                start_time = datetime.now(timezone.utc)
 
                 self.logger.info("Starting inbox check")
 
@@ -127,7 +143,7 @@ class InboxMonitor:
                     break
 
                 # Calculate time until next run
-                processing_time = (datetime.utcnow() - start_time).total_seconds()
+                processing_time = (datetime.now(timezone.utc) - start_time).total_seconds()
                 sleep_time = max(
                     0,
                     self.settings.processing.polling_interval_seconds - processing_time,
@@ -227,7 +243,7 @@ class InboxMonitor:
         """
         health = {
             "status": "healthy" if self._running else "stopped",
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
             "graph_api_connected": False,
             "last_error": None,
         }
