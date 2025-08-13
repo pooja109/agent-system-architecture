@@ -1,0 +1,141 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "System Instructions Schema",
+  "description": "JSON schema for validating system instructions YAML configuration files",
+  "type": "object",
+  "required": [
+    "agent_config",
+    "system_instructions"
+  ],
+  "properties": {
+    "agent_config": {
+      "type": "object",
+      "required": ["name", "description", "version"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9_-]+$",
+          "description": "Agent name identifier (alphanumeric, underscores, dashes only)"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 500,
+          "description": "Agent description and purpose"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "description": "Semantic version (x.y.z format)"
+        },
+        "created_date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Configuration creation date in ISO format"
+        },
+        "updated_date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update date in ISO format"
+        },
+        "author": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Configuration author"
+        }
+      },
+      "additionalProperties": false
+    },
+    "system_instructions": {
+      "type": "string",
+      "minLength": 50,
+      "description": "Complete system instructions for the agent",
+      "pattern": "[\\s\\S]*INTENT CATEGORIES[\\s\\S]*CONFIDENCE SCORING[\\s\\S]*RESPONSE FORMAT[\\s\\S]*"
+    },
+    "confidence_scoring": {
+      "type": "object",
+      "required": ["high", "medium", "low", "very_low"],
+      "properties": {
+        "high": {
+          "$ref": "#/definitions/confidence_range"
+        },
+        "medium": {
+          "$ref": "#/definitions/confidence_range"
+        },
+        "low": {
+          "$ref": "#/definitions/confidence_range"
+        },
+        "very_low": {
+          "$ref": "#/definitions/confidence_range"
+        }
+      },
+      "additionalProperties": false
+    },
+    "response_format": {
+      "type": "object",
+      "required": ["type", "response_schema"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["json", "text", "xml"],
+          "description": "Response format type"
+        },
+        "response_schema": {
+          "type": "object",
+          "minProperties": 1,
+          "description": "Schema definition for response structure"
+        }
+      },
+      "additionalProperties": false
+    },
+    "examples": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["input", "expected_output"],
+        "properties": {
+          "input": {
+            "type": "object",
+            "description": "Example input data"
+          },
+          "expected_output": {
+            "type": "object",
+            "description": "Expected output for the input"
+          }
+        }
+      },
+      "description": "Example inputs and expected outputs"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional metadata for the prompt"
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "confidence_range": {
+      "type": "object",
+      "required": ["range", "description"],
+      "properties": {
+        "range": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0
+          },
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "Confidence range [min, max] values between 0.0 and 1.0"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 5,
+          "description": "Description of this confidence level"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

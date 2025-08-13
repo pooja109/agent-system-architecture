@@ -1,0 +1,112 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Template Configuration Schema",
+  "description": "JSON schema for validating template YAML configuration files",
+  "type": "object",
+  "required": [
+    "template_version",
+    "template"
+  ],
+  "properties": {
+    "template_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Template version in semantic version format (x.y.z)"
+    },
+    "template": {
+      "type": "string",
+      "minLength": 10,
+      "description": "Template string with variable placeholders (e.g., {variable_name})"
+    },
+    "variables": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z][a-zA-Z0-9_]*$": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "description": "Simple variable description"
+            },
+            {
+              "$ref": "#/definitions/template_variable"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "description": "Template variable definitions"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional template metadata"
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "template_variable": {
+      "type": "object",
+      "required": ["name", "description"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$",
+          "description": "Variable name (must start with letter, contain only alphanumeric and underscore)"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 5,
+          "description": "Variable description and purpose"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["string", "integer", "float", "boolean", "list", "dict"],
+          "default": "string",
+          "description": "Variable data type"
+        },
+        "required": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether variable is required"
+        },
+        "default_value": {
+          "description": "Default value if not provided"
+        },
+        "validation": {
+          "type": "object",
+          "properties": {
+            "min_length": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Minimum string length (for string type)"
+            },
+            "max_length": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Maximum string length (for string type)"
+            },
+            "pattern": {
+              "type": "string",
+              "description": "Regex pattern for validation (for string type)"
+            },
+            "min_value": {
+              "type": "number",
+              "description": "Minimum numeric value (for integer/float types)"
+            },
+            "max_value": {
+              "type": "number",
+              "description": "Maximum numeric value (for integer/float types)"
+            },
+            "allowed_values": {
+              "type": "array",
+              "description": "List of allowed values"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Validation rules for the variable"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

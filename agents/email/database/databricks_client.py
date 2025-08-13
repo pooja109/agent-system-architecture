@@ -1,122 +1,114 @@
-import logging
+import structlog
 from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime, timezone
 import uuid
 
-from databricks import sql
-from databricks.sql.client import Connection, Cursor
+try:
+    from services.pooled_service_base import PooledServiceBase
+    from services.databricks_oauth_client import DatabricksOAuthClient
+    from database.models import EmailRecord
+except ImportError:
+    from ..services.pooled_service_base import PooledServiceBase
+    from ..services.databricks_oauth_client import DatabricksOAuthClient
+    from .models import EmailRecord
 
-from config.settings import DatabricksSettings
-from database.models import EmailRecord
+logger = structlog.get_logger(__name__)
 
-logger = logging.getLogger(__name__)
-
-class DatabricksClient:
-    """Client for interacting with Databricks SQL Warehouse."""
+class DatabricksClient(PooledServiceBase):
+    """Databricks client using connection pooling for optimal performance."""
     
-    def __init__(self, settings: DatabricksSettings):
-        """Initialize Databricks client with settings."""
-        self.settings = settings
-        self.connection: Optional[Connection] = None
-        self._table_name = f"`{settings.catalog}`.`{settings.schema}`.`email_communication_pipeline{settings.table_suffix}`"
+    def __init__(self):
+        """Initialize Databricks client with connection pooling."""
+        super().__init__()
         
-    def connect(self) -> bool:
-        """Establish connection to Databricks."""
-        try:
-            self.connection = sql.connect(
-                server_hostname=self.settings.server_hostname,
-                http_path=self.settings.http_path,
-                access_token=self.settings.access_token
-            )
-            logger.info("Successfully connected to Databricks")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to connect to Databricks: {e}")
-            return False
-    
-    def disconnect(self):
-        """Close Databricks connection."""
-        if self.connection:
+        # Don't get settings in constructor since get_settings is now async
+        # Settings will be retrieved when needed
+        self._table_name = None
+        self._databricks_settings = None
+        
+    async def _ensure_settings(self):
+        """Ensure settings are loaded."""
+        if self._table_name is None:
             try:
-                self.connection.close()
-                logger.info("Disconnected from Databricks")
-            except Exception as e:
-                logger.error(f"Error disconnecting from Databricks: {e}")
-            finally:
-                self.connection = None
+                from config.settings import get_settings
+                settings = await get_settings()
+            except ImportError:
+                from ..config.settings import get_settings
+                settings = await get_settings()
+            
+            self._table_name = f"`{settings.databricks_oauth.catalog}`.`{settings.databricks_oauth.schema_name}`.`email_communication_pipeline{settings.databricks_oauth.table_suffix}`"
+            self._databricks_settings = settings.databricks_oauth
+        
+    # Connection management handled by base class and global pool
     
-    def __enter__(self):
-        """Context manager entry."""
-        self.connect()
-        return self
+    async def execute_query(self, query: str, parameters: Optional[List] = None) -> List[Dict[str, Any]]:
+        """Execute a query using pooled connection."""
+        return await self.execute_with_connection(
+            self._execute_query_impl,
+            query,
+            parameters
+        )
     
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit."""
-        self.disconnect()
-    
-    def execute_query(self, query: str, parameters: Optional[List] = None) -> List[Dict[str, Any]]:
-        """Execute a query and return results."""
-        if not self.connection:
-            raise RuntimeError("Not connected to Databricks. Call connect() first.")
+    async def _execute_query_impl(
+        self,
+        connection: DatabricksOAuthClient,
+        query: str,
+        parameters: Optional[List] = None
+    ) -> List[Dict[str, Any]]:
+        """Implementation of execute query with pooled connection."""
         
         try:
-            with self.connection.cursor() as cursor:
-                cursor.execute(query, parameters or [])
-                
-                # Get column names
-                columns = [desc[0] for desc in cursor.description] if cursor.description else []
-                
-                # Fetch all rows
-                rows = cursor.fetchall()
-                
-                # Convert to list of dictionaries
-                results = []
-                for row in rows:
-                    row_dict = dict(zip(columns, row))
-                    results.append(row_dict)
-                
-                logger.debug(f"Query executed successfully, returned {len(results)} rows")
-                return results
+            # Use secure parameter handling through OAuth client
+            if parameters:
+                # Convert parameters to dict format expected by Databricks SDK
+                param_dict = {f"param_{i}": param for i, param in enumerate(parameters)}
+                results = await connection.execute_sql_fetchall(query, param_dict)
+            else:
+                results = await connection.execute_sql_fetchall(query)
+            
+            logger.debug(f"Query executed successfully, returned {len(results)} rows")
+            return results
                 
         except Exception as e:
-            logger.error(f"Error executing query: {e}")
-            logger.error(f"Query: {query}")
-            logger.error(f"Parameters: {parameters}")
+            logger.error("Error executing query", error=str(e), query=query[:100], parameters=parameters)
             raise
     
-    def execute_update(self, query: str, parameters: Optional[List] = None) -> int:
-        """Execute an update/insert/delete query and return affected row count.
-        
-        Note: Databricks SQL connector may return -1 for rowcount on UPDATE statements.
-        This method returns 1 to indicate successful execution if no exception occurs.
-        """
-        if not self.connection:
-            raise RuntimeError("Not connected to Databricks. Call connect() first.")
+    async def execute_update(self, query: str, parameters: Optional[List] = None) -> int:
+        """Execute an update/insert/delete query using pooled connection."""
+        return await self.execute_with_connection(
+            self._execute_update_impl,
+            query,
+            parameters
+        )
+    
+    async def _execute_update_impl(
+        self,
+        connection: DatabricksOAuthClient,
+        query: str,
+        parameters: Optional[List] = None
+    ) -> int:
+        """Implementation of execute update with pooled connection."""
         
         try:
-            with self.connection.cursor() as cursor:
-                cursor.execute(query, parameters or [])
-                
-                # Databricks SQL connector often returns -1 for UPDATE statements
-                # If no exception occurred, assume the update was successful
-                affected_rows = cursor.rowcount
-                
-                if affected_rows == -1:
-                    # Databricks limitation - assume success if no exception
-                    logger.debug(f"Update query executed (Databricks returned -1 rowcount, assuming success)")
-                    return 1  # Return 1 to indicate successful execution
-                else:
-                    logger.debug(f"Update query executed successfully, affected {affected_rows} rows")
-                    return affected_rows
+            # Use secure parameter handling through OAuth client
+            if parameters:
+                # Convert parameters to dict format expected by Databricks SDK
+                param_dict = {f"param_{i}": param for i, param in enumerate(parameters)}
+                await connection.execute_sql(query, param_dict)
+            else:
+                await connection.execute_sql(query)
+            
+            # OAuth client doesn't provide rowcount - assume success if no exception
+            logger.debug("Update query executed successfully (assuming 1 row affected)")
+            return 1  # Return 1 to indicate successful execution
                 
         except Exception as e:
-            logger.error(f"Error executing update query: {e}")
-            logger.error(f"Query: {query}")
-            logger.error(f"Parameters: {parameters}")
+            logger.error("Error executing update query", error=str(e), query=query[:100], parameters=parameters)
             raise
     
-    def create_tables(self) -> bool:
+    async def create_tables(self) -> bool:
         """Create the email communication pipeline table and related objects."""
+        await self._ensure_settings()
         try:
             # Read the schema SQL file
             import os
@@ -127,9 +119,9 @@ class DatabricksClient:
             
             # Replace placeholders with actual values
             schema_sql = schema_sql.format(
-                catalog=self.settings.catalog,
-                schema=self.settings.schema,
-                table_suffix=self.settings.table_suffix
+                catalog=self._databricks_settings.catalog,
+                schema=self._databricks_settings.schema_name,
+                table_suffix=self._databricks_settings.table_suffix
             )
             
             # Split into individual statements
@@ -138,18 +130,19 @@ class DatabricksClient:
             # Execute each statement
             for statement in statements:
                 if statement:
-                    self.execute_update(statement)
+                    await self.execute_update(statement)
                     logger.info(f"Executed: {statement[:50]}...")
             
             logger.info("Successfully created tables and views")
             return True
             
         except Exception as e:
-            logger.error(f"Failed to create tables: {e}")
+            logger.error("Failed to create tables", error=str(e))
             return False
     
-    def get_pending_emails(self, limit: int = 100) -> List[EmailRecord]:
+    async def get_pending_emails(self, limit: int = 100) -> List[EmailRecord]:
         """Get pending emails that need to be processed."""
+        await self._ensure_settings()
         query = f"""
         SELECT 
             batch_id, run_date, agent_name, status, input_file, output_file,
@@ -167,7 +160,7 @@ class DatabricksClient:
         """
         
         try:
-            results = self.execute_query(query)
+            results = await self.execute_query(query)
             
             email_records = []
             for row in results:
@@ -207,14 +200,15 @@ class DatabricksClient:
             return email_records
             
         except Exception as e:
-            logger.error(f"Failed to get pending emails: {e}")
+            logger.error("Failed to get pending emails", error=str(e))
             raise
     
-    def update_email_sent(self, batch_id: int, customer_id: str, 
+    async def update_email_sent(self, batch_id: int, customer_id: str, 
                          sent_email_id: str, recipient_email: str, subject: str,
                          acs_message_id: Optional[str] = None, 
                          send_status: str = "sent") -> bool:
         """Update record after successful email send."""
+        await self._ensure_settings()
         try:
             current_time = datetime.now(timezone.utc)
             
@@ -222,30 +216,18 @@ class DatabricksClient:
             UPDATE {self._table_name}
             SET 
                 is_email_sent = true,
-                sent_email_id = ?,
-                recipient_email = ?,
-                subject = ?,
-                send_timestamp = ?,
-                send_status = ?,
-                acs_message_id = ?,
-                updated_at = ?,
+                sent_email_id = '{sent_email_id}',
+                recipient_email = '{recipient_email}',
+                subject = '{subject.replace("'", "''")}',
+                send_timestamp = '{current_time.isoformat()}',
+                send_status = '{send_status}',
+                acs_message_id = '{acs_message_id or ""}',
+                updated_at = '{current_time.isoformat()}',
                 error_message = NULL
-            WHERE batch_id = ? AND customer_id = ?
+            WHERE batch_id = {batch_id} AND customer_id = '{customer_id}'
             """
             
-            parameters = [
-                sent_email_id,
-                recipient_email, 
-                subject,
-                current_time,
-                send_status,
-                acs_message_id,
-                current_time,
-                batch_id,
-                customer_id
-            ]
-            
-            affected_rows = self.execute_update(query, parameters)
+            affected_rows = await self.execute_update(query)
             
             if affected_rows > 0:
                 logger.info(f"Updated email sent status for batch_id={batch_id}, customer_id={customer_id}")
@@ -255,40 +237,34 @@ class DatabricksClient:
                 return False
                 
         except Exception as e:
-            logger.error(f"Failed to update email sent status: {e}")
+            logger.error("Failed to update email sent status", error=str(e))
             return False
     
-    def update_email_failed(self, batch_id: int, customer_id: str, 
+    async def update_email_failed(self, batch_id: int, customer_id: str, 
                            error_message: str, attempted_email: Optional[str] = None) -> bool:
         """Update record after failed email send."""
+        await self._ensure_settings()
         try:
             current_time = datetime.now(timezone.utc)
             sent_email_id = str(uuid.uuid4())  # Generate ID for tracking even failed attempts
+            
+            # Escape single quotes in error message
+            escaped_error = error_message.replace("'", "''")
             
             query = f"""
             UPDATE {self._table_name}
             SET 
                 is_email_sent = false,
-                sent_email_id = ?,
-                recipient_email = ?,
-                send_timestamp = ?,
+                sent_email_id = '{sent_email_id}',
+                recipient_email = '{attempted_email or ""}',
+                send_timestamp = '{current_time.isoformat()}',
                 send_status = 'failed',
-                error_message = ?,
-                updated_at = ?
-            WHERE batch_id = ? AND customer_id = ?
+                error_message = '{escaped_error}',
+                updated_at = '{current_time.isoformat()}'
+            WHERE batch_id = {batch_id} AND customer_id = '{customer_id}'
             """
             
-            parameters = [
-                sent_email_id,
-                attempted_email,
-                current_time,
-                error_message,
-                current_time,
-                batch_id,
-                customer_id
-            ]
-            
-            affected_rows = self.execute_update(query, parameters)
+            affected_rows = await self.execute_update(query)
             
             if affected_rows > 0:
                 logger.info(f"Updated email failed status for batch_id={batch_id}, customer_id={customer_id}")
@@ -298,11 +274,12 @@ class DatabricksClient:
                 return False
                 
         except Exception as e:
-            logger.error(f"Failed to update email failed status: {e}")
+            logger.error("Failed to update email failed status", error=str(e))
             return False
     
-    def get_email_stats(self, days: int = 7) -> Dict[str, Any]:
+    async def get_email_stats(self, days: int = 7) -> Dict[str, Any]:
         """Get email processing statistics for the last N days."""
+        await self._ensure_settings()
         query = f"""
         SELECT 
             send_status,
@@ -317,7 +294,7 @@ class DatabricksClient:
         """
         
         try:
-            results = self.execute_query(query)
+            results = await self.execute_query(query)
             
             stats = {
                 'total_processed': 0,
@@ -329,7 +306,7 @@ class DatabricksClient:
             }
             
             for row in results:
-                count = row['count']
+                count = int(row['count'])  # Ensure count is an integer
                 stats['total_processed'] += count
                 
                 if row['send_status'] == 'sent':
@@ -345,11 +322,12 @@ class DatabricksClient:
             return stats
             
         except Exception as e:
-            logger.error(f"Failed to get email stats: {e}")
+            logger.error("Failed to get email stats", error=str(e))
             return {'error': str(e)}
     
-    def get_communication_records_for_customer(self, batch_id: int, customer_id: str) -> List[EmailRecord]:
+    async def get_communication_records_for_customer(self, batch_id: int, customer_id: str) -> List[EmailRecord]:
         """Get all communication records for a specific customer and batch."""
+        await self._ensure_settings()
         query = f"""
         SELECT 
             batch_id, run_date, agent_name, status, input_file, output_file,
@@ -359,14 +337,14 @@ class DatabricksClient:
             blob_date_folder, json_file_path, html_file_path,
             created_at, updated_at, processed_by
         FROM {self._table_name}
-        WHERE batch_id = ? 
-            AND customer_id = ? 
+        WHERE batch_id = {batch_id} 
+            AND customer_id = '{customer_id}' 
             AND agent_name = 'communication'
         ORDER BY created_at ASC
         """
         
         try:
-            results = self.execute_query(query, [batch_id, customer_id])
+            results = await self.execute_query(query)
             
             email_records = []
             for row in results:
@@ -405,45 +383,37 @@ class DatabricksClient:
             return email_records
             
         except Exception as e:
-            logger.error(f"Failed to get communication records for customer: {e}")
+            logger.error("Failed to get communication records for customer", error=str(e))
             return []
     
-    def update_all_customer_records_sent(self, batch_id: int, customer_id: str, 
+    async def update_all_customer_records_sent(self, batch_id: int, customer_id: str, 
                                        sent_email_id: str, recipient_email: str, subject: str,
                                        acs_message_id: Optional[str] = None, 
                                        send_status: str = "sent") -> bool:
         """Update all communication records for a customer after successful email send."""
+        await self._ensure_settings()
         try:
             current_time = datetime.now(timezone.utc)
+            
+            # Escape single quotes in subject
+            escaped_subject = subject.replace("'", "''")
             
             query = f"""
             UPDATE {self._table_name}
             SET 
                 is_email_sent = true,
-                sent_email_id = ?,
-                recipient_email = ?,
-                subject = ?,
-                send_timestamp = ?,
-                send_status = ?,
-                acs_message_id = ?,
-                updated_at = ?,
+                sent_email_id = '{sent_email_id}',
+                recipient_email = '{recipient_email}',
+                subject = '{escaped_subject}',
+                send_timestamp = '{current_time.isoformat()}',
+                send_status = '{send_status}',
+                acs_message_id = '{acs_message_id or ""}',
+                updated_at = '{current_time.isoformat()}',
                 error_message = NULL
-            WHERE batch_id = ? AND customer_id = ? AND agent_name = 'communication'
+            WHERE batch_id = {batch_id} AND customer_id = '{customer_id}' AND agent_name = 'communication'
             """
             
-            parameters = [
-                sent_email_id,
-                recipient_email, 
-                subject,
-                current_time.isoformat(),
-                send_status,
-                acs_message_id,
-                current_time.isoformat(),
-                batch_id,
-                str(customer_id)
-            ]
-            
-            affected_rows = self.execute_update(query, parameters)
+            affected_rows = await self.execute_update(query)
             
             if affected_rows > 0:
                 logger.info(f"Updated communication records for batch_id={batch_id}, customer_id={customer_id}")
@@ -453,40 +423,34 @@ class DatabricksClient:
                 return False
                 
         except Exception as e:
-            logger.error(f"Failed to update all customer records: {e}")
+            logger.error("Failed to update all customer records", error=str(e))
             return False
     
-    def update_all_customer_records_failed(self, batch_id: int, customer_id: str, 
+    async def update_all_customer_records_failed(self, batch_id: int, customer_id: str, 
                                          error_message: str, attempted_email: Optional[str] = None) -> bool:
         """Update all communication records for a customer after failed email send."""
+        await self._ensure_settings()
         try:
             current_time = datetime.now(timezone.utc)
             sent_email_id = str(uuid.uuid4())  # Generate ID for tracking even failed attempts
+            
+            # Escape single quotes in error message
+            escaped_error = error_message.replace("'", "''")
             
             query = f"""
             UPDATE {self._table_name}
             SET 
                 is_email_sent = false,
-                sent_email_id = ?,
-                recipient_email = ?,
-                send_timestamp = ?,
+                sent_email_id = '{sent_email_id}',
+                recipient_email = '{attempted_email or ""}',
+                send_timestamp = '{current_time.isoformat()}',
                 send_status = 'failed',
-                error_message = ?,
-                updated_at = ?
-            WHERE batch_id = ? AND customer_id = ? AND agent_name = 'communication'
+                error_message = '{escaped_error}',
+                updated_at = '{current_time.isoformat()}'
+            WHERE batch_id = {batch_id} AND customer_id = '{customer_id}' AND agent_name = 'communication'
             """
             
-            parameters = [
-                sent_email_id,
-                attempted_email,
-                current_time.isoformat(),
-                error_message,
-                current_time.isoformat(),
-                batch_id,
-                str(customer_id)
-            ]
-            
-            affected_rows = self.execute_update(query, parameters)
+            affected_rows = await self.execute_update(query)
             
             if affected_rows > 0:
                 logger.info(f"Updated communication records as failed for batch_id={batch_id}, customer_id={customer_id}")
@@ -496,15 +460,24 @@ class DatabricksClient:
                 return False
                 
         except Exception as e:
-            logger.error(f"Failed to update all customer records as failed: {e}")
+            logger.error("Failed to update all customer records as failed", error=str(e))
             return False
 
-    def test_connection(self) -> bool:
-        """Test the Databricks connection."""
+    async def test_connection(self) -> bool:
+        """Test the Databricks OAuth connection."""
         try:
-            query = "SELECT 1 as test"
-            result = self.execute_query(query)
-            return len(result) == 1 and result[0]['test'] == 1
+            # Use connection pool to test connectivity
+            return await self.execute_with_connection(
+                self._test_connection_impl
+            )
         except Exception as e:
-            logger.error(f"Connection test failed: {e}")
+            logger.error("Connection test failed", error=str(e))
+            return False
+    
+    async def _test_connection_impl(self, connection: DatabricksOAuthClient) -> bool:
+        """Implementation of connection test with pooled connection."""
+        try:
+            return await connection.test_connection()
+        except Exception as e:
+            logger.error("Connection test implementation failed", error=str(e))
             return False

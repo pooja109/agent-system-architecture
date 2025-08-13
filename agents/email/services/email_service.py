@@ -5,21 +5,22 @@ import uuid
 from datetime import datetime
 
 from config.settings import AppSettings
-from database.databricks_client import DatabricksClient
 from database.models import EmailRecord, EmailContent, EmailSendResult, ResearchOutput
 from email_clients.azure_email_client import AzureEmailClient
 from services.blob_service import BlobStorageService
 from services.test_mode_service import TestModeService
+from services.pooled_service_base import PooledServiceBase
 
 logger = logging.getLogger(__name__)
 
-class EmailService:
+class EmailService(PooledServiceBase):
     """Main service for processing and sending emails."""
     
-    def __init__(self, settings: AppSettings):
+    def __init__(self, databricks_client, settings: AppSettings):
         """Initialize email service with all required clients."""
+        super().__init__()
+        self.databricks_client = databricks_client  # Store for compatibility
         self.settings = settings
-        self.databricks_client = DatabricksClient(settings.databricks)
         self.azure_email_client = AzureEmailClient(settings.azure_communication)
         self.blob_service = BlobStorageService(settings.azure_storage)
         self.test_mode_service = TestModeService(settings)
@@ -27,12 +28,15 @@ class EmailService:
     async def initialize(self) -> bool:
         """Initialize all service connections."""
         try:
-            # Test Databricks connection
-            if not self.databricks_client.connect():
-                logger.error("Failed to connect to Databricks")
-                return False
+            # Initialize connection pool reference
+            from services.databricks_connection_pool import get_connection_pool
+            self._connection_pool = await get_connection_pool()
             
-            if not self.databricks_client.test_connection():
+            # Initialize the databricks client's connection pool as well
+            self.databricks_client._connection_pool = self._connection_pool
+            
+            # Test Databricks connection
+            if not await self.databricks_client.test_connection():
                 logger.error("Databricks connection test failed")
                 return False
             
@@ -56,8 +60,7 @@ class EmailService:
     def cleanup(self):
         """Clean up service connections."""
         try:
-            if self.databricks_client:
-                self.databricks_client.disconnect()
+            # Connection pool cleanup handled globally, no individual cleanup needed
             logger.info("Email service cleanup completed")
         except Exception as e:
             logger.error(f"Error during email service cleanup: {e}")
@@ -67,8 +70,8 @@ class EmailService:
         batch_size = batch_size or self.settings.processing.batch_size
         
         try:
-            # Get pending email records
-            pending_records = self.databricks_client.get_pending_emails(limit=batch_size)
+            # Get pending email records using DatabricksClient
+            pending_records = await self.databricks_client.get_pending_emails(limit=batch_size)
             
             if not pending_records:
                 logger.info("No pending emails to process")
@@ -133,7 +136,7 @@ class EmailService:
                 logger.error(error_msg)
                 
                 # Update all communication records with failure
-                self.databricks_client.update_all_customer_records_failed(
+                await self.databricks_client.update_all_customer_records_failed(
                     record.batch_id, 
                     record.customer_id, 
                     error_msg
@@ -169,7 +172,7 @@ class EmailService:
             # Step 3: Update all communication records for this customer
             if send_result.success:
                 # Update all communication records with success
-                success = self.databricks_client.update_all_customer_records_sent(
+                success = await self.databricks_client.update_all_customer_records_sent(
                     batch_id=record.batch_id,
                     customer_id=record.customer_id,
                     sent_email_id=send_result.message_id or str(uuid.uuid4()),
@@ -199,7 +202,7 @@ class EmailService:
                     }
             else:
                 # Update all communication records with failure
-                self.databricks_client.update_all_customer_records_failed(
+                await self.databricks_client.update_all_customer_records_failed(
                     batch_id=record.batch_id,
                     customer_id=record.customer_id,
                     error_message=send_result.error_message or "Unknown send error",
@@ -221,7 +224,7 @@ class EmailService:
             
             # Try to update all communication records with failure
             try:
-                self.databricks_client.update_all_customer_records_failed(
+                await self.databricks_client.update_all_customer_records_failed(
                     record.batch_id, 
                     record.customer_id, 
                     error_msg
@@ -240,7 +243,7 @@ class EmailService:
         """Load email content from blob storage by finding all related communication records."""
         try:
             # Get all communication records for this customer/batch to find the JSON and HTML files
-            all_comm_records = self.databricks_client.get_communication_records_for_customer(
+            all_comm_records = await self.databricks_client.get_communication_records_for_customer(
                 record.batch_id, record.customer_id
             )
             
@@ -386,10 +389,10 @@ class EmailService:
                 'error': str(e)
             }
     
-    def get_processing_stats(self, days: int = 7) -> Dict[str, Any]:
+    async def get_processing_stats(self, days: int = 7) -> Dict[str, Any]:
         """Get email processing statistics."""
         try:
-            stats = self.databricks_client.get_email_stats(days)
+            stats = await self.databricks_client.get_email_stats(days)
             return stats
         except Exception as e:
             logger.error(f"Error getting processing stats: {e}")

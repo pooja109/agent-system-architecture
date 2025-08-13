@@ -7,6 +7,7 @@ from typing import Optional
 
 from config.settings import get_settings, validate_settings
 from services.email_service import EmailService
+from database.databricks_client import DatabricksClient
 
 logger = logging.getLogger(__name__)
 
@@ -15,18 +16,22 @@ class SimpleEmailProcessor:
     
     def __init__(self):
         """Initialize the simple email processor."""
-        self.settings = get_settings()
+        self.settings = None  # Will be loaded async in initialize()
         self.email_service: Optional[EmailService] = None
     
     async def initialize(self) -> bool:
         """Initialize the email processor and all services."""
         try:
+            # Load settings asynchronously
+            self.settings = await get_settings()
+            
             # Validate settings
             validate_settings(self.settings)
             logger.info("Settings validation passed")
             
-            # Initialize email service
-            self.email_service = EmailService(self.settings)
+            # Initialize email service with DatabricksClient
+            db_client = DatabricksClient()
+            self.email_service = EmailService(db_client, self.settings)
             
             if not await self.email_service.initialize():
                 logger.error("Failed to initialize email service")

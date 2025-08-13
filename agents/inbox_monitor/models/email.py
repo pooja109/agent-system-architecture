@@ -5,7 +5,7 @@ Email Models
 Pydantic models for email data structures used in the inbox monitor.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
@@ -65,7 +65,7 @@ class ProcessingMetadata(BaseModel):
     inbox_monitor_version: str = Field(..., description="Version of inbox monitor")
     processing_id: str = Field(..., description="Unique processing ID")
     processing_timestamp: datetime = Field(
-        default_factory=datetime.utcnow, description="When the email was processed"
+        default_factory=lambda: datetime.now(timezone.utc), description="When the email was processed"
     )
     source_folder: str = Field(default="Inbox", description="Source folder name")
     retry_count: int = Field(default=0, description="Number of processing retries")
@@ -107,7 +107,7 @@ class Email(BaseModel):
     # Processing metadata
     processing_metadata: ProcessingMetadata = Field(..., description="Metadata about processing")
 
-    model_config = {"json_encoders": {datetime: lambda v: v.isoformat() + "Z"}}
+    # Removed deprecated json_encoders - using custom serialization in to_ai_format() instead
 
     def to_ai_format(self) -> dict[str, Any]:
         """Convert to format suitable for AI processing."""
@@ -146,6 +146,9 @@ class ProcessingResult(BaseModel):
     success: bool = Field(..., description="Whether processing succeeded")
     email_id: str = Field(..., description="ID of processed email")
     processing_id: str = Field(..., description="Unique processing ID")
+    sender_email: str | None = Field(None, description="Email sender address")
+    sender_name: str | None = Field(None, description="Email sender display name")
+    subject: str | None = Field(None, description="Email subject")
     error: str | None = Field(None, description="Error message if failed")
     moved_to_folder: str | None = Field(None, description="Folder where email was moved")
     output_location: str | None = Field(None, description="Where processed email was stored")
@@ -160,3 +163,8 @@ class ProcessingResult(BaseModel):
     emails_sent: list[str] = Field(
         default_factory=list, description="Emails sent during processing"
     )
+
+
+# Aliases for backwards compatibility and different naming conventions
+EmailMessage = Email
+ProcessedEmail = ProcessingResult

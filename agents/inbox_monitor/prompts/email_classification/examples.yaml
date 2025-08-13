@@ -1,0 +1,136 @@
+examples_version: "1.0.0"
+
+classification_examples:
+  positive_examples:
+    - input:
+        subject: "Re: Your proposal"
+        body: "This looks interesting, can we schedule a call to discuss further?"
+        sender_email: "john.doe@acme.com"
+      expected_output:
+        intent: "positive"
+        confidence: 0.92
+        reasoning: "Customer explicitly requests further engagement and shows interest"
+        detected_phrases: ["looks interesting", "schedule a call", "discuss further"]
+    
+    - input:
+        subject: "Re: Partnership opportunity"  
+        body: "I'd like to learn more about this. Please send me additional information."
+        sender_email: "sarah.jones@techcorp.com"
+      expected_output:
+        intent: "positive"
+        confidence: 0.88
+        reasoning: "Clear request for more information indicating genuine interest"
+        detected_phrases: ["like to learn more", "send me additional information"]
+
+  negative_examples:
+    - input:
+        subject: "Remove me"
+        body: "Please remove me from your mailing list. I'm not interested."
+        sender_email: "jane.smith@company.org"
+      expected_output:
+        intent: "negative"
+        confidence: 0.95
+        reasoning: "Clear request to stop communication with explicit disinterest"
+        detected_phrases: ["remove me", "not interested"]
+    
+    - input:
+        subject: "Unsubscribe"
+        body: "Stop sending me these emails. I don't want your services."
+        sender_email: "bob.wilson@enterprise.edu"
+      expected_output:
+        intent: "negative"
+        confidence: 0.93
+        reasoning: "Direct request to stop with rejection of services"
+        detected_phrases: ["stop sending", "don't want your services"]
+
+  service_inquiry_examples:
+    - input:
+        subject: "Question about my account"
+        body: "Hi, I have a question about my current subscription. Can someone help?"
+        sender_email: "customer@business.com"
+      expected_output:
+        intent: "service_inquiry"
+        confidence: 0.90
+        reasoning: "Clear service question about existing relationship"
+        detected_phrases: ["question about my account", "current subscription", "can someone help"]
+    
+    - input:
+        subject: "Billing issue"
+        body: "I was charged twice last month. Please check my billing."
+        sender_email: "finance@company.net"
+      expected_output:
+        intent: "service_inquiry"
+        confidence: 0.91
+        reasoning: "Specific billing problem requiring support assistance"
+        detected_phrases: ["charged twice", "check my billing"]
+
+  out_of_office_examples:
+    - input:
+        subject: "Out of Office AutoReply"
+        body: "I am currently out of the office and will return on Monday, March 15th. For urgent matters, please contact my assistant."
+        sender_email: "executive@corporation.com"
+      expected_output:
+        intent: "out_of_office"
+        confidence: 0.98
+        reasoning: "Clear automated out-of-office message with return date"
+        detected_phrases: ["out of the office", "will return on", "for urgent matters"]
+
+  email_invalid_examples:
+    - input:
+        subject: "Mail delivery failed: returning message to sender"
+        body: "This message was created automatically by mail delivery software. A message that you sent could not be delivered to one or more of its recipients."
+        sender_email: "MAILER-DAEMON@mailserver.com"
+      expected_output:
+        intent: "email_invalid"
+        confidence: 0.96
+        reasoning: "System-generated bounce message indicating delivery failure"
+        detected_phrases: ["mail delivery failed", "could not be delivered", "MAILER-DAEMON"]
+
+  no_longer_works_examples:
+    - input:
+        subject: "No longer with company"
+        body: "John Smith is no longer with our organization. Please direct future correspondence to our general inquiries team."
+        sender_email: "hr@company.com"
+      expected_output:
+        intent: "no_longer_works"
+        confidence: 0.94
+        reasoning: "Notification that contact person has left the organization"
+        detected_phrases: ["no longer with", "direct future correspondence"]
+
+edge_cases:
+  minimal_content_corporate:
+    - input:
+        subject: "Test"
+        body: "Test"
+        sender_email: "developer@techcompany.com"
+      expected_output:
+        intent: "service_inquiry"
+        confidence: 0.45
+        reasoning: "Minimal content from corporate domain should default to service inquiry, not invalid"
+        detected_phrases: ["test"]
+        notes: "Corporate emails with minimal content should not be classified as EMAIL_INVALID"
+
+  ambiguous_intent:
+    - input:
+        subject: "Thanks"
+        body: "Thanks."
+        sender_email: "contact@business.org"
+      expected_output:
+        intent: "service_inquiry"
+        confidence: 0.35
+        reasoning: "Ambiguous minimal response from legitimate corporate domain"
+        detected_phrases: ["thanks"]
+        notes: "When unclear, prefer service_inquiry for corporate domains"
+
+validation_guidelines:
+  - "Corporate domain emails (.com, .org, .edu) should rarely be classified as EMAIL_INVALID"
+  - "Minimal content from real people should default to SERVICE_INQUIRY when intent is unclear"
+  - "Only classify EMAIL_INVALID for actual system-generated bounce messages"
+  - "Confidence scores should reflect the clarity of intent determination"
+  - "Always provide reasoning that explains the classification logic"
+
+metadata:
+  description: "Classification examples for email intent analysis"
+  use_case: "Training and validation reference for email classification"
+  last_updated: "2025-01-01T00:00:00Z"
+  version_notes: "Comprehensive examples covering all intent categories with edge cases"

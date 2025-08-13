@@ -21,7 +21,9 @@ import argparse
 import logging
 import sys
 import os
+import json
 from typing import Optional
+from aiohttp import web, ClientSession
 
 # Add the current directory to Python path for imports
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -29,8 +31,10 @@ sys.path.insert(0, current_dir)
 
 from config.settings import get_settings, validate_settings
 from services.email_service import EmailService
+from services.databricks_connection_pool import initialize_connection_pool, shutdown_connection_pool
 from database.databricks_client import DatabricksClient
 from simple_processor import SimpleEmailProcessor
+from services.health_check_service import HealthCheckService
 
 def setup_logging(level: str = "INFO", format_type: str = "json"):
     """Set up logging configuration."""
@@ -67,15 +71,195 @@ def setup_logging(level: str = "INFO", format_type: str = "json"):
             stream=sys.stdout
         )
 
+
+# Health Check HTTP Endpoints
+async def health_check_handler(request: web.Request) -> web.Response:
+    """Simple health check endpoint for load balancers."""
+    try:
+        health_service = HealthCheckService()
+        health_status = await health_service.get_simple_health_status()
+        
+        status_code = 200 if health_status["status"] == "HEALTHY" else 503
+        
+        return web.Response(
+            text=json.dumps(health_status, indent=2),
+            status=status_code,
+            content_type="application/json"
+        )
+    except Exception as e:
+        return web.Response(
+            text=json.dumps({
+                "status": "UNHEALTHY",
+                "error": str(e),
+                "timestamp": "unknown"
+            }, indent=2),
+            status=503,
+            content_type="application/json"
+        )
+
+
+async def health_detailed_handler(request: web.Request) -> web.Response:
+    """Detailed health check endpoint with comprehensive system information."""
+    try:
+        health_service = HealthCheckService()
+        health_status = await health_service.get_comprehensive_health_status()
+        
+        status_code = 200 if health_status["overall_status"] == "HEALTHY" else 503
+        
+        return web.Response(
+            text=json.dumps(health_status, indent=2),
+            status=status_code,
+            content_type="application/json"
+        )
+    except Exception as e:
+        return web.Response(
+            text=json.dumps({
+                "overall_status": "UNHEALTHY",
+                "error": str(e),
+                "timestamp": "unknown",
+                "components": []
+            }, indent=2),
+            status=503,
+            content_type="application/json"
+        )
+
+
+async def readiness_handler(request: web.Request) -> web.Response:
+    """Kubernetes readiness probe endpoint."""
+    try:
+        health_service = HealthCheckService()
+        readiness_status = await health_service.get_readiness_status()
+        
+        status_code = 200 if readiness_status["ready"] else 503
+        
+        return web.Response(
+            text=json.dumps(readiness_status, indent=2),
+            status=status_code,
+            content_type="application/json"
+        )
+    except Exception as e:
+        return web.Response(
+            text=json.dumps({
+                "ready": False,
+                "status": "NOT_READY",
+                "error": str(e),
+                "timestamp": "unknown"
+            }, indent=2),
+            status=503,
+            content_type="application/json"
+        )
+
+
+async def create_health_check_server(port: int = 8081) -> web.Application:
+    """Create health check HTTP server."""
+    app = web.Application()
+    
+    # Add health check routes
+    app.router.add_get("/health", health_check_handler)
+    app.router.add_get("/health/detailed", health_detailed_handler)
+    app.router.add_get("/ready", readiness_handler)
+    
+    # Add root route for basic info
+    async def root_handler(request: web.Request) -> web.Response:
+        return web.Response(
+            text=json.dumps({
+                "service": "email",
+                "status": "running",
+                "oauth_migration": "enabled",
+                "connection_pooling": "enabled",
+                "endpoints": {
+                    "health": "/health",
+                    "detailed_health": "/health/detailed", 
+                    "readiness": "/ready"
+                }
+            }, indent=2),
+            content_type="application/json"
+        )
+    
+    app.router.add_get("/", root_handler)
+    
+    return app
+
+
 async def run_continuous():
-    """Run the email processor continuously."""
-    print("🚀 For continuous processing, use: python run_email_processor.py")
-    print("⚠️  The continuous mode with full scheduling requires the email_processor module")
-    print("💡 For now, you can run: python main.py process (to process once)")
-    return True
+    """Run the email processor continuously with health check server."""
+    settings = await get_settings()
+    validate_settings(settings)
+    
+    print("🚀 Starting Email Agent with OAuth Migration and Health Monitoring")
+    print("⚠️  For full scheduling, consider using the email_processor module")
+    
+    try:
+        # Initialize connection pool
+        await initialize_connection_pool(
+            settings.databricks_oauth,
+            settings.key_vault
+        )
+        print("✅ Connection pool initialized")
+        
+        # Start health check server if enabled
+        runner = None
+        if settings.monitoring.health_check_enabled:
+            health_port = int(os.getenv("HEALTH_CHECK_PORT", "8081"))
+            health_app = await create_health_check_server(health_port)
+            runner = web.AppRunner(health_app)
+            await runner.setup()
+            site = web.TCPSite(runner, "0.0.0.0", health_port)
+            await site.start()
+            print(f"🏥 Health check server started on port {health_port}")
+            print(f"   Health endpoints: http://localhost:{health_port}/health")
+            print(f"   Detailed health: http://localhost:{health_port}/health/detailed")
+            print(f"   Readiness probe: http://localhost:{health_port}/ready")
+        else:
+            print("🚫 Health check endpoints disabled (HEALTH_CHECK_ENABLED=false)")
+        
+        print("✅ Email agent running with health monitoring")
+        print("💡 Use 'python main.py process' to process emails once")
+        print("🛑 Press Ctrl+C to stop...")
+        
+        # Keep running until interrupted
+        try:
+            while True:
+                await asyncio.sleep(1)
+        except KeyboardInterrupt:
+            print("\n🛑 Shutting down...")
+        
+        # Cleanup
+        if runner is not None:
+            print("🏥 Shutting down health check server...")
+            try:
+                await runner.cleanup()
+            except Exception as e:
+                print(f"⚠️  Error stopping health check server: {e}")
+        else:
+            print("🏥 No health check server to shutdown")
+        
+        print("🔧 Shutting down connection pool...")
+        await shutdown_connection_pool()
+        print("✅ Email agent stopped successfully")
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ Email agent failed: {e}")
+        try:
+            await shutdown_connection_pool()
+        except:
+            pass
+        return False
 
 async def process_once():
     """Process emails once and exit."""
+    settings = await get_settings()
+    validate_settings(settings)
+    
+    # Initialize connection pool for processing
+    await initialize_connection_pool(
+        settings.databricks_oauth,
+        settings.key_vault,
+        settings.connection_pool
+    )
+    
     processor = SimpleEmailProcessor()
     
     try:
@@ -113,9 +297,20 @@ async def process_once():
         return False
     finally:
         await processor.cleanup()
+        await shutdown_connection_pool()
 
 async def send_test_email(email: str):
     """Send a test email."""
+    settings = await get_settings()
+    validate_settings(settings)
+    
+    # Initialize connection pool for testing
+    await initialize_connection_pool(
+        settings.databricks_oauth,
+        settings.key_vault,
+        settings.connection_pool
+    )
+    
     processor = SimpleEmailProcessor()
     
     try:
@@ -138,22 +333,33 @@ async def send_test_email(email: str):
         return False
     finally:
         await processor.cleanup()
+        await shutdown_connection_pool()
 
 async def setup_database():
     """Set up database tables."""
     try:
         print("🔧 Setting up database tables...")
         
-        settings = get_settings()
+        settings = await get_settings()
         validate_settings(settings)
         
-        with DatabricksClient(settings.databricks) as client:
-            if client.create_tables():
-                print("✅ Database tables created successfully!")
-                return True
-            else:
-                print("❌ Failed to create database tables")
-                return False
+        # Initialize connection pool for database operations
+        await initialize_connection_pool(
+            settings.databricks_oauth,
+            settings.key_vault,
+            settings.connection_pool
+        )
+        
+        try:
+            async with DatabricksClient() as client:
+                if await client.create_tables():
+                    print("✅ Database tables created successfully!")
+                    return True
+                else:
+                    print("❌ Failed to create database tables")
+                    return False
+        finally:
+            await shutdown_connection_pool()
                 
     except Exception as e:
         print(f"❌ Error setting up database: {e}")
@@ -165,7 +371,7 @@ async def show_status():
         print("📊 System Status")
         print("=" * 50)
         
-        settings = get_settings()
+        settings = await get_settings()
         
         # Validate settings
         try:
@@ -178,27 +384,46 @@ async def show_status():
         # Test connections
         print("\n🔗 Connection Tests:")
         
-        # Test Databricks
+        # Initialize connection pool for all tests
         try:
-            with DatabricksClient(settings.databricks) as db_client:
-                if db_client.test_connection():
-                    print("✅ Databricks: Connected")
-                else:
-                    print("❌ Databricks: Connection failed")
+            await initialize_connection_pool(
+                settings.databricks_oauth,
+                settings.key_vault,
+                settings.connection_pool
+            )
+            
+            # Test Databricks connection pool
+            try:
+                async with DatabricksClient() as db_client:
+                    if await db_client.test_connection():
+                        print("✅ Databricks: Connected (using connection pool)")
+                    else:
+                        print("❌ Databricks: Connection failed")
+            except Exception as e:
+                print(f"❌ Databricks: {e}")
+            
+            # Test Email Service (while connection pool is still active)
+            try:
+                async with DatabricksClient() as db_client:
+                    email_service = EmailService(db_client, settings)
+                    if await email_service.initialize():
+                        print("✅ Azure Communication Services: Connected")
+                        print("✅ Azure Blob Storage: Connected")
+                        email_service.cleanup()
+                    else:
+                        print("❌ Email services: Connection failed")
+            except Exception as e:
+                print(f"❌ Email services: {e}")
+            
+            # Shutdown connection pool after all tests
+            await shutdown_connection_pool()
+            
         except Exception as e:
-            print(f"❌ Databricks: {e}")
-        
-        # Test Email Service
-        try:
-            email_service = EmailService(settings)
-            if await email_service.initialize():
-                print("✅ Azure Communication Services: Connected")
-                print("✅ Azure Blob Storage: Connected")
-                email_service.cleanup()
-            else:
-                print("❌ Email services: Connection failed")
-        except Exception as e:
-            print(f"❌ Email services: {e}")
+            print(f"❌ Connection pool initialization failed: {e}")
+            try:
+                await shutdown_connection_pool()
+            except:
+                pass
         
         # Show configuration
         print(f"\n⚙️  Configuration:")
@@ -206,8 +431,8 @@ async def show_status():
         print(f"   Processing interval: {settings.processing.interval_minutes} minutes")
         print(f"   Batch size: {settings.processing.batch_size}")
         print(f"   Max retry attempts: {settings.processing.max_retry_attempts}")
-        print(f"   Databricks catalog: {settings.databricks.catalog}")
-        print(f"   Databricks schema: {settings.databricks.schema}")
+        print(f"   Databricks catalog: {settings.databricks_oauth.catalog}")
+        print(f"   Databricks schema: {settings.databricks_oauth.schema_name}")
         print(f"   Blob container: {settings.azure_storage.container_name}")
         
         # Show test mode status
@@ -232,34 +457,48 @@ async def show_stats(days: int = 7):
         print(f"📈 Email Processing Statistics (Last {days} days)")
         print("=" * 50)
         
-        settings = get_settings()
-        email_service = EmailService(settings)
+        settings = await get_settings()
+        validate_settings(settings)
         
-        if not await email_service.initialize():
-            print("❌ Failed to initialize email service")
-            return False
+        # Initialize connection pool for statistics
+        await initialize_connection_pool(
+            settings.databricks_oauth,
+            settings.key_vault,
+            settings.connection_pool
+        )
         
-        stats = email_service.get_processing_stats(days)
+        try:
+            async with DatabricksClient() as db_client:
+                email_service = EmailService(db_client, settings)
+                
+                if not await email_service.initialize():
+                    print("❌ Failed to initialize email service")
+                    return False
+                
+                stats = await email_service.get_processing_stats(days)
+                
+                if 'error' in stats:
+                    print(f"❌ Error getting stats: {stats['error']}")
+                    return False
+                
+                print(f"📊 Summary:")
+                print(f"   Total processed: {stats.get('total_processed', 0)}")
+                print(f"   Successfully sent: {stats.get('sent', 0)}")
+                print(f"   Failed: {stats.get('failed', 0)}")
+                print(f"   Success rate: {stats.get('success_rate', 0):.1f}%")
+                
+                if stats.get('details'):
+                    print(f"\n📋 Details:")
+                    for detail in stats['details']:
+                        status = detail.get('send_status', 'unknown')
+                        count = detail.get('count', 0)
+                        print(f"   {status}: {count}")
+                
+                email_service.cleanup()
+                return True
         
-        if 'error' in stats:
-            print(f"❌ Error getting stats: {stats['error']}")
-            return False
-        
-        print(f"📊 Summary:")
-        print(f"   Total processed: {stats.get('total_processed', 0)}")
-        print(f"   Successfully sent: {stats.get('sent', 0)}")
-        print(f"   Failed: {stats.get('failed', 0)}")
-        print(f"   Success rate: {stats.get('success_rate', 0):.1f}%")
-        
-        if stats.get('details'):
-            print(f"\n📋 Details:")
-            for detail in stats['details']:
-                status = detail.get('send_status', 'unknown')
-                count = detail.get('count', 0)
-                print(f"   {status}: {count}")
-        
-        email_service.cleanup()
-        return True
+        finally:
+            await shutdown_connection_pool()
         
     except Exception as e:
         print(f"❌ Error getting statistics: {e}")
@@ -303,12 +542,13 @@ Examples:
     
     # Set up logging
     try:
-        settings = get_settings()
-        log_level = args.log_level or settings.logging.level
-        log_format = args.log_format or settings.logging.format
+        # Try to get basic logging settings from environment variables
+        # We can't await here since we're not in an async context yet
+        log_level = args.log_level or os.getenv("LOG_LEVEL", "INFO")
+        log_format = args.log_format or os.getenv("LOG_FORMAT", "json")
     except:
-        log_level = args.log_level
-        log_format = args.log_format
+        log_level = args.log_level or "INFO"
+        log_format = args.log_format or "json"
     
     setup_logging(log_level, log_format)
     

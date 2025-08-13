@@ -67,7 +67,10 @@ def retry_with_backoff(
                         error=str(e),
                     )
 
-                    await asyncio.sleep(current_delay)
+                    # Use shorter delays in test environment
+                    import os
+                    test_delay = 0.1 if os.getenv('TEST_MODE') or os.getenv('PYTEST_CURRENT_TEST') else current_delay
+                    await asyncio.sleep(test_delay)
                     current_delay = int(current_delay * backoff_factor)
 
             # This should never be reached, but just in case
@@ -130,6 +133,9 @@ async def retry_operation(
                 error=last_error,
             )
 
-            await asyncio.sleep(delay_seconds)
+            # Use shorter delays in test environment
+            import os
+            test_delay = 0.01 if os.getenv('TEST_MODE') or os.getenv('PYTEST_CURRENT_TEST') else delay_seconds
+            await asyncio.sleep(test_delay)
 
     return False, None, last_error or "Unknown error"

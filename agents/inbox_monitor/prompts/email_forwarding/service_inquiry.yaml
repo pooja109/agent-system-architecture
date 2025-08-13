@@ -1,0 +1,23 @@
+template_version: "1.0.0"
+scenario_type: "service_inquiry"
+scenario_number: 7
+description: "Template for forwarding service inquiry responses"
+
+forwarding_reason: "Customer service inquiry requiring assistance"
+
+subject_template: "FWD: Service Inquiry - ${original_subject}"
+
+additional_context: |
+  This customer has a question or inquiry about existing services.
+  Please review and provide appropriate support.
+  
+  Customer Classification: Service Inquiry (Scenario 7)
+  Requires: Customer support response
+
+escalation_priority: "high"
+requires_manual_review: true
+
+metadata:
+  target_scenarios: [7]
+  business_impact: "Customer satisfaction opportunity"
+  recommended_action: "Provide timely customer support response"

@@ -9,45 +9,60 @@ storage, and folder management.
 import asyncio
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import httpx
 import structlog
 
-try:
-    # Try absolute imports first (for direct script execution)
-    from config.settings import AppSettings
-    from models.email import Email, ProcessingResult
-    from services.graph_api_client import GraphAPIClient
-    from services.response_handler import ResponseHandler
-    from services.scenario_processor import ScenarioProcessor
+import importlib.util
+from pathlib import Path
 
+from config.settings import AppSettings
+from models.email import Email, ProcessingResult
+from services.graph_api_client import GraphAPIClient
+from services.response_handler import ResponseHandler
+from services.scenario_processor import ScenarioProcessor
+from services.logging.business_logic_logger import BusinessLogicLoggerMixin
+
+# Import retry utilities
+try:
     from utils.retry import retry_operation
 except ImportError:
-    # Fall back to relative imports (for module execution)
-    from ..config.settings import AppSettings
-    from ..models.email import Email, ProcessingResult
-    from ..utils.retry import retry_operation
-    from .graph_api_client import GraphAPIClient
-    from .response_handler import ResponseHandler
-    from .scenario_processor import ScenarioProcessor
+    # Fallback to direct import if module structure is different
+    current_dir = Path(__file__).parent.parent
+    utils_retry_path = current_dir / "utils" / "retry.py"
+    spec = importlib.util.spec_from_file_location("inbox_utils.retry", utils_retry_path)
+    if spec and spec.loader:
+        retry_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(retry_module)
+        retry_operation = retry_module.retry_operation
+    else:
+        raise ImportError(f"Could not load retry utilities")
 
 
-class EmailProcessor:
+class EmailProcessor(BusinessLogicLoggerMixin):
     """Process emails from inbox and manage their lifecycle."""
 
-    def __init__(self, settings: AppSettings, graph_client: GraphAPIClient):
+    def __init__(self, settings: AppSettings, graph_client: GraphAPIClient, 
+                 progress_manager=None):
         """Initialize email processor.
 
         Args:
             settings: Application settings
             graph_client: Graph API client instance
+            progress_manager: Optional progress manager for UI integration
         """
         self.settings = settings
         self.graph_client = graph_client
+        self.progress_manager = progress_manager
+        
+        # Keep existing logger for backward compatibility
         self.logger = structlog.get_logger(__name__)
+        
+        # Initialize logging mixin after setting existing logger
+        self.__init_logging__("email_processor")
         self.version = "2.1.0"  # Updated version for response integration
 
         # Initialize scenario processor
@@ -69,7 +84,7 @@ class EmailProcessor:
         Returns:
             Dictionary with processing results
         """
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
         results: dict[str, Any] = {
             "success": True,
             "processed_count": 0,
@@ -78,6 +93,19 @@ class EmailProcessor:
             "processing_results": [],
         }
 
+        # Initialize progress tracking
+        operation_id = None
+        if self.progress_manager:
+            from ui.progress.progress_manager import OperationType, ProgressType
+            operation_id = self.progress_manager.create_operation(
+                OperationType.EMAIL_PROCESSING,
+                "Processing inbox emails",
+                ProgressType.SPINNER
+            )
+
+        # Log operation start
+        correlation_id = self.log_processing_start("inbox", "batch")
+
         try:
             # Get emails from inbox
             messages = await self.graph_client.get_inbox_messages(
@@ -85,10 +113,34 @@ class EmailProcessor:
             )
 
             if not messages:
-                self.logger.info("No new messages in inbox")
+                self.log_user_message("No new messages in inbox", "info")
+                self.log_processing_result(correlation_id, "inbox", "no_messages", {"count": 0})
+                
+                # Complete progress tracking
+                if operation_id:
+                    self.progress_manager.complete_operation(operation_id, "completed", "No new messages")
+                
                 return results
 
-            self.logger.info(f"Processing {len(messages)} emails from inbox", count=len(messages))
+            self.log_user_message(f"🔄 Processing {len(messages)} emails from inbox", "info")
+            self.log_diagnostic("Starting inbox processing", "info", count=len(messages), batch_size=self.settings.processing.batch_size)
+
+            # Update progress tracking to show count and switch to bar
+            if operation_id:
+                self.progress_manager.update_operation(
+                    operation_id,
+                    status=f"Found {len(messages)} emails to process"
+                )
+                # Create a new bar progress operation for individual emails
+                from ui.progress.progress_manager import ProgressType
+                bar_operation_id = self.progress_manager.create_operation(
+                    OperationType.EMAIL_PROCESSING,
+                    f"Processing {len(messages)} emails",
+                    ProgressType.BAR,
+                    total=len(messages)
+                )
+            else:
+                bar_operation_id = None
 
             # Get or create processed folder
             folder_name = self._get_processed_folder_name()
@@ -96,42 +148,94 @@ class EmailProcessor:
 
             if not folder:
                 error_msg = f"Failed to create/get processed folder: {folder_name}"
-                self.logger.error(error_msg)
+                self.log_operation_error("inbox", correlation_id, Exception(error_msg), folder_name=folder_name)
                 results["success"] = False
                 results["errors"].append(error_msg)
                 return results
 
-            # Process each email
-            for message in messages:
-                result = await self._process_single_email(message, folder["id"], folder_name)
+            # Initialize scenario processor once for the entire batch
+            async with self.scenario_processor:
+                # Process each email
+                for i, message in enumerate(messages):
+                    result = await self._process_single_email(message, folder["id"], folder_name)
 
-                results["processing_results"].append(result)
+                    results["processing_results"].append(result)
 
-                if result.success:
-                    results["processed_count"] += 1
-                else:
-                    results["failed_count"] += 1
-                    results["errors"].append(f"Email {result.email_id}: {result.error}")
+                    if result.success:
+                        results["processed_count"] += 1
+                    else:
+                        results["failed_count"] += 1
+                        results["errors"].append(f"Email {result.email_id}: {result.error}")
+
+                    # Update progress for each processed email
+                    if bar_operation_id:
+                        self.progress_manager.update_operation(
+                            bar_operation_id,
+                            current=i + 1,
+                            status=f"Processed {i + 1}/{len(messages)} emails"
+                        )
 
             # Set overall success based on any failures
             if results["failed_count"] > 0:
                 results["success"] = False
 
         except Exception as e:
-            self.logger.error("Error processing inbox", error=str(e))
+            self.log_operation_error("inbox", correlation_id, e)
             results["success"] = False
             results["errors"].append(str(e))
+            
+            # Handle progress tracking on error
+            if operation_id:
+                self.progress_manager.fail_operation(operation_id, e, "Email processing failed")
+            if 'bar_operation_id' in locals() and bar_operation_id:
+                self.progress_manager.fail_operation(bar_operation_id, e, "Email batch processing failed")
 
         # Calculate processing time
-        processing_time = (datetime.utcnow() - start_time).total_seconds()
+        processing_time = (datetime.now(timezone.utc) - start_time).total_seconds()
         results["processing_time_seconds"] = processing_time
 
-        self.logger.info(
-            "Inbox processing completed",
-            processed=results["processed_count"],
-            failed=results["failed_count"],
-            time_seconds=processing_time,
-        )
+        if results["success"]:
+            self.log_user_message(f"✅ Inbox processing completed: {results['processed_count']} processed, {results['failed_count']} failed", "info")
+            self.log_processing_result(
+                correlation_id, 
+                "inbox", 
+                "completed", 
+                {
+                    "processed_count": results["processed_count"],
+                    "failed_count": results["failed_count"],
+                    "processing_time_seconds": processing_time
+                }
+            )
+            
+            # Complete progress tracking on success
+            if operation_id:
+                self.progress_manager.complete_operation(
+                    operation_id, 
+                    "completed", 
+                    f"Processed {results['processed_count']} emails"
+                )
+            if 'bar_operation_id' in locals() and bar_operation_id:
+                self.progress_manager.complete_operation(
+                    bar_operation_id,
+                    "completed", 
+                    f"All {results['processed_count']} emails processed"
+                )
+        else:
+            self.log_user_message(f"❌ Inbox processing failed: {results['failed_count']} errors", "error")
+            
+            # Handle partial failure progress tracking
+            if operation_id:
+                self.progress_manager.complete_operation(
+                    operation_id, 
+                    "failed" if results['processed_count'] == 0 else "partial", 
+                    f"Processed {results['processed_count']}, failed {results['failed_count']}"
+                )
+            if 'bar_operation_id' in locals() and bar_operation_id:
+                self.progress_manager.complete_operation(
+                    bar_operation_id,
+                    "failed" if results['processed_count'] == 0 else "partial",
+                    f"Processed {results['processed_count']}/{len(messages)} emails"
+                )
 
         return results
 
@@ -148,7 +252,7 @@ class EmailProcessor:
         Returns:
             ProcessingResult instance
         """
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
         processing_id = str(uuid.uuid4())
         email_id = message["id"]
 
@@ -160,10 +264,16 @@ class EmailProcessor:
                 raise ValueError("Message ID is required")
                 
             subject = message.get("subject", "(No Subject)")
-            sender_info = message.get("from", {}).get("emailAddress", {}).get("address", "unknown")
+            sender_info = self._safe_get_sender_email(message) or "unknown"
             
-            self.logger.info(
-                "Processing email",
+            # Log single email processing
+            email_correlation_id = self.log_processing_start(
+                "email", 
+                email_id
+            )
+            self.log_diagnostic(
+                "Processing single email",
+                "info",
                 email_id=email_id,
                 subject=subject,
                 sender=sender_info,
@@ -178,9 +288,11 @@ class EmailProcessor:
             except Exception as e:
                 self.logger.error(
                     "Failed to convert message to email model",
-                    error=str(e),
-                    email_id=email_id,
-                    message_keys=list(message.keys()) if message else []
+                    extra={
+                        "error": str(e),
+                        "email_id": email_id,
+                        "message_keys": list(message.keys()) if message else []
+                    }
                 )
                 raise ValueError(f"Email model conversion failed: {e}")
 
@@ -190,25 +302,29 @@ class EmailProcessor:
             # Process email through scenarios with timeout and error handling
             scenario_result = None
             try:
-                async with self.scenario_processor:
-                    # Add timeout to prevent hanging
-                    scenario_result = await asyncio.wait_for(
-                        self.scenario_processor.process_email_scenario(email),
-                        timeout=120.0  # 2 minute timeout
-                    )
+                # Use the scenario processor directly - it manages its own lifecycle
+                # Add timeout to prevent hanging
+                scenario_result = await asyncio.wait_for(
+                    self.scenario_processor.process_email_scenario(email),
+                    timeout=300.0  # 5 minute timeout (increased for warehouse startup scenarios)
+                )
             except asyncio.TimeoutError:
                 self.logger.error(
                     "Scenario processing timed out",
-                    email_id=email_id,
-                    timeout_seconds=120
+                    extra={
+                        "email_id": email_id,
+                        "timeout_seconds": 300
+                    }
                 )
                 # Continue with email processing even if scenario processing fails
             except Exception as e:
                 self.logger.error(
                     "Scenario processing failed",
-                    error=str(e),
-                    email_id=email_id,
-                    error_type=type(e).__name__
+                    extra={
+                        "error": str(e),
+                        "email_id": email_id,
+                        "error_type": type(e).__name__
+                    }
                 )
                 # Continue with email processing even if scenario processing fails
 
@@ -226,29 +342,46 @@ class EmailProcessor:
                             )
                             self.logger.info(
                                 "Successfully processed customer response",
-                                email_id=email_id,
-                                scenario=scenario_num
+                                extra={
+                                    "email_id": email_id,
+                                    "scenario": scenario_num
+                                }
                             )
                         except ValueError as ve:
                             self.logger.error(
                                 "Invalid data for customer response processing",
-                                error=str(ve),
-                                email_id=email_id,
-                                scenario=scenario_num,
+                                extra={
+                                    "error": str(ve),
+                                    "email_id": email_id,
+                                    "scenario": scenario_num,
+                                }
                             )
                             # Don't fail the entire email processing due to validation errors
                         except Exception as e:
                             self.logger.error(
                                 "Failed to process customer response",
-                                error=str(e),
-                                email_id=email_id,
-                                scenario=scenario_num,
-                                error_type=type(e).__name__
+                                extra={
+                                    "error": str(e),
+                                    "email_id": email_id,
+                                    "scenario": scenario_num,
+                                    "error_type": type(e).__name__
+                                }
                             )
                             # Don't fail the entire email processing due to response handling errors
 
-            # Move email to processed folder (unless in dry-run mode)
-            if not self.settings.dry_run:
+            # Only move email to processed folder if scenario processing succeeded
+            should_move_email = False
+            move_reason = "not moved - no valid scenario processing"
+            
+            if scenario_result:
+                if scenario_result.success and scenario_result.scenario_type.value != "unknown":
+                    should_move_email = True
+                    move_reason = f"moved - successful {scenario_result.scenario_type.value}"
+                else:
+                    move_reason = f"not moved - {scenario_result.scenario_type.value} {'failed' if not scenario_result.success else 'with no action'}"
+            
+            # Move email to processed folder only if processing was successful
+            if should_move_email and not self.settings.dry_run:
                 success, _, error = await retry_operation(
                     self.graph_client.move_message,
                     "Move email to processed folder",
@@ -260,25 +393,51 @@ class EmailProcessor:
 
                 if not success:
                     raise Exception(f"Failed to move email: {error}")
-            else:
+                    
+                self.logger.info(
+                    "Email moved to processed folder after successful scenario processing",
+                    extra={
+                        "email_id": email_id,
+                        "folder": folder_name,
+                        "scenario_type": scenario_result.scenario_type.value,
+                        "scenario_success": scenario_result.success
+                    }
+                )
+            elif should_move_email and self.settings.dry_run:
                 self.logger.info(
                     "Dry-run mode: Email would be moved to folder",
-                    email_id=email_id,
-                    folder=folder_name,
+                    extra={
+                        "email_id": email_id,
+                        "folder": folder_name,
+                        "scenario_type": scenario_result.scenario_type.value,
+                    }
+                )
+            else:
+                self.logger.warning(
+                    "Email left in inbox - scenario processing failed or resulted in unknown classification",
+                    extra={
+                        "email_id": email_id,
+                        "reason": move_reason,
+                        "scenario_type": scenario_result.scenario_type.value if scenario_result else "no_result",
+                        "scenario_success": scenario_result.success if scenario_result else False
+                    }
                 )
 
-            processing_time_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
-
+            processing_time_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+            
             return ProcessingResult(
-                success=True,
+                success=should_move_email,  # Only consider successful if email was moved
                 email_id=email_id,
                 processing_id=processing_id,
-                error=None,
-                moved_to_folder=folder_name if not self.settings.dry_run else None,
+                sender_email=email.sender.email,
+                sender_name=email.sender.name,
+                subject=email.subject,
+                error=None if should_move_email else f"Email not processed: {move_reason}",
+                moved_to_folder=folder_name if should_move_email and not self.settings.dry_run else None,
                 output_location=output_location,
                 processing_time_ms=processing_time_ms,
-                scenario_type=scenario_result.scenario_type.value if scenario_result else None,
-                scenario_success=scenario_result.success if scenario_result else None,
+                scenario_type=scenario_result.scenario_type.value if scenario_result else "no_scenario_result",
+                scenario_success=scenario_result.success if scenario_result else False,
                 actions_taken=scenario_result.actions_taken if scenario_result else [],
                 expert_assigned=scenario_result.expert_assigned if scenario_result else None,
                 case_created=scenario_result.case_created if scenario_result else None,
@@ -288,9 +447,9 @@ class EmailProcessor:
             )
 
         except Exception as e:
-            self.logger.error("Failed to process email", email_id=email_id, error=str(e))
+            self.logger.error(f"Failed to process email (email_id: {email_id}): {e}")
 
-            processing_time_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+            processing_time_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
 
             return ProcessingResult(
                 success=False,
@@ -345,7 +504,7 @@ class EmailProcessor:
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(email_data, f, indent=2, ensure_ascii=False)
 
-        self.logger.info("Email stored to file", filepath=str(filepath), email_id=email.id)
+        self.logger.info("Email stored to file", extra={"filepath": str(filepath), "email_id": email.id})
 
         return str(filepath)
 
@@ -384,8 +543,10 @@ class EmailProcessor:
 
             self.logger.info(
                 "Email sent to API",
-                email_id=email.id,
-                response_id=result.get("id", "unknown"),
+                extra={
+                    "email_id": email.id,
+                    "response_id": result.get("id", "unknown"),
+                }
             )
 
             return result.get("id", email.processing_metadata.processing_id)
@@ -396,11 +557,33 @@ class EmailProcessor:
         Returns:
             Folder name like "Processed_01_2024"
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         month = now.strftime("%m")
         year = now.strftime("%Y")
 
         return f"{self.settings.processing.processed_folder_prefix}_{month}_{year}"
+
+    def _safe_get_sender_email(self, email_message: dict) -> str | None:
+        """Safely extract sender email from email message.
+        
+        Args:
+            email_message: Email message from Graph API
+            
+        Returns:
+            Sender email address or None if not found
+        """
+        try:
+            from_field = email_message.get("from")
+            if not from_field:
+                return None
+            
+            sender_info = from_field.get("emailAddress") if from_field else None
+            if not sender_info:
+                return None
+                
+            return sender_info.get("address")
+        except (AttributeError, TypeError):
+            return None
 
     async def _ensure_processed_folder(self, folder_name: str) -> dict[str, Any] | None:
         """Ensure the processed folder exists.
@@ -417,13 +600,15 @@ class EmailProcessor:
         if folder and folder.get("id"):
             self.logger.info(
                 "Using existing processed folder",
-                folder_name=folder_name,
-                folder_id=folder.get("id"),
+                extra={
+                    "folder_name": folder_name,
+                    "folder_id": folder.get("id"),
+                }
             )
             return folder
 
         # Create new folder with retry
-        self.logger.info("Creating new processed folder", folder_name=folder_name)
+        self.logger.info("Creating new processed folder", extra={"folder_name": folder_name})
 
         success, folder_result, error = await retry_operation(
             self.graph_client.create_folder,
@@ -438,7 +623,7 @@ class EmailProcessor:
         if success:
             return folder
 
-        self.logger.error("Failed to create processed folder", folder_name=folder_name, error=error)
+        self.logger.error(f"Failed to create processed folder (folder: {folder_name}): {error}")
         return None
 
     def _extract_scenario_number(self, scenario_type: str) -> int | None:
@@ -504,9 +689,9 @@ class EmailProcessor:
                         error=str(e),
                         email_id=email.id
                     )
-                    message["receivedDateTime"] = datetime.utcnow().isoformat()
+                    message["receivedDateTime"] = datetime.now(timezone.utc).isoformat()
             else:
-                message["receivedDateTime"] = datetime.utcnow().isoformat()
+                message["receivedDateTime"] = datetime.now(timezone.utc).isoformat()
             
             # Handle body content with validation
             if "body" in original_message and original_message["body"]:

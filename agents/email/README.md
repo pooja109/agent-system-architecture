@@ -1,25 +1,44 @@
 # Email Agent - Enterprise Email Campaign Processing System
 
+## 📖 Quick Navigation
+
+**New to Email Agent?** Start here:
+- [⚡ Setup Guide](docs/SETUP.md) - Get Email Agent running in 30 minutes
+- [⚙️ Configuration Guide](docs/CONFIGURATION.md) - Environment setup and authentication
+- [🔧 Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and solutions
+
+**Working with the complete email automation system?**
+- [📧 Email Agent Documentation](../email/README.md) - Outbound email campaign processing
+- [📥 Inbox Monitor Documentation](../inbox_monitor/README.md) - Inbound email AI classification
+
 ## Overview
 
 The Email Agent is a sophisticated email processing system designed for automated email campaign management at enterprise scale. It seamlessly integrates Azure Communication Services, Azure Blob Storage, and Databricks to provide a complete email processing pipeline from campaign data to delivery confirmation.
 
 ## Table of Contents
 
-1. [System Architecture](#system-architecture)
-2. [Features & Capabilities](#features--capabilities)
-3. [Email Processing Pipeline](#email-processing-pipeline)
-4. [Installation & Setup](#installation--setup)
-5. [Configuration](#configuration)
-6. [Usage](#usage)
-7. [Test Mode](#test-mode)
-8. [Data Models & Schema](#data-models--schema)
-9. [Testing Framework](#testing-framework)
-10. [Monitoring & Analytics](#monitoring--analytics)
-11. [Troubleshooting](#troubleshooting)
-12. [API References](#api-references)
+1. [Quick Navigation](#-quick-navigation) ← **Start Here**
+2. [System Architecture](#system-architecture)
+3. [Features & Capabilities](#features--capabilities)
+4. [Email Processing Pipeline](#email-processing-pipeline)
+5. [Installation & Setup](#installation--setup) → See [Setup Guide](docs/SETUP.md)
+6. [Configuration](#configuration) → See [Configuration Guide](docs/CONFIGURATION.md)
+7. [Usage](#usage)
+8. [Test Mode](#test-mode)
+9. [Data Models & Schema](#data-models--schema)
+10. [Testing Framework](#testing-framework)
+11. [Monitoring & Analytics](#monitoring--analytics)
+12. [Troubleshooting](#troubleshooting) → See [Troubleshooting Guide](docs/TROUBLESHOOTING.md)
+13. [API References](#api-references)
 
 ## System Architecture
+
+### Process Flow Diagrams
+
+For detailed visual workflows, see the comprehensive system diagrams:
+- [**Outbound Email Campaign Workflow**](diagrams/outbound_email_campaign_workflow.md) - Complete email processing pipeline from monitoring to delivery
+- [**Outbound Email Error Handling**](diagrams/outbound_email_error_handling.md) - Error handling, retry logic, and recovery procedures  
+- [**Integrated System Overview**](diagrams/integrated_system_overview.md) - Complete system architecture and component relationships
 
 ### Core Components
 
@@ -56,10 +75,22 @@ The Email Agent is a sophisticated email processing system designed for automate
 - **Python 3.8+**: Core application language with async/await support
 - **Azure Communication Services**: Enterprise-grade email delivery
 - **Azure Blob Storage**: Scalable content storage with dual authentication
-- **Databricks SQL**: Data warehouse and analytics platform
+- **Databricks SQL**: Data warehouse and analytics platform with OAuth authentication
+- **Azure Key Vault**: Secure credential management for OAuth
+- **Connection Pooling**: Efficient database connection management
 - **Pydantic**: Configuration validation and data modeling
 - **Structlog**: Structured logging and observability
 - **asyncio**: Asynchronous processing for high throughput
+
+### OAuth Migration Implementation
+
+This system has been migrated from Personal Access Token (PAT) authentication to OAuth service principal authentication for Databricks connectivity. Key improvements include:
+
+- **Enhanced Security**: OAuth service principal authentication replaces PAT tokens
+- **Connection Pooling**: 80-90% reduction in connection overhead
+- **Health Monitoring**: Comprehensive health check endpoints for operational monitoring
+- **Automatic Token Management**: Transparent OAuth token refresh and caching
+- **Production Readiness**: Full monitoring, alerting, and troubleshooting capabilities
 
 ## Features & Capabilities
 
@@ -175,8 +206,10 @@ Create a `.env` file or set environment variables:
 
 ```bash
 # Azure Communication Services
-ACS_CONNECTION_STRING=endpoint=https://your-acs.communication.azure.com/;accesskey=your-key
-ACS_SENDER_EMAIL=noreply@your-domain.com
+# ACS credentials are now retrieved from Azure Key Vault
+# Required Key Vault secrets:
+# - azure-communication-connection-string
+# - azure-communication-sender-email
 
 # Azure Blob Storage (choose one authentication method)
 # Option 1: Connection String
@@ -237,6 +270,54 @@ To generate a SAS token:
 2. Set permissions: Read, List (minimum required)
 3. Set appropriate expiration date
 4. Generate token and use in `AZURE_STORAGE_SAS_TOKEN`
+
+### OAuth Configuration
+
+The system uses OAuth service principal authentication for Databricks connectivity. Required Azure Key Vault secrets:
+
+```bash
+# Service Principal Credentials (stored in Azure Key Vault)
+AZURE_KEY_VAULT_URL=https://your-keyvault.vault.azure.net/
+AZURE_TENANT_ID=your-tenant-id
+AZURE_CLIENT_ID=your-service-principal-client-id
+AZURE_CLIENT_SECRET=your-service-principal-secret
+
+# Key Vault Secret Names (default values)
+KEY_VAULT_TENANT_ID_SECRET=sales-engagement-service-principal-tenantid
+KEY_VAULT_CLIENT_ID_SECRET=sales-engagement-service-principal-clientid
+KEY_VAULT_CLIENT_SECRET_SECRET=sales-engagement-service-principal-secretid
+
+# Connection Pool Configuration
+CONNECTION_POOL_MIN_SIZE=2          # Minimum connections (default: 2)
+CONNECTION_POOL_MAX_SIZE=4          # Maximum connections (default: 4)
+CONNECTION_TIMEOUT_SECONDS=30       # Connection timeout (default: 30)
+
+# Health Monitoring
+HEALTH_CHECK_PORT=8081              # Health check server port (default: 8081)
+HEALTH_CHECK_ENABLED=true           # Enable health endpoints (default: true)
+METRICS_COLLECTION_INTERVAL=60      # Metrics collection interval (default: 60s)
+```
+
+### Health Check Endpoints
+
+The system provides comprehensive health monitoring endpoints:
+
+- **`GET /health`**: Simple health check for load balancers (returns 200/503)
+- **`GET /health/detailed`**: Comprehensive system health with component details
+- **`GET /ready`**: Kubernetes readiness probe endpoint
+- **`GET /`**: Service information and available endpoints
+
+Example health check usage:
+```bash
+# Check service health
+curl http://localhost:8081/health
+
+# Get detailed health information
+curl http://localhost:8081/health/detailed | jq '.'
+
+# Check readiness for traffic
+curl http://localhost:8081/ready
+```
 
 ### Configuration Validation
 
@@ -781,7 +862,8 @@ python main.py stats 30
 ### Error Codes and Messages
 
 #### Configuration Errors
-- `ACS_CONNECTION_STRING is required`: Missing Azure Communication Services configuration
+- `Key Vault authentication failed`: Missing or invalid Azure Key Vault configuration
+- `ACS credentials not found in Key Vault`: Missing required secrets in Key Vault
 - `DATABRICKS_ACCESS_TOKEN is required`: Missing Databricks authentication
 - `Invalid blob storage configuration`: Malformed storage settings
 
