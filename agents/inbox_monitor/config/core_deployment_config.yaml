@@ -1,0 +1,29 @@
+# Core Deployment Configuration (Phases 1-3)
+database:
+  catalog: "${DATABRICKS_CATALOG:-inbox_monitor}"
+  schema: "${DATABRICKS_SCHEMA:-scenario_tracking}"
+  warehouse_id: "${DATABRICKS_WAREHOUSE_ID}"
+  host: "${DATABRICKS_HOST}"
+  oauth_client_id: "${DATABRICKS_OAUTH_CLIENT_ID}"
+  oauth_client_secret: "${DATABRICKS_OAUTH_CLIENT_SECRET}"
+
+core_deployment:
+  log_directory: "./logs/scenario_tracking"
+  config_directory: "./config"
+  backup_directory: "./backups/scenario_tracking"
+  enable_performance_monitoring: true
+
+scenario_tracking:
+  enabled: true
+  table_suffix: ""
+  batch_insert_size: 50
+  async_insert: true
+  retry_attempts: 3
+  connection_timeout_seconds: 30
+
+logging:
+  level: "INFO"
+  format: "structured"
+  file_rotation: true
+  max_file_size: "100MB"
+  backup_count: 10

@@ -3,14 +3,9 @@ from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime, timezone
 import uuid
 
-try:
-    from services.pooled_service_base import PooledServiceBase
-    from services.databricks_oauth_client import DatabricksOAuthClient
-    from database.models import EmailRecord
-except ImportError:
-    from ..services.pooled_service_base import PooledServiceBase
-    from ..services.databricks_oauth_client import DatabricksOAuthClient
-    from .models import EmailRecord
+from services.pooled_service_base import PooledServiceBase
+from services.databricks_oauth_client import DatabricksOAuthClient
+from database.models import EmailRecord
 
 logger = structlog.get_logger(__name__)
 
@@ -29,12 +24,8 @@ class DatabricksClient(PooledServiceBase):
     async def _ensure_settings(self):
         """Ensure settings are loaded."""
         if self._table_name is None:
-            try:
-                from config.settings import get_settings
-                settings = await get_settings()
-            except ImportError:
-                from ..config.settings import get_settings
-                settings = await get_settings()
+            from config.settings import get_settings
+            settings = await get_settings()
             
             self._table_name = f"`{settings.databricks_oauth.catalog}`.`{settings.databricks_oauth.schema_name}`.`email_communication_pipeline{settings.databricks_oauth.table_suffix}`"
             self._databricks_settings = settings.databricks_oauth

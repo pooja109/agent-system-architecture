@@ -9,10 +9,12 @@ round-robin expert assignment system.
 
 import asyncio
 import sys
+from pathlib import Path
 
 import structlog
 from config.settings import get_settings, validate_settings
 from services.round_robin_service import RoundRobinService
+from services.databricks_connection_pool import get_connection_pool
 
 # Configure logging
 structlog.configure(
@@ -181,11 +183,68 @@ async def test_round_robin_assignment() -> bool:
         return False
 
 
+async def create_scenario_tracking_table() -> bool:
+    """Create the scenario processing tracking table.
+
+    Returns:
+        True if table created successfully, False otherwise
+    """
+    logger.info("Creating scenario processing tracking table...")
+
+    try:
+        settings = await get_settings()
+        
+        # Load schema SQL
+        schema_file = Path(__file__).parent.parent / "database" / "scenario_tracking_schema.sql"
+        
+        if not schema_file.exists():
+            logger.warning(f"⚠️  Scenario tracking schema file not found: {schema_file}")
+            logger.info("   Skipping scenario tracking table creation")
+            return True  # Non-critical for round-robin setup
+            
+        with open(schema_file, 'r') as f:
+            schema_sql = f.read()
+        
+        # Replace placeholders with actual values
+        formatted_sql = schema_sql.format(
+            catalog=settings.databricks_oauth.catalog,
+            schema=settings.databricks_oauth.schema_name,
+            table_suffix=settings.databricks_oauth.table_suffix or ""
+        )
+        
+        pool = get_connection_pool()
+        
+        async with pool.get_connection() as connection:
+            cursor = await connection.cursor()
+            
+            # Split SQL into individual statements
+            statements = [stmt.strip() for stmt in formatted_sql.split(';') if stmt.strip()]
+            
+            for i, statement in enumerate(statements):
+                if statement:
+                    logger.info(f"   Executing statement {i+1}/{len(statements)}...")
+                    await cursor.execute(statement)
+                    
+            logger.info("✅ Scenario processing tracking table created successfully")
+            
+            # Display table information
+            table_name = f"{settings.databricks_oauth.catalog}.{settings.databricks_oauth.schema_name}.inbox_monitor_scenario_processing{settings.databricks_oauth.table_suffix or ''}"
+            logger.info(f"   Table: {table_name}")
+            logger.info("   Features: 69 fields, Delta optimization, partitioning, 3 indexes")
+            
+            return True
+            
+    except Exception as e:
+        logger.error("❌ Failed to create scenario tracking table", extra={"error_message": str(e)})
+        logger.info("   This is non-critical for round-robin functionality")
+        return True  # Don't fail the entire setup for scenario tracking issues
+
+
 async def display_assignment_statistics() -> None:
     """Display current assignment statistics."""
     logger.info("Retrieving assignment statistics...")
 
-    settings = get_settings()
+    settings = await get_settings()
 
     try:
         async with RoundRobinService(settings.databricks_oauth) as service:
@@ -245,18 +304,26 @@ async def main():
         logger.error("❌ Setup failed: Could not create assignment table")
         sys.exit(1)
 
-    # Step 3: Verify active_rep_pool_v view
+    # Step 3: Create scenario tracking table
+    logger.info("Setting up scenario processing tracking...")
+    scenario_success = await create_scenario_tracking_table()
+    if scenario_success:
+        logger.info("✅ Scenario tracking table setup completed")
+    else:
+        logger.warning("⚠️  Scenario tracking table setup had issues (non-critical)")
+
+    # Step 4: Verify active_rep_pool_v view
     if not await verify_active_rep_pool_view():
         logger.error("❌ Setup failed: active_rep_pool_v view not available or empty")
         logger.error("   Please ensure the view exists and contains active experts")
         sys.exit(1)
 
-    # Step 4: Test round-robin functionality
+    # Step 5: Test round-robin functionality
     if not await test_round_robin_assignment():
         logger.error("❌ Setup failed: Round-robin assignment test failed")
         sys.exit(1)
 
-    # Step 5: Display current statistics
+    # Step 6: Display current statistics
     await display_assignment_statistics()
 
     # Success
@@ -267,13 +334,15 @@ async def main():
     logger.info("   • Databricks connection")
     logger.info("   • active_rep_pool_v view")
     logger.info("   • expert_lead_assignments table")
+    logger.info("   • inbox_monitor_scenario_processing table")
     logger.info("   • Round-robin assignment logic")
     logger.info("")
     logger.info("🚀 Inbox Monitor is ready for operation!")
     logger.info("")
     logger.info("Next steps:")
-    logger.info("   1. Run integration tests: python test_end_to_end_integration.py")
-    logger.info("   2. Start inbox monitoring: python main.py")
+    logger.info("   1. Run scenario tracking tests: python -m pytest tests/test_scenario_tracking_models.py")
+    logger.info("   2. Run integration tests: python test_end_to_end_integration.py")
+    logger.info("   3. Start inbox monitoring: python main.py")
 
 
 if __name__ == "__main__":

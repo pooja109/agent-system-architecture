@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: inbox-monitor
+  namespace: email-agents
+  labels:
+    app: inbox-monitor
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    app: inbox-monitor
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: inbox-monitor
+  namespace: email-agents
+  labels:
+    app: inbox-monitor

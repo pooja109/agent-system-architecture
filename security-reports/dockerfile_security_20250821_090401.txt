@@ -1,0 +1,28 @@
+Dockerfile Security Scan Results
+===============================
+Timestamp: Thu Aug 21 09:04:01 CDT 2025
+
+=== Scanning: /mnt/c/Repos/lowtouch_v8/aou-s01-lowtouch/agents/email/Dockerfile ===
+Basic Security Checks:
+✅ Non-root user specified
+✅ Health check defined
+✅ No obvious secrets in Dockerfile
+
+=== Scanning: /mnt/c/Repos/lowtouch_v8/aou-s01-lowtouch/agents/handoff/Dockerfile ===
+Basic Security Checks:
+⚠️  No USER instruction found - container may run as root
+⚠️  No HEALTHCHECK instruction found
+✅ No obvious secrets in Dockerfile
+
+=== Scanning: /mnt/c/Repos/lowtouch_v8/aou-s01-lowtouch/agents/inbox_monitor/Dockerfile ===
+Basic Security Checks:
+✅ Non-root user specified
+✅ Health check defined
+✅ No obvious secrets in Dockerfile
+
+=== Scanning: /mnt/c/Repos/lowtouch_v8/aou-s01-lowtouch/agents/research/Dockerfile ===
+Basic Security Checks:
+⚠️  No USER instruction found - container may run as root
+⚠️  No HEALTHCHECK instruction found
+✅ No obvious secrets in Dockerfile
+

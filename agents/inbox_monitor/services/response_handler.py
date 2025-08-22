@@ -228,7 +228,7 @@ class ResponseHandler(BusinessLogicLoggerMixin):
                 conversation_id=conversation_id,
                 received_time=received_time,
                 received_datetime=received_datetime.isoformat(),
-                processing_timestamp=datetime.now(timezone.utc).isoformat(),
+                processed_at=datetime.now(timezone.utc).isoformat(),
             )
 
         except Exception as e:

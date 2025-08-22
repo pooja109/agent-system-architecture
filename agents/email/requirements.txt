@@ -14,7 +14,7 @@ azure-storage-blob>=12.19.0
 # Databricks connectivity (OAuth with SDK)
 databricks-sdk>=0.28.0
 
-# Environment variable management
+# Environment Management
 python-dotenv>=1.0.0
 
 # HTTP requests

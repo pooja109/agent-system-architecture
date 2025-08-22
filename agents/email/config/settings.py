@@ -1,10 +1,45 @@
 import os
-from typing import Optional
+import sys
+from pathlib import Path
+from typing import Optional, Dict, Any
 from pydantic import BaseModel, Field, model_validator, SecretStr
-from dotenv import load_dotenv
+import logging
 
-# Load environment variables
-load_dotenv()
+# Ensure environment is loaded (delegated to main.py)
+def ensure_environment_loaded() -> None:
+    """Ensure environment variables are loaded.
+    
+    This function checks if environment loading has already been handled
+    by main.py. If not, it performs minimal loading for direct config access.
+    """
+    # Check if main.py already loaded environment
+    if os.getenv("EMAIL_AGENT_ROOT"):
+        # Environment already loaded by main.py
+        return
+    
+    # Check if we're in a containerized environment
+    if os.getenv("KUBERNETES_SERVICE_HOST") or os.getenv("IS_CONTAINER", "").lower() == "true":
+        # In container, environment should be set by orchestrator
+        return
+    
+    # For direct config access (testing, etc.), try minimal loading
+    try:
+        from dotenv import load_dotenv
+        
+        # Find .env file
+        current_dir = Path(__file__).parent.parent
+        env_file = current_dir / ".env"
+        
+        if env_file.exists() and not os.getenv("ENV_LOADED"):
+            load_dotenv(env_file, override=False)  # Don't override if already set
+            os.environ["ENV_LOADED"] = "config_fallback"
+            logging.debug(f"Config fallback: loaded environment from {env_file}")
+    except ImportError:
+        # python-dotenv not installed, assume production environment
+        pass
+
+# Load environment on module import (fallback only)
+ensure_environment_loaded()
 
 class AzureCommunicationSettings(BaseModel):
     connection_string: str = Field(..., description="Azure Communication Services connection string")
@@ -27,10 +62,7 @@ class AzureCommunicationSettings(BaseModel):
         try:
             from services.azure_key_vault_client import KeyVaultException
         except ImportError:
-            try:
-                from ..services.azure_key_vault_client import KeyVaultException
-            except ImportError:
-                raise ImportError("KeyVaultException not available")
+            raise ImportError("KeyVaultException not available")
         
         try:
             # Retrieve ACS credentials from Key Vault
@@ -205,10 +237,7 @@ async def get_settings() -> AppSettings:
     try:
         from services.azure_key_vault_client import AzureKeyVaultClient
     except ImportError:
-        try:
-            from ..services.azure_key_vault_client import AzureKeyVaultClient
-        except ImportError:
-            raise ImportError("AzureKeyVaultClient not available")
+        raise ImportError("AzureKeyVaultClient not available")
     
     key_vault_settings = KeyVaultSettings(
         key_vault_url=os.getenv("AZURE_KEY_VAULT_URL", ""),

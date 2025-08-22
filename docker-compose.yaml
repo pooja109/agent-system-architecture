@@ -1,0 +1,84 @@
+services:
+  inbox-monitor:
+    build:
+      context: ./agents/inbox_monitor
+      dockerfile: Dockerfile.dev
+    container_name: inbox-monitor-dev
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - LOG_FORMAT=text
+    env_file:
+      - ./agents/inbox_monitor/.env
+    ports:
+      - "8080:8080"  # Health check port
+      - "5678:5678"  # Debugger port
+    volumes:
+      - ./agents/inbox_monitor:/app
+      - inbox-monitor-logs:/app/logs
+      - inbox-monitor-output:/app/output
+    networks:
+      - agent-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    command: python main.py run
+
+  email-agent:
+    build:
+      context: ./agents/email
+      dockerfile: Dockerfile.dev
+    container_name: email-agent-dev
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - LOG_FORMAT=text
+    env_file:
+      - ./agents/email/.env
+    ports:
+      - "8081:8081"  # Health check port
+      - "5679:5679"  # Debugger port
+    volumes:
+      - ./agents/email:/app
+      - email-agent-logs:/app/logs
+      - email-agent-output:/app/output
+    networks:
+      - agent-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    command: python main.py run
+
+networks:
+  agent-network:
+    driver: bridge
+
+volumes:
+  inbox-monitor-logs:
+  inbox-monitor-output:
+  email-agent-logs:
+  email-agent-output:

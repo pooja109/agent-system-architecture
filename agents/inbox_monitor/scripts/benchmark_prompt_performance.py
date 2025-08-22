@@ -185,7 +185,7 @@ class PromptPerformanceBenchmark:
         """Benchmark email forwarding operations."""
         print("\nBenchmarking email forwarding...")
         
-        from models.email import Email, EmailSender, EmailBody
+        from models.email import Email, EmailAddress, EmailBody
         from datetime import datetime, timezone
         
         # Create test email

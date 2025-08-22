@@ -29,9 +29,13 @@ class ExecutionMode(Enum):
     BENCHMARK_DATETIME = "benchmark_datetime"
     # Phase 2 Recovery validation
     PHASE2_VALIDATION = "phase2_validation"
-    # Phase 3 Recovery validation
-    PHASE3_RESOURCE_MANAGEMENT = "phase3_resource_management"
-    PHASE3_VALIDATION = "phase3_validation"
+    # System Recovery validation
+    RESOURCE_MANAGEMENT = "resource_management"  # Renamed from phase3_resource_management
+    SCENARIO_TRACKING_VALIDATION = "scenario_tracking_validation"  # Renamed from phase3_validation
+    # New test categories
+    SCENARIO_TRACKING = "scenario_tracking"  # Scenario tracking tests
+    LOAD_TESTING = "load_testing"  # Load testing
+    SECURITY_TESTING = "security_testing"  # Security compliance tests
     # Phase 4 Architecture modes
     PHASE4_ISOLATED = "phase4_isolated"
     PHASE4_PERFORMANCE = "phase4_performance"
@@ -158,21 +162,46 @@ class RunnerConfig:
                 typical_count=15
             ),
             
-            # Phase 3 Recovery modes
-            ExecutionMode.PHASE3_RESOURCE_MANAGEMENT: MarkerConfig(
-                name="Phase 3 Resource Management Validation",
+            # System Recovery modes
+            ExecutionMode.RESOURCE_MANAGEMENT: MarkerConfig(
+                name="Resource Management Validation",
                 description="Validation of resource management frameworks with recovered resource-intensive tests",
                 markers="performance and not slow",
                 estimated_time="3-8 minutes",
                 typical_count=25
             ),
             
-            ExecutionMode.PHASE3_VALIDATION: MarkerConfig(
-                name="Phase 3 Recovery Validation",
-                description="Run Phase 3 recovered tests with comprehensive resource management",
-                markers="tests/test_edge_cases.py tests/test_performance_benchmarks.py tests/test_email_forwarding_templates.py tests/test_system_validation.py",
+            ExecutionMode.SCENARIO_TRACKING_VALIDATION: MarkerConfig(
+                name="Scenario Tracking Validation",
+                description="Run scenario tracking integration and validation tests",
+                markers="tests/test_scenario_tracking_integration_validation.py tests/test_end_to_end_scenario_tracking_integration.py",
                 estimated_time="5-12 minutes",
                 typical_count=35
+            ),
+            
+            # New test categories
+            ExecutionMode.SCENARIO_TRACKING: MarkerConfig(
+                name="Scenario Tracking Tests",
+                description="All scenario tracking functionality tests",
+                markers="scenario_tracking",
+                estimated_time="2-5 minutes", 
+                typical_count=20
+            ),
+            
+            ExecutionMode.LOAD_TESTING: MarkerConfig(
+                name="Load Testing",
+                description="High volume and concurrency load tests",
+                markers="load",
+                estimated_time="10-30 minutes",
+                typical_count=10
+            ),
+            
+            ExecutionMode.SECURITY_TESTING: MarkerConfig(
+                name="Security Compliance Tests",
+                description="Security, PII handling, and compliance tests",
+                markers="security",
+                estimated_time="2-5 minutes",
+                typical_count=15
             ),
             
             # Phase 4 Architecture modes
@@ -548,20 +577,42 @@ class RunnerConfig:
                 'tests/test_cli_integration.py', 
                 'tests/integration/test_service_logging_integration_isolated.py'
             ])
-        # Phase 3 Recovery: Special handling for resource management validation
-        elif mode == ExecutionMode.PHASE3_RESOURCE_MANAGEMENT:
+        # System Recovery: Special handling for resource management validation
+        elif mode == ExecutionMode.RESOURCE_MANAGEMENT:
             # Run resource management framework tests
             cmd.extend([
                 'tests/fixtures/',  # Test all resource management fixtures
                 '-k', 'resource_managed or memory_manager or cpu_manager or connection_manager'
             ])
-        elif mode == ExecutionMode.PHASE3_VALIDATION:
-            # Run specific Phase 3 recovered files  
+        elif mode == ExecutionMode.SCENARIO_TRACKING_VALIDATION:
+            # Run specific scenario tracking validation files
             cmd.extend([
-                'tests/test_edge_cases.py',
-                'tests/test_performance_benchmarks.py',
-                'tests/test_email_forwarding_templates.py',
+                'tests/test_scenario_tracking_integration_validation.py',
+                'tests/test_end_to_end_scenario_tracking_integration.py',
                 'tests/test_system_validation.py'
+            ])
+        elif mode == ExecutionMode.SCENARIO_TRACKING:
+            # Run all scenario tracking tests
+            cmd.extend([
+                'tests/scenario_tracking/',
+                'tests/test_scenario_tracking_integration_validation.py',
+                'tests/test_end_to_end_scenario_tracking_integration.py',
+                '-m', 'scenario_tracking'
+            ])
+        elif mode == ExecutionMode.LOAD_TESTING:
+            # Run load tests with extended timeouts
+            cmd.extend([
+                'tests/load_testing/',
+                '-m', 'load',
+                '--timeout=1800',  # 30 minute timeout for load tests
+                '--tb=short'
+            ])
+        elif mode == ExecutionMode.SECURITY_TESTING:
+            # Run security compliance tests
+            cmd.extend([
+                'tests/security/',
+                '-m', 'security',
+                '--tb=short'
             ])
         else:
             cmd.append('tests/')

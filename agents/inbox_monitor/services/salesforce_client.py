@@ -358,20 +358,25 @@ class SalesforceClient(APIClientLoggerMixin):
 
                 return CaseCreateResponse(id=case_id, success=True, errors=[])
             else:
-                # Error occurred
-                errors = result if isinstance(result, list) else [result]
+                # Error occurred - handle different error formats
+                if isinstance(result, list):
+                    error_messages = [str(error) for error in result]
+                elif isinstance(result, dict):
+                    error_messages = [str(result.get('message', str(result)))]
+                else:
+                    error_messages = [str(result)]
 
                 self.logger.error(
                     "Failed to create Salesforce case",
                     extra={
                         "status": response.status_code,
-                        "errors": errors,
+                        "errors": error_messages,
                         "account_id": case_request.account_id,
                         "contact_id": case_request.contact_id,
                     }
                 )
 
-                return CaseCreateResponse(id="", success=False, errors=errors)
+                return CaseCreateResponse(id="", success=False, errors=error_messages)
 
         except Exception as e:
             self.logger.error(

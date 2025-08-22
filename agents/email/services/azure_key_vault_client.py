@@ -21,10 +21,7 @@ from azure.core.exceptions import (
 )
 from pydantic import BaseModel, Field, SecretStr
 
-try:
-    from config.settings import KeyVaultSettings
-except ImportError:
-    from ..config.settings import KeyVaultSettings
+from config.settings import KeyVaultSettings
 
 
 class ServicePrincipalCredentials(BaseModel):

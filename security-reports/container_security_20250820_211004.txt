@@ -1,0 +1,10 @@
+Container Image Security Scan Results
+====================================
+Timestamp: Wed Aug 20 21:10:04 CDT 2025
+
+=== Scanning Image: inbox-monitor:latest ===
+❌ Image not found: inbox-monitor:latest
+
+=== Scanning Image: email-agent:latest ===
+❌ Image not found: email-agent:latest
+

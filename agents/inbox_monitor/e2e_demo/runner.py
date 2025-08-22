@@ -235,10 +235,10 @@ class RealServiceAdapter:
                 content_type="text/plain",
                 content=email_data.get('body', 'Test content')
             ),
-            body_preview=email_data.get('body', 'Test content')[:255],
+            email_body=email_data.get('body', 'Test content')[:255],
             processing_metadata=ProcessingMetadata(
-                inbox_monitor_version="1.0.0",
-                processing_id=str(uuid.uuid4())
+                monitor_version="1.0.0",
+                process_id=str(uuid.uuid4())
             )
         )
         
@@ -282,7 +282,7 @@ class RealServiceAdapter:
                     'classification': classification_result.intent,
                     'confidence': classification_result.confidence,
                     'tokens_used': 0,  # Not available in current result model
-                    'processing_time': classification_result.processing_time_ms
+                    'processing_time': classification_result.processing_duration_ms
                 }
             except Exception as e:
                 print(f"❌ AI Classification failed: {e}")
@@ -305,8 +305,11 @@ class RealServiceAdapter:
     
     async def create_engagement(self, email: Dict[str, Any], intent: Dict[str, Any]) -> str:
         """Create positive engagement using real services - Scenario 5."""
+        print(f"🔍 DEBUG: create_engagement called - about to get scenario processor")
         processor = await self._get_scenario_processor()
+        print(f"🔍 DEBUG: processor obtained: {type(processor)}")
         email_model = email.get('email_model')
+        print(f"🔍 DEBUG: email_model: {type(email_model) if email_model else 'None'}")
         
         if email_model:
             # Process the email through the real scenario processor
@@ -330,19 +333,31 @@ class RealServiceAdapter:
         
         if email_model:
             try:
-                # Call the specific scenario method for Victoria Grant notifications (scenarios 6 & 10)
+                # CRITICAL FIX: Force the appropriate scenario and use main process_email_scenario method
+                # This ensures scenario tracking is properly called for ALL scenarios
                 if notification_type == "negative_response":
-                    # Scenario 6
-                    result = await processor._process_scenario_6(email_model, [])
+                    # Force Scenario 6
+                    original_force_scenario = processor.settings.test_mode.force_scenario
+                    processor.settings.test_mode.force_scenario = 6
+                    scenario_num = 6
                 else:
-                    # Scenario 10 
-                    result = await processor._process_scenario_10(email_model, [])
+                    # Force Scenario 10 
+                    original_force_scenario = processor.settings.test_mode.force_scenario
+                    processor.settings.test_mode.force_scenario = 10
+                    scenario_num = 10
+                
+                try:
+                    # Use the main process_email_scenario method which includes tracking
+                    result = await processor.process_email_scenario(email_model)
+                finally:
+                    # Restore original force_scenario setting
+                    processor.settings.test_mode.force_scenario = original_force_scenario
                 
                 if result.success and result.emails_sent:
                     return f"REAL_VG_EMAIL_{len(result.emails_sent)}_SENT"
                 else:
                     error_msg = result.error_message or "Unknown error occurred"
-                    raise Exception(f"Victoria Grant notification failed: {error_msg}")
+                    raise Exception(f"Scenario {scenario_num} processing failed: {error_msg}")
             except Exception as e:
                 print(f"Error in Victoria Grant notification: {e}")
                 raise Exception(f"Victoria Grant notification error: {str(e)}")
@@ -356,14 +371,23 @@ class RealServiceAdapter:
         
         if email_model:
             try:
-                # Call the specific scenario method for account team notifications (scenario 7)
-                result = await processor._process_scenario_7(email_model, [])
+                # CRITICAL FIX: Force Scenario 7 and use main process_email_scenario method
+                # This ensures scenario tracking is properly called for ALL scenarios
+                original_force_scenario = processor.settings.test_mode.force_scenario
+                processor.settings.test_mode.force_scenario = 7
+                
+                try:
+                    # Use the main process_email_scenario method which includes tracking
+                    result = await processor.process_email_scenario(email_model)
+                finally:
+                    # Restore original force_scenario setting
+                    processor.settings.test_mode.force_scenario = original_force_scenario
                 
                 if result.success and result.emails_sent:
                     return f"REAL_TEAM_EMAIL_{len(result.emails_sent)}_SENT"
                 else:
                     error_msg = result.error_message or "Unknown error occurred"
-                    raise Exception(f"Account team notification failed: {error_msg}")
+                    raise Exception(f"Scenario 7 processing failed: {error_msg}")
             except Exception as e:
                 print(f"Error in account team notification: {e}")
                 raise Exception(f"Account team notification error: {str(e)}")
@@ -406,8 +430,17 @@ class RealServiceAdapter:
         if email_model and status == "temporary_away":
             try:
                 print(f"🔧 Executing scenario 8: Out of office processing for {email.get('from', 'unknown')}")
-                # Call the actual scenario 8 processor method for out-of-office handling
-                result = await processor._process_scenario_8(email_model, [])
+                # CRITICAL FIX: Force Scenario 8 and use main process_email_scenario method
+                # This ensures scenario tracking is properly called for ALL scenarios
+                original_force_scenario = processor.settings.test_mode.force_scenario
+                processor.settings.test_mode.force_scenario = 8
+                
+                try:
+                    # Use the main process_email_scenario method which includes tracking
+                    result = await processor.process_email_scenario(email_model)
+                finally:
+                    # Restore original force_scenario setting
+                    processor.settings.test_mode.force_scenario = original_force_scenario
                 
                 if result.success:
                     print(f"✅ Scenario 8 completed successfully: Database updated for out-of-office status")
@@ -438,8 +471,17 @@ class RealServiceAdapter:
         if email_model:
             try:
                 print(f"🔧 Executing scenario 9: Invalid email processing for {email.get('from', 'unknown')}")
-                # Call the actual scenario 9 processor method for invalid email handling
-                result = await processor._process_scenario_9(email_model, [])
+                # CRITICAL FIX: Force Scenario 9 and use main process_email_scenario method
+                # This ensures scenario tracking is properly called for ALL scenarios
+                original_force_scenario_9 = processor.settings.test_mode.force_scenario_9
+                processor.settings.test_mode.force_scenario_9 = True
+                
+                try:
+                    # Use the main process_email_scenario method which includes tracking
+                    result = await processor.process_email_scenario(email_model)
+                finally:
+                    # Restore original force_scenario_9 setting
+                    processor.settings.test_mode.force_scenario_9 = original_force_scenario_9
                 
                 if result.success:
                     print(f"✅ Scenario 9 completed successfully: Salesforce contact updated for invalid email")

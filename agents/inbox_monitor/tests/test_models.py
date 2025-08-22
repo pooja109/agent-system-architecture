@@ -109,12 +109,12 @@ class TestProcessingMetadata:
     @pytest.mark.email
     def test_processing_metadata_defaults(self):
         """Test processing metadata with defaults."""
-        metadata = ProcessingMetadata(inbox_monitor_version="1.0.0", processing_id="test-id-123")
-        assert metadata.inbox_monitor_version == "1.0.0"
-        assert metadata.processing_id == "test-id-123"
+        metadata = ProcessingMetadata(monitor_version="1.0.0", process_id="test-id-123")
+        assert metadata.monitor_version == "1.0.0"
+        assert metadata.process_id == "test-id-123"
         assert metadata.source_folder == "Inbox"
         assert metadata.retry_count == 0
-        assert isinstance(metadata.processing_timestamp, datetime)
+        assert isinstance(metadata.processed_at, datetime)
 
 
 class TestEmail:
@@ -151,7 +151,7 @@ class TestEmail:
         assert ai_format["body"]["content_type"] == email.body.content_type
         assert ai_format["importance"] == "normal"
         assert "processing_metadata" in ai_format
-        assert ai_format["processing_metadata"]["inbox_monitor_version"] == "1.0.0"
+        assert ai_format["processing_metadata"]["monitor_version"] == "1.0.0"
 
 
 
@@ -178,15 +178,15 @@ class TestProcessingResult:
         result = ProcessingResult(
             success=True,
             email_id="test-email-123",
-            processing_id="test-processing-123",
-            moved_to_folder="Processed_01_2024",
-            output_location="/output/email_123.json",
-            processing_time_ms=1500,
+            process_id="test-processing-123",
+            destination_folder="Processed_01_2024",
+            storage_location="/output/email_123.json",
+            processing_duration_ms=1500,
         )
         assert result.success is True
         assert result.error is None
-        assert result.moved_to_folder == "Processed_01_2024"
-        assert result.processing_time_ms == 1500
+        assert result.destination_folder == "Processed_01_2024"
+        assert result.processing_duration_ms == 1500
     @pytest.mark.edge_case
     @pytest.mark.email
     @pytest.mark.fast
@@ -196,14 +196,14 @@ class TestProcessingResult:
         result = ProcessingResult(
             success=False,
             email_id="test-email-123",
-            processing_id="test-processing-123",
+            process_id="test-processing-123",
             error="Failed to move email: API error",
-            processing_time_ms=500,
+            processing_duration_ms=500,
         )
         assert result.success is False
         assert result.error == "Failed to move email: API error"
-        assert result.moved_to_folder is None
-        assert result.output_location is None
+        assert result.destination_folder is None
+        assert result.storage_location is None
 
 
 @pytest.mark.fast

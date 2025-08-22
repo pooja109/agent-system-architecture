@@ -1,0 +1,51 @@
+# Environment files
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+.env.development
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+VENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+.coverage
+.pytest_cache/
+htmlcov/
+.tox/
+
+# Logs
+*.log
+logs/
+log/
+
+# Output
+output/
+outputs/
+*.json
+*.csv
+
+# Temporary
+tmp/
+temp/
+.tmp/
+
+# OS
+.DS_Store
+Thumbs.db

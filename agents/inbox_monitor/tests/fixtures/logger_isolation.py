@@ -12,6 +12,13 @@ from typing import Dict, List, Optional, Any
 from unittest import mock
 from contextlib import contextmanager
 
+# Import LoggerFactory for proper reset between tests
+try:
+    from utils.custom_logging.logger_factory import LoggerFactory
+except ImportError:
+    # Fallback for testing environments
+    LoggerFactory = None
+
 
 class LoggerIsolationManager:
     """Manages logger isolation for test execution."""
@@ -26,6 +33,13 @@ class LoggerIsolationManager:
     def isolate_loggers(self, test_name: str) -> None:
         """Create isolated logger environment for test."""
         with self.lock:
+            # Reset LoggerFactory singleton if available
+            if LoggerFactory:
+                try:
+                    LoggerFactory.reset_for_testing()
+                except Exception:
+                    pass  # Continue if reset fails
+            
             # Backup existing loggers
             self.original_loggers = dict(logging.Logger.manager.loggerDict)
             
@@ -56,6 +70,13 @@ class LoggerIsolationManager:
     def cleanup_loggers(self) -> None:
         """Clean up test logger environment."""
         with self.lock:
+            # Clean up LoggerFactory singleton if available
+            if LoggerFactory:
+                try:
+                    LoggerFactory.reset_for_testing()
+                except Exception:
+                    pass  # Continue if reset fails
+            
             # Remove test loggers and their handlers
             for logger in self.test_loggers:
                 # Remove all handlers

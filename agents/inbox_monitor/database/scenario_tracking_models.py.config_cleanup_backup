@@ -1,0 +1,723 @@
+"""
+Pydantic models for inbox monitor scenario processing data structures.
+Provides type safety, validation, and serialization for Databricks storage.
+
+PII Data Handling Notice:
+========================
+This module handles Personally Identifiable Information (PII) including:
+- Email addresses (sender_email, recipient_emails, expert_email)
+- Names (sender_name, expert_assigned, account_name)
+- Email content previews (subject, email_body)
+- Customer interaction patterns and history
+
+Security Considerations:
+- All PII fields are validated and sanitized during input
+- Email content is limited in length to prevent excessive data storage
+- Customer data is handled according to privacy regulations (GDPR, CCPA)
+- Access to this data should be restricted to authorized personnel only
+- Data retention policies are enforced through configuration settings
+- Logging of PII is minimized to prevent accidental exposure
+
+Data Privacy Compliance:
+- Field length limits prevent storage of full email content
+- Customer keys are standardized/normalized for analytics
+- Data can be anonymized through configuration for long-term analytics
+- Secure deletion procedures should be implemented for data cleanup
+"""
+
+from datetime import datetime, timezone
+from enum import Enum
+from typing import Any, Dict, List, Optional, Union
+from uuid import UUID, uuid4
+import time
+
+from pydantic import BaseModel, Field, field_validator, model_validator, ValidationError
+import structlog
+
+# Import data extraction utilities
+try:
+    from utils.data_extraction_helpers import (
+        extract_sender_info,
+        detect_environment,
+        extract_assignment_reasoning,
+        validate_extracted_data,
+        extract_customer_name,
+        get_expert_assignment_method
+    )
+except ImportError:
+    from ..utils.data_extraction_helpers import (
+        extract_sender_info,
+        detect_environment,
+        extract_assignment_reasoning,
+        validate_extracted_data,
+        extract_customer_name,
+        get_expert_assignment_method
+    )
+
+logger = structlog.get_logger(__name__)
+
+
+def is_mock_object(value: Any) -> bool:
+    """
+    Detect if a value is a Mock object to prevent test artifacts in production data.
+    Enhanced detection covers various Mock patterns.
+    """
+    if value is None:
+        return False
+    
+    try:
+        value_str = str(value)
+        value_type = type(value).__name__
+        
+        # Check for common Mock patterns
+        mock_patterns = [
+            '<Mock',           # Standard Mock objects
+            '<MagicMock',      # MagicMock objects  
+            '<AsyncMock',      # AsyncMock objects
+            '<NonCallableMock' # NonCallableMock objects
+        ]
+        
+        # Check string representation
+        if any(pattern in value_str for pattern in mock_patterns):
+            return True
+            
+        # Check type name
+        mock_types = ['Mock', 'MagicMock', 'AsyncMock', 'NonCallableMock']
+        if value_type in mock_types:
+            return True
+            
+        # Check for mock module in type
+        if hasattr(value, '__module__') and value.__module__ and 'mock' in value.__module__:
+            return True
+            
+        return False
+        
+    except Exception:
+        # If we can't determine, assume it's not a mock
+        return False
+
+
+def get_minimal_record_data(original_data: Dict[str, Any], include_error: bool = False, error_msg: str = None) -> Dict[str, Any]:
+    """
+    Get minimal required fields for a valid ScenarioProcessingRecord.
+    Used for validation error recovery.
+    """
+    minimal_data = {
+        "process_id": original_data.get("process_id", str(uuid4())),
+        "email_id": original_data.get("email_id", "unknown"),
+        "sender_email": original_data.get("sender_email", "unknown@unknown.com"),
+        "received_datetime": original_data.get("received_datetime", datetime.now(timezone.utc)),
+        "process_success": original_data.get("process_success", False),
+    }
+    
+    if include_error:
+        minimal_data["process_error"] = error_msg or "Record creation failed during validation recovery"
+    
+    return minimal_data
+
+
+class ScenarioType(str, Enum):
+    """Email scenario types with string values for database compatibility."""
+    SCENARIO_5 = "scenario_5"
+    SCENARIO_6 = "scenario_6"
+    SCENARIO_7 = "scenario_7"
+    SCENARIO_8 = "scenario_8"
+    SCENARIO_9 = "scenario_9"
+    SCENARIO_10 = "scenario_10"
+    SCENARIO_11 = "scenario_11"
+    UNKNOWN = "unknown"
+
+
+class EmailImportanceLevel(str, Enum):
+    """Email importance levels."""
+    LOW = "low"
+    NORMAL = "normal"
+    HIGH = "high"
+
+
+class TestModeType(str, Enum):
+    """Types of test mode operation."""
+    DISABLED = "disabled"
+    FULL_TEST = "full_test"
+    EMAIL_TEST = "email_test"
+    MOCK_MODE = "mock_mode"
+
+
+class AIIntent(str, Enum):
+    """AI classification intent types."""
+    POSITIVE = "POSITIVE"
+    NEGATIVE = "NEGATIVE"
+    SERVICE_INQUIRY = "SERVICE_INQUIRY"
+    OUT_OF_OFFICE = "OUT_OF_OFFICE"
+    EMAIL_INVALID = "EMAIL_INVALID"
+    NO_LONGER_WORKS = "NO_LONGER_WORKS"
+    UNKNOWN = "UNKNOWN"
+
+
+class DatabaseUpdateRecord(BaseModel):
+    """Structure for tracking database updates made during processing."""
+    table: str = Field(..., description="Table name that was updated")
+    field: str = Field(..., description="Field name that was updated")
+    old_value: Optional[str] = Field(None, description="Previous value")
+    new_value: str = Field(..., description="New value set")
+    update_timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ScenarioProcessingRecord(BaseModel):
+    """
+    Complete record of inbox monitor scenario processing.
+    Designed for storage in Databricks Delta table with comprehensive validation.
+    """
+    
+    # Primary identifiers
+    process_id: str = Field(..., description="Unique processing ID")
+    email_id: str = Field(..., description="Microsoft Graph email message ID")
+    conversation_id: Optional[str] = Field(None, description="Email conversation ID")
+    correlation_id: Optional[str] = Field(None, description="Cross-service correlation ID")
+    
+    # Email source information - PII: Contains customer email addresses and names
+    sender_email: str = Field(..., description="Original sender email address (PII)")
+    sender_name: Optional[str] = Field(None, description="Sender display name (PII)")
+    recipient_emails: List[str] = Field(default_factory=list, description="All recipient addresses (PII)")
+    subject: Optional[str] = Field(None, description="Email subject line (PII - truncated to 500 chars)")
+    received_datetime: datetime = Field(..., description="When email was received")
+    sent_datetime: Optional[datetime] = Field(None, description="When email was sent")
+    email_body: Optional[str] = Field(None, description="Email body preview (PII - limited to 255 chars)")
+    email_importance: EmailImportanceLevel = Field(default=EmailImportanceLevel.NORMAL)
+    has_attachments: bool = Field(default=False)
+    attachment_count: int = Field(default=0, ge=0)
+    
+    # Processing workflow
+    processed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    processing_duration_ms: Optional[int] = Field(None, ge=0, description="Total processing time")
+    process_success: bool = Field(..., description="Whether processing succeeded")
+    process_error: Optional[str] = Field(None, description="Error message if failed")
+    monitor_version: Optional[str] = Field(None, description="System version")
+    retry_count: int = Field(default=0, ge=0)
+    
+    # AI Classification Results
+    ai_intent: Optional[AIIntent] = Field(None, description="AI classified intent")
+    ai_confidence: Optional[float] = Field(None, ge=0.0, le=1.0, description="AI confidence score")
+    ai_reasoning: Optional[str] = Field(None, description="AI reasoning")
+    ai_detected_phrases: List[str] = Field(default_factory=list)
+    ai_processing_duration_ms: Optional[int] = Field(None, ge=0)
+    ai_model_version: Optional[str] = Field(None)
+    
+    # Scenario processing
+    scenario_type: ScenarioType = Field(default=ScenarioType.UNKNOWN)
+    scenario_success: Optional[bool] = Field(None)
+    scenario_processing_duration_ms: Optional[int] = Field(None, ge=0)
+    scenario_error_message: Optional[str] = Field(None)
+    
+    # Actions and results
+    agent_actions_log: List[str] = Field(default_factory=list)
+    
+    # Expert assignment (Scenario 5) - PII: Contains expert names and contact info
+    expert_assigned: Optional[str] = Field(None, description="Expert name (PII)")
+    expert_id: Optional[str] = Field(None, description="Expert system ID")
+    expert_email: Optional[str] = Field(None, description="Expert email address (PII)")
+    assignment_method: Optional[str] = Field(None, description="Assignment method used")
+    
+    # Salesforce integration - PII: Contains customer account information
+    case_created: Optional[str] = Field(None, description="Salesforce case ID")
+    case_subject: Optional[str] = Field(None, description="Case subject (may contain PII)")
+    case_status: Optional[str] = Field(None, description="Case status")
+    sf_contact_id: Optional[str] = Field(None, description="Customer contact ID")
+    sf_account_id: Optional[str] = Field(None, description="Customer account ID")
+    account_name: Optional[str] = Field(None, description="Customer company name (PII)")
+    
+    # Email forwarding - PII: Contains email addresses
+    emails_forwarded: List[str] = Field(default_factory=list, description="Forwarded email addresses (PII)")
+    forwarding_reason: Optional[str] = Field(None, description="Reason for forwarding")
+    forwarding_success: Optional[bool] = Field(None, description="Forwarding success status")
+    forwarding_error: Optional[str] = Field(None, description="Forwarding error details")
+    
+    # Database updates
+    external_operations_status: Dict[str, str] = Field(default_factory=dict)
+    status_updates: List[DatabaseUpdateRecord] = Field(default_factory=list)
+    
+    # Test mode tracking
+    test_mode: bool = Field(default=False)
+    test_mode_type: TestModeType = Field(default=TestModeType.DISABLED)
+    test_email_substitutions: Dict[str, str] = Field(default_factory=dict)
+    environment: Optional[str] = Field(None)
+    
+    # Email lifecycle
+    destination_folder: Optional[str] = Field(None)
+    storage_location: Optional[str] = Field(None)
+    email_deleted: bool = Field(default=False)
+    
+    # Customer interaction patterns
+    customer_interaction_count: Optional[int] = Field(None, ge=0)
+    last_customer_interaction: Optional[datetime] = Field(None)
+    customer_scenario_history: List[str] = Field(default_factory=list)
+    
+    # Performance tracking
+    memory_usage_mb: Optional[float] = Field(None, ge=0)
+    cpu_time_ms: Optional[int] = Field(None, ge=0)
+    connection_pool_wait_ms: Optional[int] = Field(None, ge=0)
+    
+    # Audit fields
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_by: str = Field(default="inbox_monitor")
+    data_version: int = Field(default=1)
+    processing_date: Optional[datetime] = Field(None, description="Date partition field for the table")
+    
+    # Note: Advanced Analytics Fields were removed as they don't exist in the actual database table
+
+    model_config = {
+        "use_enum_values": True,
+        "validate_assignment": True,
+        "extra": "ignore"
+    }
+
+    @field_validator("sender_email")
+    def validate_sender_email_security(cls, v):
+        """Validate sender email for security issues."""
+        if not v:
+            return "unknown@unknown.com"
+        
+        # Basic security checks for malicious patterns
+        malicious_patterns = [
+            "'; DROP TABLE",
+            "; --",
+            "<script",
+            "javascript:",
+            "../../",
+            "\\x00",
+            "\n\r"
+        ]
+        
+        for pattern in malicious_patterns:
+            if pattern.lower() in v.lower():
+                logger.warning("Malicious pattern detected in sender email", 
+                               email=v[:50], pattern=pattern)
+                return "[SANITIZED_EMAIL]"
+        
+        # Basic email format validation
+        if "@" not in v or "." not in v:
+            logger.debug("Invalid email format", email=v[:50])
+            return "[INVALID_EMAIL]"
+        
+        # Length validation
+        if len(v) > 254:
+            logger.warning("Email exceeds RFC length limit", length=len(v))
+            return "[OVERSIZED_EMAIL]"
+        
+        return v.lower().strip()
+
+    @field_validator("subject")
+    def validate_subject_security(cls, v):
+        """Enhanced subject validation with security sanitization."""
+        if not v:
+            return v
+        
+        original_v = v
+        
+        # XSS protection - replace dangerous HTML/JS patterns
+        import re
+        xss_patterns = [
+            r'<script[^>]*>.*?</script>',
+            r'javascript:',
+            r'vbscript:',
+            r'onload\s*=',
+            r'onerror\s*=',
+            r';alert\s*\(',
+            r'\.alert\s*\(',
+            r'eval\s*\(',
+            r'document\.write',
+            r'document\.cookie',
+        ]
+        
+        for pattern in xss_patterns:
+            v = re.sub(pattern, '[SANITIZED]', v, flags=re.IGNORECASE)
+        
+        # SQL injection protection
+        sql_patterns = [
+            r"'; DROP TABLE",
+            r"' OR '1'='1",
+            r"' UNION SELECT",
+        ]
+        
+        for pattern in sql_patterns:
+            v = re.sub(pattern, '[SANITIZED]', v, flags=re.IGNORECASE)
+        
+        # Length validation
+        if len(v) > 500:
+            logger.warning("Subject line truncated", original_length=len(original_v))
+            v = v[:497] + "..."
+        
+        # Log if sanitization occurred
+        if v != original_v:
+            logger.warning("Subject sanitization applied", 
+                           original_length=len(original_v), 
+                           sanitized_length=len(v))
+        
+        return v
+
+    @field_validator("email_body")
+    def validate_email_body_security(cls, v):
+        """Enhanced body preview validation with security sanitization."""
+        if not v:
+            return v
+        
+        original_v = v
+        
+        # XSS protection - replace dangerous HTML/JS patterns  
+        import re
+        xss_patterns = [
+            r'<script[^>]*>.*?</script>',
+            r'javascript:',
+            r'vbscript:',
+            r'onload\s*=',
+            r'onerror\s*=',
+            r';alert\s*\(',
+            r'\.alert\s*\(',
+            r'eval\s*\(',
+            r'document\.write',
+            r'document\.cookie',
+        ]
+        
+        for pattern in xss_patterns:
+            v = re.sub(pattern, '[SANITIZED]', v, flags=re.IGNORECASE)
+        
+        # Length validation
+        if len(v) > 255:
+            v = v[:255]
+        
+        # Log if sanitization occurred
+        if v != original_v:
+            logger.debug("Body preview sanitization applied",
+                         original_length=len(original_v),
+                         sanitized_length=len(v))
+        
+        return v
+
+    @field_validator("recipient_emails")
+    def validate_recipient_emails(cls, v):
+        """Validate email addresses in recipient list."""
+        validated = []
+        for email in v:
+            if email and "@" in email and "." in email:
+                validated.append(email.lower().strip())
+            else:
+                logger.warning("Invalid email in recipients list", email=email)
+        return validated
+
+    @model_validator(mode="after")
+    def validate_scenario_consistency(self):
+        """Ensure scenario-specific fields are consistent."""
+        scenario_type = self.scenario_type
+        
+        # Validate expert assignment fields for Scenario 5
+        if scenario_type == ScenarioType.SCENARIO_5:
+            if self.expert_assigned and not self.expert_email:
+                logger.warning("Expert assigned but no email provided")
+        
+        # Validate forwarding fields for forwarding scenarios
+        forwarding_scenarios = {ScenarioType.SCENARIO_6, ScenarioType.SCENARIO_7, ScenarioType.SCENARIO_10}
+        if scenario_type in forwarding_scenarios:
+            if self.emails_forwarded and self.forwarding_success is None:
+                self.forwarding_success = True  # Assume success if emails listed
+                
+        return self
+
+    def to_databricks_dict(self) -> Dict[str, Any]:
+        """
+        Convert to dictionary format optimized for Databricks insertion.
+        Handles type conversions and null value formatting.
+        """
+        # Use mode='json' to prevent serialization issues with complex types
+        # Exclude processing_date since it's a generated column
+        data = self.model_dump(exclude_none=False, mode='python', exclude={'processing_date'})
+        
+        # DEBUG: Log all boolean fields found
+        boolean_fields_found = [k for k, v in data.items() if isinstance(v, bool)]
+        logger.debug(f"Boolean fields found in model_dump: {boolean_fields_found}")
+        
+        # Convert datetime objects to ISO strings and handle type conversions
+        for field_name, field_value in data.items():
+            if isinstance(field_value, datetime):
+                data[field_name] = field_value.isoformat()
+            elif isinstance(field_value, bool):
+                # Convert Python boolean to integer for Databricks compatibility
+                data[field_name] = 1 if field_value else 0
+                logger.debug(f"Converted boolean field {field_name}: {field_value} -> {data[field_name]}")
+            elif field_name.endswith('_time_ms') and isinstance(field_value, float):
+                # CRITICAL FIX: Convert float time values to integers for Databricks INT columns
+                data[field_name] = int(round(field_value))
+            elif field_name.endswith('_ms') and isinstance(field_value, float):
+                # Convert all _ms fields from float to int
+                data[field_name] = int(round(field_value))
+        
+        # CRITICAL FIX: Ensure ALL boolean fields are converted to integers
+        # This handles any boolean fields that might be added after model creation
+        boolean_fields = [
+            'process_success', 'has_attachments', 'is_read', 'is_draft',
+            'is_test_mode', 'contains_urls', 'contains_attachments', 'requires_human_review'
+        ]
+        
+        for bool_field in boolean_fields:
+            if bool_field in data:
+                logger.debug(f"Checking field {bool_field}: value={data[bool_field]}, type={type(data[bool_field])}")
+                if isinstance(data[bool_field], bool):
+                    original_value = data[bool_field]
+                    data[bool_field] = 1 if original_value else 0
+                    logger.debug(f"FORCED boolean conversion {bool_field}: {original_value} -> {data[bool_field]}")
+            else:
+                logger.debug(f"Field {bool_field} not found in data")
+        
+        # Handle complex types for Databricks compatibility
+        if self.status_updates:
+            data["status_updates"] = [update.model_dump() for update in self.status_updates]
+        
+        # Note: Field filtering logic removed as extra fields have been cleaned up from the model
+        
+        # Ensure arrays are properly formatted as lists, not JSON strings
+        for array_field in ["recipient_emails", "agent_actions_log", "ai_detected_phrases", 
+                           "emails_forwarded", "customer_scenario_history"]:
+            if array_field in data:
+                original_value = data[array_field]
+                original_type = type(original_value).__name__
+                
+                if data[array_field] is None:
+                    data[array_field] = []
+                elif isinstance(data[array_field], str):
+                    # If it's a JSON string, parse it back to a list
+                    try:
+                        import json
+                        data[array_field] = json.loads(data[array_field])
+                        logger.debug(f"Converted {array_field} from JSON string to list", 
+                                   original_type=original_type, 
+                                   new_type=type(data[array_field]).__name__)
+                    except (json.JSONDecodeError, TypeError):
+                        # If parsing fails, treat as single item or empty list
+                        data[array_field] = [data[array_field]] if data[array_field] else []
+                        logger.debug(f"Converted {array_field} from string to single-item list", 
+                                   original_type=original_type, 
+                                   new_type=type(data[array_field]).__name__)
+                elif not isinstance(data[array_field], list):
+                    # Ensure it's a list
+                    data[array_field] = [data[array_field]] if data[array_field] else []
+                    logger.debug(f"Converted {array_field} to list", 
+                               original_type=original_type, 
+                               new_type=type(data[array_field]).__name__)
+                else:
+                    logger.debug(f"Field {array_field} is already a list", 
+                               type=original_type, 
+                               length=len(data[array_field]))
+        
+        # Ensure maps are properly formatted as dicts, not JSON strings
+        for map_field in ["external_operations_status", "test_email_substitutions"]:
+            if map_field in data:
+                if data[map_field] is None:
+                    data[map_field] = {}
+                elif isinstance(data[map_field], str):
+                    # If it's a JSON string, parse it back to a dict
+                    try:
+                        import json
+                        data[map_field] = json.loads(data[map_field])
+                    except (json.JSONDecodeError, TypeError):
+                        data[map_field] = {}
+                elif not isinstance(data[map_field], dict):
+                    data[map_field] = {}
+        
+        # Remove advanced analytics metadata fields that don't exist in database
+        # These fields were being added but the database schema doesn't include them
+        
+        # Field validation and conversion completed
+        
+        return data
+
+    @classmethod
+    def from_processing_results(
+        cls,
+        email_data: Any,
+        processing_result: Any,
+        scenario_result: Any = None,
+        intent_result: Any = None,
+        **kwargs
+    ) -> "ScenarioProcessingRecord":
+        """
+        Factory method to create record from existing processing results.
+        Refactored to use specialized data extractors for maintainability and testability.
+        
+        Uses:
+        - EmailDataExtractor: Extract and validate email-related data
+        - ScenarioDataExtractor: Extract scenario processing results  
+        - AIDataExtractor: Extract AI classification data
+        - ScenarioProcessingRecordBuilder: Assemble final record
+        """
+        try:
+            # Import the new extractors
+            from .scenario_data_extractors import ScenarioProcessingRecordBuilder
+            
+            logger.debug("Creating scenario processing record using refactored extractors")
+            
+            # Use the builder to create the complete record data
+            record_data = ScenarioProcessingRecordBuilder.build(
+                processing_result=processing_result,
+                email_data=email_data,
+                scenario_result=scenario_result,
+                intent_result=intent_result,
+                **kwargs
+            )
+            
+            # Create and validate the record
+            try:
+                return cls(**record_data)
+            except ValidationError as ve:
+                logger.warning(f"Validation error during record creation: {ve}")
+                
+                # Enhanced error recovery with field-by-field validation
+                safe_record_data = {}
+                problematic_fields = []
+                successful_fields = []
+                
+                # Pre-filter Mock objects before validation
+                filtered_record_data = {}
+                for field_name, field_value in record_data.items():
+                    if is_mock_object(field_value):
+                        logger.debug(f"Filtering Mock object from field {field_name}")
+                        problematic_fields.append(f"{field_name}=Mock")
+                        continue
+                    filtered_record_data[field_name] = field_value
+                
+                # Test each non-Mock field individually for validation
+                for field_name, field_value in filtered_record_data.items():
+                    try:
+                        # Convert float time fields to integers before validation
+                        if field_name.endswith('_time_ms') and isinstance(field_value, float):
+                            field_value = int(field_value)
+                        elif field_name.endswith('_processing_duration_ms') and isinstance(field_value, float):
+                            field_value = int(field_value)
+                        elif field_name in ['ai_processing_duration_ms', 'scenario_processing_duration_ms', 'processing_duration_ms'] and isinstance(field_value, float):
+                            field_value = int(field_value)
+                        
+                        # Create minimal test record with just this field
+                        test_record_data = get_minimal_record_data(record_data)
+                        test_record_data[field_name] = field_value
+                        
+                        # Test Pydantic validation for this field
+                        test_instance = cls(**test_record_data)
+                        
+                        # If validation succeeds, field is safe to include
+                        safe_record_data[field_name] = field_value
+                        successful_fields.append(field_name)
+                        
+                    except ValidationError as field_ve:
+                        logger.debug(f"Field {field_name} failed validation: {field_ve}")
+                        problematic_fields.append(f"{field_name}={type(field_value).__name__}")
+                    except Exception as field_e:
+                        logger.debug(f"Field {field_name} caused error: {field_e}")
+                        problematic_fields.append(f"{field_name}=error")
+                
+                # Ensure minimum required fields are present with safe defaults
+                safe_record_data.update(get_minimal_record_data(record_data))
+                
+                # Add validation recovery metadata for audit trail
+                safe_record_data["process_error"] = f"Validation recovery: {len(successful_fields)} successful fields, {len(problematic_fields)} problematic fields"
+                
+                # Log detailed validation recovery information
+                logger.info("Validation error recovery completed", 
+                          total_fields=len(record_data),
+                          successful_fields=len(successful_fields),
+                          problematic_fields=len(problematic_fields),
+                          successful_list=successful_fields[:10],
+                          problematic_list=problematic_fields[:10])
+                
+                try:
+                    return cls(**safe_record_data)
+                except ValidationError as recovery_ve:
+                    logger.error(f"Validation recovery failed: {recovery_ve}")
+                    # Final fallback - return absolute minimum record
+                    return cls(**get_minimal_record_data(record_data, include_error=True, error_msg=f"Recovery failed: {str(recovery_ve)}"))
+            
+        except Exception as e:
+            logger.error("Failed to create scenario processing record", error=str(e))
+            # Return minimal valid record on error
+            return cls(
+                process_id=str(uuid4()),
+                email_id="error_" + str(uuid4()),
+                sender_email="error@unknown.com",
+                received_datetime=datetime.now(timezone.utc),
+                process_success=False,
+                process_error=f"Record creation failed: {str(e)}"
+            )
+
+    def calculate_performance_score(self) -> float:
+        """
+        Calculate a performance score based on processing metrics.
+        Used for monitoring and optimization.
+        """
+        score = 100.0
+        
+        # Processing time penalty
+        if self.processing_duration_ms:
+            if self.processing_duration_ms > 30000:  # > 30 seconds
+                score -= 50
+            elif self.processing_duration_ms > 10000:  # > 10 seconds
+                score -= 25
+            elif self.processing_duration_ms > 5000:   # > 5 seconds
+                score -= 10
+        
+        # AI confidence bonus/penalty
+        if self.ai_confidence:
+            if self.ai_confidence >= 0.9:
+                score += 10
+            elif self.ai_confidence < 0.6:
+                score -= 20
+        
+        # Success bonus/penalty
+        if self.process_success:
+            score += 10
+        else:
+            score -= 30
+        
+        # Retry penalty
+        score -= (self.retry_count * 10)
+        
+        return max(0.0, min(100.0, score))
+
+    def get_customer_key(self) -> str:
+        """Get standardized customer key for grouping and analytics."""
+        return self.sender_email.lower().strip()
+
+    def is_scenario_actionable(self) -> bool:
+        """Determine if this scenario resulted in actionable outcomes."""
+        actionable_indicators = [
+            self.expert_assigned,
+            self.case_created,
+            self.emails_forwarded,
+            self.external_operations_status,
+            self.destination_folder
+        ]
+        return any(indicator for indicator in actionable_indicators)
+
+
+class ScenarioTrackingConfiguration(BaseModel):
+    """Configuration settings for scenario tracking functionality."""
+    
+    enabled: bool = Field(default=True, description="Enable scenario tracking")
+    table_suffix: str = Field(default="", description="Table suffix for environment isolation")
+    batch_insert_size: int = Field(default=100, ge=1, le=1000, description="Batch size for inserts")
+    async_insert: bool = Field(default=True, description="Use async background inserts")
+    retry_attempts: int = Field(default=3, ge=1, le=10, description="Insert retry attempts")
+    retry_delay_seconds: float = Field(default=2.0, ge=0.1, le=60.0, description="Retry delay")
+    connection_timeout_seconds: int = Field(default=30, ge=5, le=300, description="Connection timeout")
+    
+    # Performance and monitoring
+    performance_monitoring_enabled: bool = Field(default=True)
+    slow_query_threshold_ms: int = Field(default=5000, ge=100)
+    health_check_interval_seconds: int = Field(default=300, ge=60)
+    
+    # Data retention and archiving
+    data_retention_days: int = Field(default=365, ge=30, description="Days to retain detailed data")
+    archive_after_days: int = Field(default=90, ge=30, description="Days before archiving old data")
+    cleanup_enabled: bool = Field(default=False, description="Enable automatic cleanup")
+    
+    model_config = {
+        "validate_assignment": True,
+        "extra": "forbid"
+    }

@@ -1,0 +1,10 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: inbox-monitor
+  namespace: email-agents
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: inbox-monitor

@@ -21,16 +21,8 @@ except ImportError:
     from config.runner_config import RunnerConfig, ExecutionMode
 
 # Import thread manager if available
-try:
-    try:
-        # When imported as module
-        from .monitoring import ThreadLifecycleManager
-    except ImportError:
-        # When run directly
-        from monitoring import ThreadLifecycleManager
-    THREAD_MANAGER_AVAILABLE = True
-except ImportError:
-    THREAD_MANAGER_AVAILABLE = False
+# Phase 4 monitoring system removed - ThreadLifecycleManager no longer available
+THREAD_MANAGER_AVAILABLE = False
 
 
 class TestStatus(Enum):

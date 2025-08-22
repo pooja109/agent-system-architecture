@@ -286,7 +286,7 @@ class TestAzureAIFoundryClient:
         assert isinstance(result, IntentClassificationResult)
         assert result.intent == EmailIntent.POSITIVE
         assert result.confidence == 0.95
-        assert result.processing_time_ms > 0
+        assert result.processing_duration_ms > 0
     @pytest.mark.asyncio
     @pytest.mark.fast
     @pytest.mark.edge_case
@@ -303,7 +303,7 @@ class TestAzureAIFoundryClient:
         assert result.intent == EmailIntent.UNKNOWN
         assert result.confidence == 0.0
         assert "Classification failed: API Error" in result.reasoning
-        assert result.processing_time_ms > 0
+        assert result.processing_duration_ms > 0
     @pytest.mark.asyncio
     @pytest.mark.fast
     @pytest.mark.integration
@@ -332,7 +332,7 @@ class TestAzureAIFoundryClient:
             confidence=0.95,
             reasoning="Test successful",
             detected_phrases=[],
-            processing_time_ms=100,
+            processing_duration_ms=100,
         )
         # Mock the agent to ensure proper initialization
         mock_agent = AsyncMock()
@@ -362,7 +362,7 @@ class TestAzureAIFoundryClient:
             confidence=0.0,
             reasoning="Test failed",
             detected_phrases=[],
-            processing_time_ms=100,
+            processing_duration_ms=100,
         )
         with patch.object(azure_ai_client, "classify_email_intent", return_value=mock_result):
             result = await azure_ai_client.test_connection()
@@ -553,4 +553,4 @@ class TestExternalPromptIntegration:
                 assert result.confidence == 0.92
                 assert result.reasoning == "Customer shows interest"
                 assert result.detected_phrases == ["interested", "more information"]
-                assert result.processing_time_ms > 0
+                assert result.processing_duration_ms > 0

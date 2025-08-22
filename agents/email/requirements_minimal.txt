@@ -1,0 +1,4 @@
+# Minimal requirements for container testing
+aiohttp>=3.9.0
+structlog>=23.2.0
+python-dotenv>=1.0.0

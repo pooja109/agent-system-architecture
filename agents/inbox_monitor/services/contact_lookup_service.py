@@ -12,16 +12,10 @@ from dataclasses import dataclass
 import structlog
 from pydantic import BaseModel, Field
 
-try:
-    from config.settings import TestModeSettings
-    from services.pooled_service_base import PooledServiceBase
-    from services.databricks_oauth_client import DatabricksOAuthClient
-    from services.logging.database_logger import DatabaseLoggerMixin
-except ImportError:
-    from ..config.settings import TestModeSettings
-    from .pooled_service_base import PooledServiceBase
-    from .databricks_oauth_client import DatabricksOAuthClient
-    from services.logging.database_logger import DatabaseLoggerMixin
+from config.settings import TestModeSettings
+from services.pooled_service_base import PooledServiceBase
+from services.databricks_oauth_client import DatabricksOAuthClient
+from services.logging.database_logger import DatabaseLoggerMixin
 
 
 class ContactLookupResult(BaseModel):

@@ -60,9 +60,11 @@ class InboxMonitor(ServiceLoggerMixin):
         """Start the inbox monitor service."""
         self.logger.info(
             "Starting inbox monitor",
-            environment=self.settings.environment,
-            monitored_email=self.settings.graph_api.monitored_email,
-            polling_interval=self.settings.processing.polling_interval_seconds,
+            extra={
+                "environment": self.settings.environment,
+                "monitored_email": self.settings.graph_api.monitored_email,
+                "polling_interval": self.settings.processing.polling_interval_seconds,
+            }
         )
 
         # Suppress future warnings during startup

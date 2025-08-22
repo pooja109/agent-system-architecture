@@ -83,11 +83,11 @@ class TestEndToEndIntegration:
                 content_type="text/plain",
                 content="I'm very interested in learning more about your AI solutions. Please contact me."
             ),
-            body_preview="I'm very interested in learning more about your AI solutions...",
+            email_body="I'm very interested in learning more about your AI solutions...",
             received_datetime=datetime.now(timezone.utc),
             processing_metadata=ProcessingMetadata(
-                inbox_monitor_version="1.0.0",
-                processing_id="test-processing-001"
+                monitor_version="1.0.0",
+                process_id="test-processing-001"
             )
         )
     @pytest.mark.slow

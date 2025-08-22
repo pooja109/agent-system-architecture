@@ -1,0 +1,120 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: inbox-monitor
+  namespace: email-agents
+  labels:
+    app: inbox-monitor
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: inbox-monitor
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+    honorLabels: true
+    metricRelabelings:
+    - sourceLabels: [__name__]
+      regex: '^go_.*'
+      action: drop
+    - sourceLabels: [__name__]
+      regex: '^promhttp_.*'
+      action: drop
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: email-agent
+  namespace: email-agents
+  labels:
+    app: email-agent
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: email-agent
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+    honorLabels: true
+    metricRelabelings:
+    - sourceLabels: [__name__]
+      regex: '^go_.*'
+      action: drop
+    - sourceLabels: [__name__]
+      regex: '^promhttp_.*'
+      action: drop
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: email-agents-alerts
+  namespace: email-agents
+  labels:
+    app: email-agents
+    release: prometheus
+spec:
+  groups:
+  - name: email-agents
+    interval: 30s
+    rules:
+    - alert: InboxMonitorDown
+      expr: up{job="inbox-monitor"} == 0
+      for: 5m
+      labels:
+        severity: critical
+        service: inbox-monitor
+      annotations:
+        summary: "Inbox Monitor is down"
+        description: "Inbox Monitor has been down for more than 5 minutes"
+        
+    - alert: EmailAgentDown
+      expr: up{job="email-agent"} == 0
+      for: 5m
+      labels:
+        severity: critical
+        service: email-agent
+      annotations:
+        summary: "Email Agent is down"
+        description: "Email Agent has been down for more than 5 minutes"
+        
+    - alert: HighMemoryUsage
+      expr: (container_memory_working_set_bytes{pod=~"inbox-monitor-.*|email-agent-.*"} / container_spec_memory_limit_bytes) > 0.8
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High memory usage detected"
+        description: "Pod {{ $labels.pod }} is using more than 80% of its memory limit"
+        
+    - alert: HighCPUUsage
+      expr: (rate(container_cpu_usage_seconds_total{pod=~"inbox-monitor-.*|email-agent-.*"}[5m]) / container_spec_cpu_quota) > 0.8
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High CPU usage detected"
+        description: "Pod {{ $labels.pod }} is using more than 80% of its CPU limit"
+        
+    - alert: PodCrashLooping
+      expr: rate(kube_pod_container_status_restarts_total{pod=~"inbox-monitor-.*|email-agent-.*"}[15m]) > 0
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Pod is crash looping"
+        description: "Pod {{ $labels.pod }} has restarted more than once in the last 15 minutes"
+        
+    - alert: PodNotReady
+      expr: kube_pod_status_ready{condition="false", pod=~"inbox-monitor-.*|email-agent-.*"} == 1
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Pod is not ready"
+        description: "Pod {{ $labels.pod }} has been in not ready state for more than 5 minutes"

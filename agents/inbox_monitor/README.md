@@ -1200,7 +1200,7 @@ The system uses a dual-stream structured logging architecture with configurable 
     "event": "Email intent classified successfully",
     "intent": "positive",
     "confidence": 0.95,
-    "processing_time_ms": 1250,
+    "processing_duration_ms": 1250,
     "sender": "customer@example.com",
     "timestamp": "2025-07-21T20:30:15.123456Z",
     "logger": "services.azure_ai_foundry_client",

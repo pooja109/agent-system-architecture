@@ -14,16 +14,22 @@ import time
 
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import Config, DatabricksError
-from databricks.sdk.service.sql import ExecuteStatementRequest, StatementResponse
-from databricks.sdk.service.sql import StatementState, StatementStatus, StatementParameterListItem, State
+# Databricks SDK imports - handling different versions
+try:
+    from databricks.sdk.service.sql import ExecuteStatementRequest, StatementResponse
+    from databricks.sdk.service.sql import StatementState, StatementStatus, StatementParameterListItem, State
+except ImportError:
+    # Fallback for different SDK versions
+    ExecuteStatementRequest = None
+    StatementResponse = None
+    StatementState = None 
+    StatementStatus = None
+    StatementParameterListItem = None
+    State = None
 from pydantic import BaseModel, Field
 
-try:
-    from config.settings import DatabricksOAuthSettings
-    from services.azure_key_vault_client import AzureKeyVaultClient, ServicePrincipalCredentials
-except ImportError:
-    from ..config.settings import DatabricksOAuthSettings
-    from .azure_key_vault_client import AzureKeyVaultClient, ServicePrincipalCredentials
+from config.settings import DatabricksOAuthSettings
+from services.azure_key_vault_client import AzureKeyVaultClient, ServicePrincipalCredentials
 
 
 class OAuthTokenInfo(BaseModel):
@@ -175,16 +181,20 @@ class DatabricksOAuthClient:
             
             self.logger.info(
                 "Successfully initialized Databricks OAuth client",
-                host=f"https://{self.databricks_settings.server_hostname}",
-                client_id=self._service_principal_creds.client_id,
-                warehouse_id=self._warehouse_id
+                extra={
+                    "host": f"https://{self.databricks_settings.server_hostname}",
+                    "client_id": self._service_principal_creds.client_id,
+                    "warehouse_id": self._warehouse_id
+                }
             )
             
         except Exception as e:
             self.logger.error(
                 "Failed to initialize Databricks OAuth client",
-                error=str(e),
-                host=self.databricks_settings.server_hostname
+                extra={
+                    "error": str(e),
+                    "host": self.databricks_settings.server_hostname
+                }
             )
             raise OAuthAuthenticationError(f"Failed to initialize OAuth client: {e}") from e
     
@@ -217,10 +227,12 @@ class DatabricksOAuthClient:
             # Check warehouse state
             self.logger.info(
                 "Found SQL warehouse",
-                warehouse_id=self._warehouse_id,
-                warehouse_name=getattr(target_warehouse, 'name', 'Unknown'),
-                warehouse_state=getattr(target_warehouse, 'state', 'Unknown'),
-                warehouse_size=getattr(target_warehouse, 'cluster_size', 'Unknown')
+                extra={
+                    "warehouse_id": self._warehouse_id,
+                    "warehouse_name": getattr(target_warehouse, 'name', 'Unknown'),
+                    "warehouse_state": getattr(target_warehouse, 'state', 'Unknown'),
+                    "warehouse_size": getattr(target_warehouse, 'cluster_size', 'Unknown')
+                }
             )
             
             # Check if warehouse is running
@@ -229,23 +241,29 @@ class DatabricksOAuthClient:
                 if target_warehouse.state != State.RUNNING:
                     self.logger.warning(
                         "SQL warehouse is not in RUNNING state",
-                        warehouse_id=self._warehouse_id,
-                        current_state=target_warehouse.state,
-                        message="Warehouse may need to be started before queries can execute"
+                        extra={
+                            "warehouse_id": self._warehouse_id,
+                            "current_state": target_warehouse.state,
+                            "message": "Warehouse may need to be started before queries can execute"
+                        }
                     )
             
             self.logger.info(
                 "SQL warehouse setup complete",
-                warehouse_id=self._warehouse_id,
-                catalog=self._default_catalog,
-                schema=self._default_schema
+                extra={
+                    "warehouse_id": self._warehouse_id,
+                    "catalog": self._default_catalog,
+                    "schema": self._default_schema
+                }
             )
             
         except Exception as e:
             self.logger.error(
                 "Failed to setup SQL warehouse",
-                error=str(e),
-                http_path=self.databricks_settings.http_path
+                extra={
+                    "error": str(e),
+                    "http_path": self.databricks_settings.http_path
+                }
             )
             raise OAuthException(f"SQL warehouse setup failed: {e}") from e
     
@@ -272,9 +290,11 @@ class DatabricksOAuthClient:
         
         self.logger.info(
             "Waiting for warehouse to be ready",
-            warehouse_id=self._warehouse_id,
-            max_wait_minutes=max_wait_minutes,
-            check_interval_seconds=check_interval_seconds
+            extra={
+                "warehouse_id": self._warehouse_id,
+                "max_wait_minutes": max_wait_minutes,
+                "check_interval_seconds": check_interval_seconds
+            }
         )
         
         while time.time() - start_time < max_wait_seconds:
@@ -285,52 +305,62 @@ class DatabricksOAuthClient:
                 if warehouse.state == State.RUNNING:
                     self.logger.info(
                         "Warehouse is now running and ready",
-                        warehouse_id=self._warehouse_id,
-                        wait_time_seconds=int(time.time() - start_time)
+                        extra={
+                            "warehouse_id": self._warehouse_id,
+                            "wait_time_seconds": int(time.time() - start_time)
+                        }
                     )
                     return True
                 
                 elif warehouse.state == State.STARTING:
                     self.logger.info(
                         "Warehouse is starting, continuing to wait",
-                        warehouse_id=self._warehouse_id,
-                        current_state=warehouse.state,
-                        elapsed_seconds=int(time.time() - start_time),
-                        remaining_seconds=int(max_wait_seconds - (time.time() - start_time))
+                        extra={
+                            "warehouse_id": self._warehouse_id,
+                            "current_state": warehouse.state,
+                            "elapsed_seconds": int(time.time() - start_time),
+                            "remaining_seconds": int(max_wait_seconds - (time.time() - start_time))
+                        }
                     )
                     
                 elif warehouse.state == State.STOPPED:
                     self.logger.info(
                         "Warehouse is stopped, attempting to start",
-                        warehouse_id=self._warehouse_id
+                        extra={"warehouse_id": self._warehouse_id}
                     )
                     
                     try:
                         self._workspace_client.warehouses.start(self._warehouse_id)
                         self.logger.info(
                             "Initiated warehouse startup",
-                            warehouse_id=self._warehouse_id
+                            extra={"warehouse_id": self._warehouse_id}
                         )
                     except Exception as e:
                         self.logger.warning(
                             "Failed to start warehouse, continuing to wait",
-                            warehouse_id=self._warehouse_id,
-                            error=str(e)
+                            extra={
+                                "warehouse_id": self._warehouse_id,
+                                "error": str(e)
+                            }
                         )
                 
                 elif warehouse.state in [State.DELETING, State.DELETED]:
                     self.logger.error(
                         "Warehouse is being deleted or deleted",
-                        warehouse_id=self._warehouse_id,
-                        current_state=warehouse.state
+                        extra={
+                            "warehouse_id": self._warehouse_id,
+                            "current_state": warehouse.state
+                        }
                     )
                     return False
                 
                 else:
                     self.logger.warning(
                         "Warehouse in unexpected state",
-                        warehouse_id=self._warehouse_id,
-                        current_state=warehouse.state
+                        extra={
+                            "warehouse_id": self._warehouse_id,
+                            "current_state": warehouse.state
+                        }
                     )
                 
                 # Wait before next check
@@ -339,16 +369,20 @@ class DatabricksOAuthClient:
             except Exception as e:
                 self.logger.warning(
                     "Error checking warehouse status, retrying",
-                    warehouse_id=self._warehouse_id,
-                    error=str(e)
+                    extra={
+                        "warehouse_id": self._warehouse_id,
+                        "error": str(e)
+                    }
                 )
                 await asyncio.sleep(check_interval_seconds)
         
         self.logger.error(
             "Timeout waiting for warehouse to be ready",
-            warehouse_id=self._warehouse_id,
-            max_wait_minutes=max_wait_minutes,
-            total_wait_seconds=int(time.time() - start_time)
+            extra={
+                "warehouse_id": self._warehouse_id,
+                "max_wait_minutes": max_wait_minutes,
+                "total_wait_seconds": int(time.time() - start_time)
+            }
         )
         return False
     
@@ -391,11 +425,12 @@ class DatabricksOAuthClient:
         if not self._workspace_client:
             raise OAuthException("OAuth client not initialized")
         
-        # Implement retry logic with exponential backoff
+        # Implement retry logic with exponential backoff - fix timing calculation
+        overall_start_time = datetime.now(timezone.utc)
         last_exception = None
         for attempt in range(max_retries + 1):  # +1 to include initial attempt
             try:
-                start_time = datetime.now(timezone.utc)
+                attempt_start_time = datetime.now(timezone.utc)
                 
                 # Convert parameters to Databricks SDK format
                 statement_parameters = None
@@ -421,15 +456,19 @@ class DatabricksOAuthClient:
                     
                     self.logger.debug(
                         "Using parameterized query execution",
-                        parameter_count=len(statement_parameters),
-                        attempt=attempt + 1
+                        extra={
+                            "parameter_count": len(statement_parameters),
+                            "attempt": attempt + 1
+                        }
                     )
                 
                 self.logger.debug(
                     "Executing SQL query",
-                    query_preview=query[:100] + "..." if len(query) > 100 else query,
-                    warehouse_id=self._warehouse_id,
-                    attempt=attempt + 1
+                    extra={
+                        "query_preview": query[:100] + "..." if len(query) > 100 else query,
+                        "warehouse_id": self._warehouse_id,
+                        "attempt": attempt + 1
+                    }
                 )
                 
                 # Execute statement using SQL execution API with proper parameterization
@@ -452,11 +491,13 @@ class DatabricksOAuthClient:
                     if attempt < max_retries:
                         self.logger.warning(
                             "SQL execution pending - warehouse may be starting, will retry after waiting",
-                            wait_timeout=wait_timeout,
-                            query_preview=query[:100],
-                            warehouse_id=self._warehouse_id,
-                            attempt=attempt + 1,
-                            max_retries=max_retries
+                            extra={
+                                "wait_timeout": wait_timeout,
+                                "query_preview": query[:100],
+                                "warehouse_id": self._warehouse_id,
+                                "attempt": attempt + 1,
+                                "max_retries": max_retries
+                            }
                         )
                         
                         # Check if warehouse is starting and wait if needed
@@ -468,14 +509,18 @@ class DatabricksOAuthClient:
                             if not warehouse_ready:
                                 self.logger.warning(
                                     "Warehouse still not ready after wait, will retry with exponential backoff",
-                                    warehouse_id=self._warehouse_id,
-                                    attempt=attempt + 1
+                                    extra={
+                                        "warehouse_id": self._warehouse_id,
+                                        "attempt": attempt + 1
+                                    }
                                 )
                         except Exception as wait_error:
                             self.logger.warning(
                                 "Error while waiting for warehouse, proceeding with backoff retry",
-                                error=str(wait_error),
-                                attempt=attempt + 1
+                                extra={
+                                    "error": str(wait_error),
+                                    "attempt": attempt + 1
+                                }
                             )
                         
                         # Store exception and continue to retry logic
@@ -489,10 +534,12 @@ class DatabricksOAuthClient:
                         # Final attempt failed
                         self.logger.error(
                             "SQL execution failed after all retry attempts",
-                            wait_timeout=wait_timeout,
-                            query_preview=query[:100],
-                            warehouse_id=self._warehouse_id,
-                            total_attempts=attempt + 1
+                            extra={
+                                "wait_timeout": wait_timeout,
+                                "query_preview": query[:100],
+                                "warehouse_id": self._warehouse_id,
+                                "total_attempts": attempt + 1
+                            }
                         )
                         raise SQLExecutionError(
                             f"SQL execution timed out in PENDING state after {wait_timeout} "
@@ -515,10 +562,12 @@ class DatabricksOAuthClient:
                         
                         self.logger.error(
                             "SQL execution failed with error status",
-                            state=state.value if hasattr(state, 'value') else str(state),
-                            error=error_msg,
-                            query_preview=query[:100],
-                            attempt=attempt + 1
+                            extra={
+                                "state": state.value if hasattr(state, 'value') else str(state),
+                                "error": error_msg,
+                                "query_preview": query[:100],
+                                "attempt": attempt + 1
+                            }
                         )
                         raise SQLExecutionError(error_msg)
                     
@@ -537,8 +586,10 @@ class DatabricksOAuthClient:
                         self.logger.error("SQL execution in unexpected state", extra={"state": str(state), "query_preview": query[:100], "attempt": attempt + 1})
                         raise SQLExecutionError(error_msg)
                 
-                # Process results - successful execution
-                execution_time = (datetime.now(timezone.utc) - start_time).total_seconds() * 1000
+                # Process results - successful execution (use overall timing, not per-attempt)
+                execution_time = (datetime.now(timezone.utc) - overall_start_time).total_seconds() * 1000
+                # Ensure non-negative execution time
+                execution_time = max(0, execution_time)
                 
                 columns = []
                 rows = []
@@ -568,10 +619,12 @@ class DatabricksOAuthClient:
                 
                 self.logger.info(
                     "SQL query executed successfully",
-                    row_count=result.row_count,
-                    execution_time_ms=result.execution_time_ms,
-                    columns_count=len(columns),
-                    attempt=attempt + 1
+                    extra={
+                        "row_count": result.row_count,
+                        "execution_time_ms": result.execution_time_ms,
+                        "columns_count": len(columns),
+                        "attempt": attempt + 1
+                    }
                 )
                 
                 return result
@@ -586,17 +639,21 @@ class DatabricksOAuthClient:
                 if attempt < max_retries:
                     self.logger.warning(
                         "Databricks error occurred, will retry with exponential backoff",
-                        error=str(e),
-                        query_preview=query[:100],
-                        attempt=attempt + 1,
-                        max_retries=max_retries
+                        extra={
+                            "error": str(e),
+                            "query_preview": query[:100],
+                            "attempt": attempt + 1,
+                            "max_retries": max_retries
+                        }
                     )
                 else:
                     self.logger.error(
                         "Databricks SQL execution failed after all attempts",
-                        error=str(e),
-                        query_preview=query[:100],
-                        total_attempts=attempt + 1
+                        extra={
+                            "error": str(e),
+                            "query_preview": query[:100],
+                            "total_attempts": attempt + 1
+                        }
                     )
                     raise last_exception from e
                     
@@ -607,17 +664,21 @@ class DatabricksOAuthClient:
                 if attempt < max_retries:
                     self.logger.warning(
                         "Unexpected error occurred, will retry with exponential backoff",
-                        error=str(e),
-                        query_preview=query[:100],
-                        attempt=attempt + 1,
-                        max_retries=max_retries
+                        extra={
+                            "error": str(e),
+                            "query_preview": query[:100],
+                            "attempt": attempt + 1,
+                            "max_retries": max_retries
+                        }
                     )
                 else:
                     self.logger.error(
                         "Unexpected error during SQL execution after all attempts",
-                        error=str(e),
-                        query_preview=query[:100],
-                        total_attempts=attempt + 1
+                        extra={
+                            "error": str(e),
+                            "query_preview": query[:100],
+                            "total_attempts": attempt + 1
+                        }
                     )
                     raise last_exception from e
             
@@ -626,9 +687,11 @@ class DatabricksOAuthClient:
                 backoff_seconds = min(300, retry_backoff_base ** attempt)  # Cap at 5 minutes
                 self.logger.info(
                     "Waiting before retry with exponential backoff",
-                    backoff_seconds=backoff_seconds,
-                    attempt=attempt + 1,
-                    max_retries=max_retries
+                    extra={
+                        "backoff_seconds": backoff_seconds,
+                        "attempt": attempt + 1,
+                        "max_retries": max_retries
+                    }
                 )
                 await asyncio.sleep(backoff_seconds)
         

@@ -1,0 +1,132 @@
+# Test Configuration File
+# ======================
+# 
+# This file provides flexible configuration for integration tests.
+# Values can be overridden by environment variables.
+
+# Service configurations
+services:
+  inbox_monitor:
+    name: "inbox-monitor"
+    host: "localhost"
+    port: 8080
+    health_endpoint: "/health"
+    metrics_endpoint: "/metrics"
+    timeout: 30
+    retry_count: 3
+  
+  email_agent:
+    name: "email-agent"
+    host: "localhost"
+    port: 8081
+    health_endpoint: "/health"
+    metrics_endpoint: "/metrics"
+    timeout: 30
+    retry_count: 3
+
+# Container configuration
+container:
+  registry: "docker.io"
+  namespace: "email-agents"
+  tag: "latest"
+  dockerfile_path: "Dockerfile"
+  build_context: "."
+  resource_limits:
+    memory: "512Mi"
+    cpu: "500m"
+  environment_vars:
+    LOG_LEVEL: "INFO"
+    ENVIRONMENT: "test"
+
+# Kubernetes configuration
+kubernetes:
+  namespace: "email-agents-test"
+  context: "default"
+  kubeconfig_path: null  # Uses default kubectl config
+  wait_timeout: 300
+  manifest_dir: "k8s"
+  service_account: "default"
+
+# Monitoring configuration
+monitoring:
+  prometheus:
+    host: "localhost"
+    port: 9090
+  grafana:
+    host: "localhost"
+    port: 3000
+  alertmanager:
+    host: "localhost"
+    port: 9093
+  loki:
+    host: "localhost"
+    port: 3100
+  query_timeout: 30
+  scrape_interval: "15s"
+  retention_period: "7d"
+
+# Performance testing configuration
+performance:
+  duration: 60
+  concurrent_users: 10
+  ramp_up: 10
+  think_time: 1
+  success_rate_threshold: 95.0
+  response_time_threshold: 2000
+  error_rate_threshold: 5.0
+  tools:
+    - "hey"
+    - "ab"
+    - "wrk"
+    - "curl"
+
+# Security configuration
+security:
+  scanners:
+    - "trivy"
+    - "hadolint"
+    - "bandit"
+    - "semgrep"
+  policies:
+    allow_root: false
+    allow_privilege_escalation: false
+    require_non_root_user: true
+    require_read_only_filesystem: false
+  allowed_registries:
+    - "docker.io"
+    - "ghcr.io"
+    - "mcr.microsoft.com"
+  scan_timeout: 300
+
+# Environment-specific overrides
+environments:
+  test:
+    # Test environment specific settings
+    performance:
+      duration: 30
+      concurrent_users: 5
+    security:
+      scan_timeout: 120
+  
+  staging:
+    # Staging environment specific settings
+    services:
+      inbox_monitor:
+        host: "inbox-monitor.staging.local"
+      email_agent:
+        host: "email-agent.staging.local"
+    kubernetes:
+      namespace: "email-agents-staging"
+  
+  production:
+    # Production environment specific settings
+    services:
+      inbox_monitor:
+        host: "inbox-monitor.prod.local"
+      email_agent:
+        host: "email-agent.prod.local"
+    kubernetes:
+      namespace: "email-agents-prod"
+    performance:
+      duration: 300
+      concurrent_users: 50

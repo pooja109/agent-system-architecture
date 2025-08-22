@@ -63,7 +63,17 @@ class IntentClassificationResult(BaseModel):
     detected_phrases: list[str] = Field(
         default_factory=list, description="Key phrases that influenced the decision"
     )
-    processing_time_ms: int = Field(..., description="Processing time in milliseconds")
+    processing_duration_ms: int = Field(..., description="Processing time in milliseconds")
+
+
+class OriginalSubjectResult(BaseModel):
+    """Result of original subject extraction."""
+
+    original_subject: str = Field(..., description="Extracted original subject line")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score")
+    reasoning: str = Field(..., description="Reasoning for the extraction")
+    extraction_method: str = Field(..., description="Method used for extraction")
+    processing_duration_ms: int = Field(..., ge=0, description="Processing time in milliseconds")
 
 
 class AzureAIFoundryClient(APIClientLoggerMixin):
@@ -349,6 +359,142 @@ class AzureAIFoundryClient(APIClientLoggerMixin):
             content = str(response)
         
         return {"classification": content, "response_time": response_time}
+    
+    async def _make_ai_request_with_validation(self, prompt: str, sender_email: str, max_retries: int = 3) -> IntentClassificationResult:
+        """Make AI request with validation and retry logic (Solution 2).
+        
+        Args:
+            prompt: Classification prompt
+            sender_email: Sender email for logging context
+            max_retries: Maximum number of retry attempts
+            
+        Returns:
+            IntentClassificationResult with classification details
+            
+        Raises:
+            Exception: If all retry attempts fail
+        """
+        retry_delay = 1.0
+        last_exception = None
+        
+        for attempt in range(max_retries):
+            try:
+                self.logger.debug("Starting AI request attempt", 
+                                attempt=attempt + 1,
+                                max_attempts=max_retries,
+                                sender_email=sender_email,
+                                retry_delay=retry_delay if attempt > 0 else 0)
+                
+                if not self.agent:
+                    raise RuntimeError("Client not properly initialized. Use async context manager.")
+                
+                # Make the agent call
+                self.logger.debug(f"Agent object type: {type(self.agent)}")
+                self.logger.debug(f"Agent definition id: {getattr(self.agent.definition, 'id', 'unknown') if hasattr(self.agent, 'definition') else 'no definition'}")
+                
+                # Call the agent using fresh thread for each request
+                response = await self.agent.get_response(messages=[prompt], thread=None)
+                
+                self.logger.debug(f"Agent response type: {type(response)}")
+                self.logger.debug(f"Response object attributes: {dir(response)}")
+                
+                # Extract content using existing logic
+                if hasattr(response, "content") and hasattr(response.content, "content"):
+                    content = response.content.content
+                elif hasattr(response, "message") and hasattr(response.message, "content"):
+                    content = response.message.content
+                elif hasattr(response, "content"):
+                    content = str(response.content)
+                else:
+                    content = str(response)
+                
+                self.logger.debug("Raw AI response extracted", 
+                                content_length=len(content),
+                                content_preview=content[:300],
+                                content_suffix=content[-100:] if len(content) > 100 else content)
+                
+                # Validate response format before parsing
+                if not self._validate_ai_response(content):
+                    error_msg = f"Invalid response format on attempt {attempt + 1}"
+                    self.logger.warning(error_msg, 
+                                      content_preview=content[:500],
+                                      sender_email=sender_email)
+                    raise Exception(error_msg)
+                
+                # Check for Azure AI Foundry service errors
+                if len(content.strip()) < 500 and (
+                    ("Run failed with status" in content and "RunStatus.FAILED" in content and "agent" in content) or 
+                    ("Sorry, something went wrong" in content and len(content.strip()) < 100) or
+                    "service temporarily unavailable" in content.lower() or
+                    "rate limit exceeded" in content.lower()
+                ):
+                    error_msg = f"Azure AI Foundry service error on attempt {attempt + 1}: {content}"
+                    self.logger.warning(error_msg, sender_email=sender_email)
+                    raise Exception(error_msg)
+                
+                # Parse the response
+                result = self._parse_agent_response(content)
+                
+                # Success - log and return
+                self.logger.debug("AI request successful", 
+                                attempt=attempt + 1,
+                                intent=result.intent.value if hasattr(result.intent, 'value') else str(result.intent),
+                                confidence=result.confidence,
+                                sender_email=sender_email)
+                
+                return result
+                
+            except Exception as e:
+                last_exception = e
+                error_type = type(e).__name__
+                error_msg = str(e)
+                
+                self.logger.warning("AI request attempt failed", 
+                                  attempt=attempt + 1,
+                                  max_attempts=max_retries,
+                                  error_type=error_type,
+                                  error_message=error_msg[:500],
+                                  sender_email=sender_email)
+                
+                # Check if this is a retryable error
+                retryable_errors = [
+                    'timeout', 'connection', 'service unavailable', 'rate limit',
+                    'too many requests', '429', '503', '502', '500', 'temporary',
+                    'invalid response format', 'json', 'html format'
+                ]
+                
+                is_retryable = any(keyword in error_msg.lower() for keyword in retryable_errors)
+                
+                if attempt < max_retries - 1 and is_retryable:
+                    self.logger.info("Retrying AI request", 
+                                   retry_delay=retry_delay,
+                                   next_attempt=attempt + 2,
+                                   sender_email=sender_email,
+                                   is_retryable=is_retryable)
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                else:
+                    # Either max retries reached or non-retryable error
+                    if not is_retryable:
+                        self.logger.error("Non-retryable error encountered", 
+                                        error_type=error_type,
+                                        error_message=error_msg,
+                                        sender_email=sender_email)
+                        raise e
+                    else:
+                        self.logger.error("Max retry attempts exceeded", 
+                                        attempts=max_retries,
+                                        final_error=error_msg,
+                                        sender_email=sender_email)
+                        break
+        
+        # All attempts failed
+        final_error_msg = f"Failed to get valid response after {max_retries} attempts. Last error: {str(last_exception)}"
+        self.logger.error("All AI request attempts failed", 
+                        max_attempts=max_retries,
+                        final_error=final_error_msg,
+                        sender_email=sender_email)
+        raise Exception(final_error_msg)
 
     async def classify_email_intent(
         self, subject: str, body: str, sender_email: str
@@ -378,75 +524,20 @@ class AzureAIFoundryClient(APIClientLoggerMixin):
             self.logger.debug(f"Sending prompt to Azure AI Foundry agent (length: {len(prompt)})")
             self.logger.debug(f"Prompt preview: {prompt[:200]}...")
 
-            # Always use a fresh thread for each email classification to avoid context confusion
-            # Don't reuse threads as each email should be classified independently
-            # Add retry logic for Azure AI Foundry service issues
-            max_retries = 2
-            retry_delay = 1.0
-            
-            for attempt in range(max_retries + 1):
-                try:
-                    self.logger.debug(f"Azure AI Foundry agent call attempt {attempt + 1}/{max_retries + 1}")
-                    self.logger.debug(f"Agent object type: {type(self.agent)}")
-                    self.logger.debug(f"Agent definition id: {getattr(self.agent.definition, 'id', 'unknown') if hasattr(self.agent, 'definition') else 'no definition'}")
-                    
-                    # Call the agent using the original working approach with thread parameter
-                    # thread=None means Azure AI Foundry will create a new thread for each call
-                    response = await self.agent.get_response(messages=[prompt], thread=None)
-                    
-                    self.logger.debug(f"Agent response type: {type(response)}")
-                    self.logger.debug(f"Response object attributes: {dir(response)}")
-                    
-                    # If we get here without exception, break out of retry loop
-                    break
-                    
-                except Exception as agent_error:
-                    self.logger.warning(f"Azure AI Foundry agent call attempt {attempt + 1} failed: {agent_error}")
-                    self.logger.debug(f"Agent error details: {type(agent_error)} - {agent_error}")
-                    
-                    if attempt < max_retries:
-                        self.logger.info(f"Retrying Azure AI Foundry agent call in {retry_delay} seconds...")
-                        await asyncio.sleep(retry_delay)
-                        retry_delay *= 2  # Exponential backoff
-                    else:
-                        # Final attempt failed, re-raise the exception
-                        raise
-
-            # Parse the agent's response - use the original working approach
-            if hasattr(response, "content") and hasattr(response.content, "content"):
-                content = response.content.content
-            elif hasattr(response, "message") and hasattr(response.message, "content"):
-                content = response.message.content
-            elif hasattr(response, "content"):
-                content = str(response.content)
-            else:
-                content = str(response)
-
-            self.logger.debug(f"Extracted content (full): {content}")
-            self.logger.debug(f"Content length: {len(content)}")
-
-            # Check for Azure AI Foundry service errors in the response content
-            # Only treat as service error if it's a short error message, not legitimate email content
-            if len(content.strip()) < 500 and (
-                ("Run failed with status" in content and "RunStatus.FAILED" in content and "agent" in content) or 
-                ("Sorry, something went wrong" in content and len(content.strip()) < 100)
-            ):
-                # This indicates an Azure AI Foundry service-level error, not a client error
-                raise Exception(f"Azure AI Foundry service error: {content}")
-
-            result = self._parse_agent_response(content)
+            # Solution 2: Response Validation and Retry with enhanced logic
+            result = await self._make_ai_request_with_validation(prompt, sender_email)
 
             # Calculate processing time and create new result with updated time
-            processing_time_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+            processing_duration_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
             # Ensure processing time is at least 1ms to avoid test failures
-            if processing_time_ms == 0:
-                processing_time_ms = 1
+            if processing_duration_ms == 0:
+                processing_duration_ms = 1
             result = IntentClassificationResult(
                 intent=result.intent,
                 confidence=result.confidence,
                 reasoning=result.reasoning,
                 detected_phrases=result.detected_phrases,
-                processing_time_ms=processing_time_ms,
+                processing_duration_ms=processing_duration_ms,
             )
 
             self.logger.info(
@@ -454,7 +545,7 @@ class AzureAIFoundryClient(APIClientLoggerMixin):
                 extra={
                     "intent": result.intent.value,
                     "confidence": result.confidence,
-                    "processing_time_ms": processing_time_ms,
+                    "processing_duration_ms": processing_duration_ms,
                     "sender": sender_email,
                 }
             )
@@ -462,13 +553,13 @@ class AzureAIFoundryClient(APIClientLoggerMixin):
             return result
 
         except Exception as e:
-            processing_time_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
+            processing_duration_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
             
             # Enhanced error logging with more detail
             error_details = {
                 "error_message": str(e),
                 "error_type": type(e).__name__,
-                "processing_time_ms": processing_time_ms,
+                "processing_duration_ms": processing_duration_ms,
                 "sender": sender_email,
                 "subject_preview": subject[:50] if subject else "No subject",
             }
@@ -498,7 +589,7 @@ class AzureAIFoundryClient(APIClientLoggerMixin):
                 confidence=0.0,
                 reasoning=f"Classification failed: {e!s}",
                 detected_phrases=[],
-                processing_time_ms=processing_time_ms,
+                processing_duration_ms=processing_duration_ms,
             )
 
         finally:
@@ -622,8 +713,167 @@ Sender Pattern: Standard business communication format
 Analyze the overall context, tone, and meaning to determine the sender's true intent. Provide your classification in the JSON format specified in your instructions.
 """.strip()
 
+    def _extract_json_from_response(self, response_text: str) -> dict:
+        """Extract JSON from potentially malformed response with comprehensive debugging.
+        
+        This is Solution 1 - Enhanced Response Parsing to handle various response formats.
+        
+        Args:
+            response_text: Raw response content from Azure AI Foundry
+            
+        Returns:
+            Dictionary containing parsed JSON data
+            
+        Raises:
+            ValueError: If no valid JSON found in response
+        """
+        original_length = len(response_text)
+        
+        # Log detailed response analysis for debugging
+        self.logger.debug("Starting JSON extraction from AI response", 
+                         response_length=original_length,
+                         response_preview=response_text[:200],
+                         response_suffix=response_text[-100:] if len(response_text) > 100 else response_text)
+        
+        # Check if response starts with HTML (common error case)
+        if response_text.strip().startswith('<'):
+            self.logger.error("Received HTML response instead of JSON", 
+                             response_preview=response_text[:500])
+            raise ValueError("Response is HTML format, not JSON")
+        
+        # Check for common error patterns
+        error_indicators = ['<!DOCTYPE', '<html', '<error', 'HTTP/', 'Server Error', '500 Internal', '429 Too Many', '503 Service']
+        for indicator in error_indicators:
+            if indicator.lower() in response_text[:200].lower():
+                self.logger.error("Response contains error indicator", 
+                                indicator=indicator,
+                                response_preview=response_text[:300])
+                raise ValueError(f"Response contains error indicator: {indicator}")
+        
+        # Try direct JSON parsing first (most common case)
+        try:
+            result = json.loads(response_text)
+            self.logger.debug("Successfully parsed response as direct JSON")
+            return result
+        except json.JSONDecodeError as e:
+            self.logger.debug("Direct JSON parsing failed, trying extraction methods", 
+                            json_error=str(e),
+                            error_position=e.pos if hasattr(e, 'pos') else None)
+        
+        # Method 1: Extract from markdown code blocks
+        import re
+        json_block_match = re.search(r"```(?:json)?\s*\n?(.*?)\n?```", response_text, re.DOTALL)
+        if json_block_match:
+            json_content = json_block_match.group(1).strip()
+            try:
+                result = json.loads(json_content)
+                self.logger.debug("Successfully extracted JSON from markdown code block")
+                return result
+            except json.JSONDecodeError as e:
+                self.logger.debug("Markdown code block JSON parsing failed", 
+                                json_error=str(e),
+                                extracted_content=json_content[:200])
+        
+        # Method 2: Find JSON object boundaries more precisely
+        json_start = -1
+        json_end = -1
+        brace_count = 0
+        
+        for i, char in enumerate(response_text):
+            if char == '{':
+                if json_start == -1:
+                    json_start = i
+                brace_count += 1
+            elif char == '}':
+                brace_count -= 1
+                if brace_count == 0 and json_start != -1:
+                    json_end = i
+                    break
+        
+        if json_start != -1 and json_end != -1:
+            json_content = response_text[json_start:json_end+1]
+            try:
+                result = json.loads(json_content)
+                self.logger.debug("Successfully extracted JSON using brace matching", 
+                                json_start=json_start,
+                                json_end=json_end,
+                                extracted_length=len(json_content))
+                return result
+            except json.JSONDecodeError as e:
+                self.logger.debug("Brace-matched JSON parsing failed", 
+                                json_error=str(e),
+                                json_content_preview=json_content[:200])
+        
+        # Method 3: Simple regex fallback
+        json_match = re.search(r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}", response_text, re.DOTALL)
+        if json_match:
+            json_content = json_match.group()
+            try:
+                result = json.loads(json_content)
+                self.logger.debug("Successfully extracted JSON using regex fallback")
+                return result
+            except json.JSONDecodeError as e:
+                self.logger.debug("Regex fallback JSON parsing failed", 
+                                json_error=str(e))
+        
+        # Log the exact problematic area mentioned in user's error
+        char_665_area = response_text[660:670] if len(response_text) > 670 else response_text
+        line_6_area = response_text.split('\n')[5:7] if len(response_text.split('\n')) > 6 else ["N/A"]
+        
+        self.logger.error("All JSON extraction methods failed", 
+                         char_665_area=char_665_area,
+                         line_6_area=line_6_area,
+                         response_lines_count=len(response_text.split('\n')),
+                         response_first_500=response_text[:500],
+                         response_last_200=response_text[-200:] if len(response_text) > 200 else response_text)
+        
+        raise ValueError(f"No valid JSON found in agent response (length: {original_length})")
+    
+    def _validate_ai_response(self, content: str) -> bool:
+        """Validate AI response format before parsing.
+        
+        Args:
+            content: Response content to validate
+            
+        Returns:
+            True if response appears valid, False otherwise
+        """
+        if not content or not content.strip():
+            self.logger.warning("Empty or whitespace-only response received")
+            return False
+        
+        content_lower = content.lower().strip()
+        
+        # Check for HTML responses (rate limiting, errors)
+        if content_lower.startswith('<'):
+            self.logger.warning("Response appears to be HTML format")
+            return False
+        
+        # Check for HTTP error responses
+        http_errors = ['http/1.1', 'http/2.0', '<!doctype', '<html', 'server error', 
+                      'internal server error', 'service unavailable', 'too many requests']
+        if any(error in content_lower[:200] for error in http_errors):
+            self.logger.warning("Response appears to be HTTP error page")
+            return False
+        
+        # Check for Azure AI service errors
+        ai_errors = ['run failed with status', 'sorry, something went wrong', 
+                    'service temporarily unavailable', 'rate limit exceeded']
+        if any(error in content_lower for error in ai_errors):
+            self.logger.warning("Response contains Azure AI service error")
+            return False
+        
+        # Basic JSON structure check
+        if '{' not in content or '}' not in content:
+            self.logger.warning("Response does not contain JSON structure")
+            return False
+        
+        return True
+    
     def _parse_agent_response(self, content: str) -> IntentClassificationResult:
         """Parse the agent's response and extract intent classification.
+        
+        Enhanced with Solution 1 (robust JSON extraction) and debugging.
 
         Args:
             content: Response content string from the agent
@@ -635,33 +885,12 @@ Analyze the overall context, tone, and meaning to determine the sender's true in
             Exception: If parsing fails
         """
         try:
-            # Try to parse as JSON directly
-            try:
-                result_data = json.loads(content)
-            except json.JSONDecodeError:
-                # If not valid JSON, try to extract JSON from markdown code blocks or text
-                import re
-
-                # First try to extract from markdown code blocks (```json ... ```)
-                json_block_match = re.search(r"```(?:json)?\s*\n?(.*?)\n?```", content, re.DOTALL)
-                if json_block_match:
-                    json_content = json_block_match.group(1).strip()
-                    try:
-                        result_data = json.loads(json_content)
-                    except json.JSONDecodeError:
-                        # Fallback to regex pattern for raw JSON
-                        json_match = re.search(r"\{.*?\}", content, re.DOTALL)
-                        if json_match:
-                            result_data = json.loads(json_match.group())
-                        else:
-                            raise Exception(f"No valid JSON found in agent response: {content}") from None
-                else:
-                    # Fallback to regex pattern for raw JSON
-                    json_match = re.search(r"\{.*?\}", content, re.DOTALL)
-                    if json_match:
-                        result_data = json.loads(json_match.group())
-                    else:
-                        raise Exception(f"No valid JSON found in agent response: {content}") from None
+            # Validate response before parsing
+            if not self._validate_ai_response(content):
+                raise Exception(f"Invalid response format detected: {content[:200]}")
+            
+            # Use enhanced JSON extraction
+            result_data = self._extract_json_from_response(content)
 
             # Map intent string to enum
             intent_str = result_data.get("intent", "unknown").lower()
@@ -683,7 +912,7 @@ Analyze the overall context, tone, and meaning to determine the sender's true in
                 confidence=confidence,
                 reasoning=reasoning,
                 detected_phrases=detected_phrases,
-                processing_time_ms=0,  # Will be set by caller
+                processing_duration_ms=0,  # Will be set by caller
             )
 
         except Exception as e:

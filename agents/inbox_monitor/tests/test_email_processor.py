@@ -24,7 +24,7 @@ class TestEmailProcessor:
             mock_scenario_result = Mock()
             mock_scenario_result.scenario_type.value = "scenario_1"
             mock_scenario_result.success = True  # Ensure scenario processing succeeds
-            mock_scenario_result.actions_taken = ["test_action"]
+            mock_scenario_result.agent_actions_log = ["test_action"]
             mock_scenario_result.expert_assigned = None  # Proper None value
             mock_scenario_result.case_created = None  # Proper None value
             mock_scenario_result.emails_sent = []  # Proper list value
@@ -66,7 +66,7 @@ class TestEmailProcessor:
         mock_email.id = "test-message-id-123"
         mock_email.to_ai_format.return_value = {"id": "test-message-id-123"}
         mock_email.processing_metadata = Mock()
-        mock_email.processing_metadata.processing_id = "test-processing-id"
+        mock_email.processing_metadata.process_id = "test-processing-id"
         
         # Set up required string attributes for ProcessingResult
         mock_email.sender = Mock()
@@ -79,7 +79,7 @@ class TestEmailProcessor:
         mock_scenario_result = Mock()
         mock_scenario_result.scenario_type.value = "scenario_1"
         mock_scenario_result.success = True  # Ensure scenario succeeds
-        mock_scenario_result.actions_taken = ["test_action"]
+        mock_scenario_result.agent_actions_log = ["test_action"]
         mock_scenario_result.expert_assigned = None
         mock_scenario_result.case_created = None
         mock_scenario_result.emails_sent = []
@@ -126,7 +126,7 @@ class TestEmailProcessor:
         mock_email.id = "test-message-id-123"
         mock_email.to_ai_format.return_value = {"id": "test-message-id-123"}
         mock_email.processing_metadata = Mock()
-        mock_email.processing_metadata.processing_id = "test-processing-id"
+        mock_email.processing_metadata.process_id = "test-processing-id"
         
         # Set up required string attributes for ProcessingResult
         mock_email.sender = Mock()
@@ -145,8 +145,8 @@ class TestEmailProcessor:
                 )
         assert result.success is True
         assert result.email_id == "test-message-id-123"
-        assert result.moved_to_folder == "Processed_01_2024"
-        assert result.output_location is not None
+        assert result.destination_folder == "Processed_01_2024"
+        assert result.storage_location is not None
         assert result.error is None
     @pytest.mark.asyncio
     @pytest.mark.fast
@@ -162,7 +162,7 @@ class TestEmailProcessor:
         mock_email.id = "test-message-id-123"
         mock_email.to_ai_format.return_value = {"id": "test-message-id-123"}
         mock_email.processing_metadata = Mock()
-        mock_email.processing_metadata.processing_id = "test-processing-id"
+        mock_email.processing_metadata.process_id = "test-processing-id"
         
         # Set up required string attributes for ProcessingResult
         mock_email.sender = Mock()
@@ -177,7 +177,7 @@ class TestEmailProcessor:
                 mock_graph_message, "folder-id", "Processed_01_2024"
             )
         assert result.success is True
-        assert result.moved_to_folder is None  # Not moved in dry-run
+        assert result.destination_folder is None  # Not moved in dry-run
         # Verify email was NOT moved
         mock_graph_client.move_message.assert_not_called()
     @pytest.mark.asyncio
@@ -194,7 +194,7 @@ class TestEmailProcessor:
         )
         assert result.success is False
         assert "Conversion failed" in result.error
-        assert result.moved_to_folder is None
+        assert result.destination_folder is None
     @pytest.mark.asyncio
     @pytest.mark.fast
     @pytest.mark.unit

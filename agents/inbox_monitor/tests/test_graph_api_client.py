@@ -261,5 +261,5 @@ class TestGraphAPIClient:
         assert email.recipients.to[0].email == "recipient@example.com"
         assert email.body.content_type == "text/html"
         assert email.importance == EmailImportance.NORMAL
-        assert email.processing_metadata.inbox_monitor_version == "1.0.0"
-        assert email.processing_metadata.processing_id == "test-processing-id"
+        assert email.processing_metadata.monitor_version == "1.0.0"
+        assert email.processing_metadata.process_id == "test-processing-id"

@@ -89,7 +89,7 @@ class TestContactLookupServiceTestMode:
     @pytest.mark.email
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
-    async def test_email_substitution_when_test_mode_enabled(
+    async def test_email_substitution_when_test_mode(
         self, databricks_settings, enabled_test_mode_settings, mock_databricks_connection
     ):
         """Test email substitution when test mode is enabled."""

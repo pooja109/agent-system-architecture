@@ -175,11 +175,11 @@ class MockEmailProcessor(BusinessLogicLoggerMixin):
             result = {
                 "success": True,
                 "email_id": email_id,
-                "processing_id": f"proc_{email_id}",
+                "process_id": f"proc_{email_id}",
                 "error": None,
-                "moved_to_folder": "Processed_Mock",
-                "output_location": f"/tmp/mock_{email_id}.json",
-                "processing_time_ms": 50
+                "destination_folder": "Processed_Mock",
+                "storage_location": f"/tmp/mock_{email_id}.json",
+                "processing_duration_ms": 50
             }
             
             self.processed_emails.append(message)

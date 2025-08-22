@@ -1,0 +1,31 @@
+Security Scan Summary
+====================
+Timestamp: Wed Aug 20 21:10:05 CDT 2025
+Scan Configuration:
+  - Containers: true
+  - Kubernetes: false
+  - Network: false
+  - Namespace: email-agents
+
+Reports Generated:
+  - configuration_security_20250820_211004.txt
+  - container_security_20250820_211004.txt
+  - dockerfile_security_20250820_211004.txt
+  - security_summary_20250820_211004.txt
+
+Security Recommendations:
+  1. Review all ⚠️  warnings in the detailed reports
+  2. Fix any ❌ critical issues found
+  3. Implement missing security headers for web services
+  4. Ensure proper file permissions on configuration files
+  5. Use Kubernetes network policies to restrict traffic
+  6. Regularly update container images to patch vulnerabilities
+  7. Follow principle of least privilege for service accounts
+  8. Monitor for suspicious network activity
+
+Next Steps:
+  1. Address critical and high-severity findings
+  2. Implement automated security scanning in CI/CD
+  3. Set up monitoring for security events
+  4. Regular security reviews and updates
+
