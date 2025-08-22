@@ -200,7 +200,7 @@ class TestEmailProcessorErrorConditions:
         mock_email.id = "test-message-id"
         mock_email.to_ai_format.side_effect = TypeError("Object is not JSON serializable")
         mock_email.processing_metadata = Mock()
-        mock_email.processing_metadata.processing_id = "test-processing-id"
+        mock_email.processing_metadata.process_id = "test-processing-id"
         mock_graph_client.convert_to_email_model.return_value = mock_email
         
         result = await processor._process_single_email(
@@ -222,7 +222,7 @@ class TestEmailProcessorErrorConditions:
         mock_email.id = "test-message-id"
         mock_email.to_ai_format.return_value = {"id": "test-message-id"}
         mock_email.processing_metadata = Mock()
-        mock_email.processing_metadata.processing_id = "test-processing-id"
+        mock_email.processing_metadata.process_id = "test-processing-id"
         mock_graph_client.convert_to_email_model.return_value = mock_email
         
         # Mock file writing to fail with encoding error

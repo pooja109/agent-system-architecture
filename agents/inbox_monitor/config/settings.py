@@ -12,11 +12,77 @@ from typing import List
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field, model_validator, SecretStr
 
-# Load environment variables from the main repo directory
+# Import scenario tracking configuration
+try:
+    from .scenario_tracking_settings import ScenarioTrackingConfiguration
+    from .tracking_integration_settings import (
+        TrackingIntegrationSettings,
+        EmailProcessorIntegrationSettings
+    )
+except ImportError:
+    from scenario_tracking_settings import ScenarioTrackingConfiguration
+    from tracking_integration_settings import (
+        TrackingIntegrationSettings,
+        EmailProcessorIntegrationSettings
+    )
+
+# Load environment variables - support both isolated and repo-wide deployment
 import pathlib
-repo_root = pathlib.Path(__file__).parent.parent.parent.parent
-env_file = repo_root / ".env"
-load_dotenv(env_file)
+
+# Cache for container detection to avoid repeated environment checks
+_is_container_cache = None
+
+def _is_containerized_environment() -> bool:
+    """Check if running in a containerized environment with caching."""
+    global _is_container_cache
+    if _is_container_cache is None:
+        _is_container_cache = (
+            os.getenv("KUBERNETES_SERVICE_HOST") is not None or 
+            os.getenv("IS_CONTAINER", "").lower() == "true"
+        )
+    return _is_container_cache
+
+def ensure_environment_loaded() -> None:
+    """Ensure environment variables are loaded, using fallback if main.py didn't run.
+    
+    This function provides a fallback environment loading mechanism for cases where
+    config/settings.py is imported directly without going through main.py.
+    
+    In most cases, main.py will have already loaded the environment, so this
+    function will detect that and skip redundant loading.
+    """
+    # Check if environment was already loaded by main.py
+    if os.getenv("ENV_LOADED") == "true" or os.getenv("INBOX_MONITOR_ROOT"):
+        # Environment already loaded by main.py or similar
+        return
+    
+    # Check if we're in a containerized environment (cached)
+    if _is_containerized_environment():
+        # In container, environment should be set by orchestrator
+        return
+    
+    # Fallback environment loading for direct config imports
+    try:
+        from dotenv import load_dotenv
+        
+        service_root = pathlib.Path(__file__).parent.parent
+        potential_env_files = [
+            service_root / ".env",  # Local to inbox_monitor
+            pathlib.Path.cwd() / ".env",  # Current working directory
+            service_root.parent.parent.parent / ".env",  # Main repo root (backward compatibility)
+        ]
+        
+        for env_file in potential_env_files:
+            if env_file.exists():
+                load_dotenv(env_file, override=False)  # Don't override already set vars
+                break
+                
+    except ImportError:
+        # python-dotenv not available, assume production environment
+        pass
+
+# Load environment on module import (fallback only)
+ensure_environment_loaded()
 
 
 class GraphAPISettings(BaseModel):
@@ -140,6 +206,10 @@ class AzureAIFoundrySettings(BaseModel):
 
     endpoint: str = Field(..., description="Azure AI Foundry endpoint")
     connection_string: str = Field(..., description="Azure AI Foundry connection string")
+    original_subject_classifier_agent_name: str = Field(
+        default="original-subject-extractor",
+        description="Agent name for original subject extraction"
+    )
     
     @classmethod
     async def from_key_vault(cls, key_vault_client) -> "AzureAIFoundrySettings":
@@ -495,6 +565,18 @@ class AppSettings(BaseModel):
     content_formatting: ContentFormattingSettings
     monitoring: MonitoringSettings
     prompt_management: PromptManagementSettings
+    scenario_tracking: ScenarioTrackingConfiguration = Field(
+        default_factory=ScenarioTrackingConfiguration,
+        description="Scenario processing tracking configuration"
+    )
+    tracking_integration: TrackingIntegrationSettings = Field(
+        default_factory=TrackingIntegrationSettings.from_environment,
+        description="Email processor integration settings for scenario tracking"
+    )
+    email_processor_integration: EmailProcessorIntegrationSettings = Field(
+        default_factory=EmailProcessorIntegrationSettings,
+        description="Email processor specific integration settings"
+    )
     environment: str = Field(default="development", description="Application environment")
     dry_run: bool = Field(default=False, description="Run in dry-run mode (don't move emails)")
 
@@ -670,6 +752,21 @@ async def get_settings(test_mode: bool = False) -> AppSettings:
             preload_prompts=os.getenv("PROMPT_PRELOAD_LIST", "email_classification,email_forwarding").split(","),
             performance_monitoring=os.getenv("PROMPT_PERFORMANCE_MONITORING", "true").lower() == "true",
             fallback_enabled=os.getenv("PROMPT_FALLBACK_ENABLED", "true").lower() == "true",
+        ),
+        scenario_tracking=ScenarioTrackingConfiguration(
+            enabled=os.getenv("SCENARIO_TRACKING_ENABLED", "true").lower() == "true",
+            table_suffix=os.getenv("SCENARIO_TRACKING_TABLE_SUFFIX", ""),
+            batch_insert_size=int(os.getenv("SCENARIO_TRACKING_BATCH_SIZE", "100")),
+            async_insert=os.getenv("SCENARIO_TRACKING_ASYNC_INSERT", "true").lower() == "true",
+            retry_attempts=int(os.getenv("SCENARIO_TRACKING_RETRY_ATTEMPTS", "3")),
+            retry_delay_seconds=float(os.getenv("SCENARIO_TRACKING_RETRY_DELAY", "2.0")),
+            connection_timeout_seconds=int(os.getenv("SCENARIO_TRACKING_CONNECTION_TIMEOUT", "30")),
+            performance_monitoring_enabled=os.getenv("SCENARIO_TRACKING_PERFORMANCE_MONITORING", "true").lower() == "true",
+            slow_query_threshold_ms=int(os.getenv("SCENARIO_TRACKING_SLOW_QUERY_THRESHOLD", "5000")),
+            health_check_interval_seconds=int(os.getenv("SCENARIO_TRACKING_HEALTH_CHECK_INTERVAL", "300")),
+            data_retention_days=int(os.getenv("SCENARIO_TRACKING_DATA_RETENTION_DAYS", "365")),
+            archive_after_days=int(os.getenv("SCENARIO_TRACKING_ARCHIVE_AFTER_DAYS", "90")),
+            cleanup_enabled=os.getenv("SCENARIO_TRACKING_CLEANUP_ENABLED", "false").lower() == "true",
         ),
         environment=os.getenv("ENVIRONMENT", "development"),
         dry_run=os.getenv("INBOX_MONITOR_DRY_RUN", "false").lower() == "true",

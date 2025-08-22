@@ -17,12 +17,8 @@ from databricks.sdk.service.sql import ExecuteStatementRequest, StatementRespons
 from databricks.sdk.service.sql import StatementState, StatementStatus, StatementParameterListItem
 from pydantic import BaseModel, Field
 
-try:
-    from config.settings import DatabricksOAuthSettings
-    from services.azure_key_vault_client import AzureKeyVaultClient, ServicePrincipalCredentials
-except ImportError:
-    from ..config.settings import DatabricksOAuthSettings
-    from .azure_key_vault_client import AzureKeyVaultClient, ServicePrincipalCredentials
+from config.settings import DatabricksOAuthSettings
+from services.azure_key_vault_client import AzureKeyVaultClient, ServicePrincipalCredentials
 
 
 class OAuthTokenInfo(BaseModel):

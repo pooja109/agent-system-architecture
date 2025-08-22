@@ -22,8 +22,48 @@ import logging
 import sys
 import os
 import json
+from pathlib import Path
 from typing import Optional
 from aiohttp import web, ClientSession
+
+# Load environment variables from .env file if present
+def load_environment() -> bool:
+    """Load environment variables from .env file if it exists.
+    
+    This is the primary environment loading function for the email agent.
+    It sets EMAIL_AGENT_ROOT which signals to config/settings.py that
+    environment loading has been handled.
+    """
+    from dotenv import load_dotenv
+    
+    # Try multiple potential .env locations
+    potential_env_files = [
+        Path(__file__).parent / ".env",  # Same directory as main.py
+        Path.cwd() / ".env",  # Current working directory
+        Path(__file__).parent / ".env.local",  # Local override
+    ]
+    
+    env_loaded = False
+    for env_file in potential_env_files:
+        if env_file.exists():
+            load_dotenv(env_file, override=True)
+            print(f"📋 Loaded environment from: {env_file}")
+            env_loaded = True
+            break
+    
+    if not env_loaded and os.getenv("REQUIRE_ENV_FILE", "false").lower() == "true":
+        print("⚠️  Warning: No .env file found and REQUIRE_ENV_FILE is set")
+        print("   Searched standard .env locations in service directory")
+        # Don't expose actual file paths for security
+    
+    # Set service root for path resolution
+    service_root = Path(__file__).parent.resolve()
+    os.environ["EMAIL_AGENT_ROOT"] = str(service_root)
+    
+    return env_loaded
+
+# Load environment before other imports
+ENV_LOADED = load_environment()
 
 # Add the current directory to Python path for imports
 current_dir = os.path.dirname(os.path.abspath(__file__))

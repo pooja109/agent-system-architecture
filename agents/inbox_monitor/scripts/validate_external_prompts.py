@@ -252,7 +252,7 @@ class ExternalPromptValidator:
         
         # Test email forwarding template rendering
         try:
-            from models.email import Email, EmailSender, EmailBody
+            from models.email import Email, EmailAddress, EmailBody
             
             test_email = Email(
                 id="validation-test",

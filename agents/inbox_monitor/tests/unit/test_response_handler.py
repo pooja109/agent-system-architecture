@@ -113,7 +113,7 @@ class TestResponseHandler:
             # Setup mocks
             mock_find_customer.return_value = {
                 "customer_id": "CUST_123",
-                "salesforce_account_id": "SF_123",
+                "sf_account_id": "SF_123",
             }
             mock_cancel.return_value = 3
             mock_track.return_value = None

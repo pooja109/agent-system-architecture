@@ -20,6 +20,19 @@ from services.round_robin_service import RoundRobinService
 from services.contact_lookup_service import ContactLookupService
 from config.settings import get_settings
 
+# Phase 3 integration monitoring
+try:
+    from utils.production_monitoring_phase3 import phase3_health_check
+    PHASE3_MONITORING_AVAILABLE = True
+except ImportError:
+    PHASE3_MONITORING_AVAILABLE = False
+    
+try:
+    from services.scenario_tracking_integration import get_tracking_integration
+    SCENARIO_TRACKING_AVAILABLE = True
+except ImportError:
+    SCENARIO_TRACKING_AVAILABLE = False
+
 
 class HealthStatus(Enum):
     """Health status enumeration."""
@@ -87,6 +100,7 @@ class HealthCheckService:
                 self._check_connection_pool_health(),
                 self._check_database_health(),
                 self._check_service_health(),
+                self._check_scenario_tracking_health(),
                 return_exceptions=True
             )
             
@@ -124,8 +138,7 @@ class HealthCheckService:
             }
             
             self.logger.info("Comprehensive health check completed", 
-                           overall_status=overall_status.value,
-                           total_time_ms=round(total_time * 1000, 2))
+                           extra={"overall_status": overall_status.value, "total_time_ms": round(total_time * 1000, 2)})
             
             return health_response
             
@@ -526,6 +539,18 @@ class HealthCheckService:
             except Exception as e:
                 service_results.append(("contact_lookup_service", False, time.time() - cl_start, str(e)))
             
+            # Test ScenarioTrackingIntegration
+            st_start = time.time()
+            try:
+                from services.scenario_tracking_integration import get_tracking_integration
+                tracking_integration = await get_tracking_integration()
+                st_health = await tracking_integration.get_integration_health()
+                st_result = st_health.get("status") in ["healthy", "disabled"]
+                st_time = time.time() - st_start
+                service_results.append(("scenario_tracking_integration", st_result, st_time))
+            except Exception as e:
+                service_results.append(("scenario_tracking_integration", False, time.time() - st_start, str(e)))
+            
             # Analyze service results
             healthy_services = sum(1 for result in service_results if len(result) == 3 and result[1])
             total_services = len(service_results)
@@ -621,6 +646,116 @@ class HealthCheckService:
                     return ComponentHealth("oauth", HealthStatus.UNHEALTHY, "OAuth credentials missing")
         except Exception:
             return ComponentHealth("oauth", HealthStatus.UNHEALTHY, "OAuth unavailable")
+    
+    async def _check_scenario_tracking_health(self) -> ComponentHealth:
+        """Check scenario tracking integration health."""
+        start_time = time.time()
+        
+        try:
+            from services.scenario_tracking_integration import get_tracking_integration
+            tracking_integration = await get_tracking_integration()
+            health_result = await tracking_integration.get_integration_health()
+            response_time = (time.time() - start_time) * 1000
+            
+            status_map = {
+                "healthy": HealthStatus.HEALTHY,
+                "degraded": HealthStatus.DEGRADED,
+                "unhealthy": HealthStatus.UNHEALTHY,
+                "disabled": HealthStatus.HEALTHY,  # Disabled is considered healthy since it's intentional
+                "not_initialized": HealthStatus.DEGRADED
+            }
+            
+            status = status_map.get(health_result.get("status"), HealthStatus.UNKNOWN)
+            
+            # Extract key metrics
+            metrics = {
+                "enabled": health_result.get("config_enabled", False),
+                "initialized": health_result.get("initialized", False),
+                "initialization_failed": health_result.get("initialization_failed", False),
+            }
+            
+            # Add batch processing metrics if available
+            if "batch_processing" in health_result:
+                batch_info = health_result["batch_processing"]
+                metrics.update({
+                    "batch_enabled": batch_info.get("enabled", False),
+                    "batch_queue_length": batch_info.get("queue_length", 0),
+                    "batch_task_running": batch_info.get("batch_task_running", False)
+                })
+            
+            # Add retry configuration if available
+            if "retry_configuration" in health_result:
+                retry_info = health_result["retry_configuration"]
+                metrics.update({
+                    "retry_max_attempts": retry_info.get("max_attempts", 0),
+                    "retry_enabled": retry_info.get("max_attempts", 0) > 0
+                })
+            
+            # Create status message
+            if status == HealthStatus.HEALTHY:
+                if health_result.get("status") == "disabled":
+                    message = "Scenario tracking disabled by configuration"
+                else:
+                    message = "Scenario tracking operational"
+            elif status == HealthStatus.DEGRADED:
+                message = f"Scenario tracking degraded: {health_result.get('status', 'unknown')}"
+            else:
+                message = f"Scenario tracking unhealthy: {health_result.get('status', 'unknown')}"
+                
+            # Add client status if available
+            if "tracking_client" in health_result:
+                client_status = health_result["tracking_client"].get("status")
+                if client_status and client_status != "healthy":
+                    message += f" (client: {client_status})"
+            
+            # **NEW: Add Phase 3 monitoring metrics if available**
+            if PHASE3_MONITORING_AVAILABLE:
+                try:
+                    phase3_health = await phase3_health_check()
+                    
+                    # Enhance metrics with Phase 3 data
+                    metrics.update({
+                        "phase3_monitoring_active": phase3_health.get("monitoring_active", False),
+                        "phase3_status": phase3_health.get("status", "unknown"),
+                        "sla_compliance_rate": phase3_health.get("sla_compliance", {}).get("compliance_rate"),
+                        "availability_rate": phase3_health.get("availability", {}).get("rate"),
+                        "avg_overhead_percent": phase3_health.get("performance", {}).get("avg_overhead_percent")
+                    })
+                    
+                    # Update status based on Phase 3 health
+                    if phase3_health.get("status") == "degraded" and status == HealthStatus.HEALTHY:
+                        status = HealthStatus.DEGRADED
+                        message += " (Phase 3 performance degraded)"
+                    elif phase3_health.get("status") == "error" and status in [HealthStatus.HEALTHY, HealthStatus.DEGRADED]:
+                        status = HealthStatus.UNHEALTHY
+                        message += " (Phase 3 monitoring error)"
+                        
+                except Exception as phase3_error:
+                    self.logger.debug(f"Phase 3 monitoring check failed: {phase3_error}")
+                    metrics["phase3_monitoring_error"] = str(phase3_error)
+            
+            return ComponentHealth(
+                name="scenario_tracking",
+                status=status,
+                message=message,
+                metrics=metrics,
+                response_time_ms=round(response_time, 2)
+            )
+            
+        except ImportError:
+            return ComponentHealth(
+                name="scenario_tracking",
+                status=HealthStatus.UNKNOWN,
+                message="Scenario tracking module not available",
+                response_time_ms=round((time.time() - start_time) * 1000, 2)
+            )
+        except Exception as e:
+            return ComponentHealth(
+                name="scenario_tracking",
+                status=HealthStatus.UNHEALTHY,
+                message=f"Scenario tracking health check failed: {str(e)}",
+                response_time_ms=round((time.time() - start_time) * 1000, 2)
+            )
     
     async def _check_connection_pool_ready(self) -> bool:
         """Check if connection pool is ready."""

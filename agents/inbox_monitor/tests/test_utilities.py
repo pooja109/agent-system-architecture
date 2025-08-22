@@ -136,15 +136,15 @@ class TestDataFactory:
     @staticmethod
     def create_processing_metadata(
         version: str = "1.0.0",
-        processing_id: str | None = None,
+        process_id: str | None = None,
         source_folder: str = "Inbox",
     ) -> ProcessingMetadata:
         """Create ProcessingMetadata instance."""
-        processing_id = processing_id or str(uuid.uuid4())
+        process_id = process_id or str(uuid.uuid4())
         return ProcessingMetadata(
-            inbox_monitor_version=version,
-            processing_id=processing_id,
-            processing_timestamp=datetime.now(timezone.utc),
+            monitor_version=version,
+            process_id=process_id,
+            processed_at=datetime.now(timezone.utc),
             source_folder=source_folder,
         )
     @staticmethod
@@ -162,7 +162,7 @@ class TestDataFactory:
         bcc_count: int = 0,
         categories: list[str] | None = None,
         headers: dict[str, str] | None = None,
-        processing_id: str | None = None,
+        process_id: str | None = None,
         version: str = "1.0.0",
     ) -> Email:
         """Create a complete Email model instance."""
@@ -181,7 +181,7 @@ class TestDataFactory:
             recipients=TestDataFactory.create_email_recipients(to_count, cc_count, bcc_count),
             subject=subject,
             body=TestDataFactory.create_email_body(content=content),
-            body_preview=content[:100],
+            email_body=content[:100],
             importance=importance,
             has_attachments=has_attachments,
             attachment_count=1 if has_attachments else 0,
@@ -191,29 +191,29 @@ class TestDataFactory:
             internet_message_headers=headers,
             processing_metadata=TestDataFactory.create_processing_metadata(
                 version=version,
-                processing_id=processing_id,
+                process_id=process_id,
             ),
         )
     @staticmethod
     def create_processing_result(
         success: bool = True,
         message_id: str | None = None,
-        processing_id: str | None = None,
+        process_id: str | None = None,
         stored_path: str | None = None,
-        moved_to_folder: str | None = None,
+        destination_folder: str | None = None,
         error: str | None = None,
     ) -> ProcessingResult:
         """Create ProcessingResult instance."""
         message_id = message_id or f"msg-{uuid.uuid4().hex[:8]}"
-        processing_id = processing_id or str(uuid.uuid4())
+        process_id = process_id or str(uuid.uuid4())
         stored_path = stored_path or f"/tmp/{message_id}.json"
-        moved_to_folder = moved_to_folder or "Processed_01_2024"
+        destination_folder = destination_folder or "Processed_01_2024"
         return ProcessingResult(
             success=success,
             message_id=message_id,
-            processing_id=processing_id,
+            process_id=process_id,
             stored_path=stored_path,
-            moved_to_folder=moved_to_folder,
+            destination_folder=destination_folder,
             error=error,
         )
     @staticmethod
@@ -424,14 +424,14 @@ class MockGraphAPIClient:
         await self._apply_delay_and_failures("move_message")
         self.message_moves.append({"message_id": message_id, "folder_id": folder_id})
         return {"id": message_id, "parentFolderId": folder_id}
-    def convert_to_email_model(self, message: dict[str, Any], processing_id: str, version: str):
+    def convert_to_email_model(self, message: dict[str, Any], process_id: str, version: str):
         """Convert Graph message to Email model."""
         return TestDataFactory.create_email_model(
             email_id=message["id"],
             subject=message.get("subject", ""),
             sender_email=message.get("from", {}).get("emailAddress", {}).get("address", ""),
             content=message.get("body", {}).get("content", ""),
-            processing_id=processing_id,
+            process_id=process_id,
             version=version,
         )
     async def _make_request(self, method: str, url: str, **kwargs):
@@ -528,16 +528,16 @@ class MockAssertions:
         assert email.subject is not None
         assert email.body is not None
         assert email.processing_metadata is not None
-        assert email.processing_metadata.processing_id is not None
-        assert email.processing_metadata.inbox_monitor_version is not None
-        assert email.processing_metadata.processing_timestamp is not None
+        assert email.processing_metadata.process_id is not None
+        assert email.processing_metadata.monitor_version is not None
+        assert email.processing_metadata.processed_at is not None
     @staticmethod
     def assert_processing_result_valid(result: ProcessingResult):
         """Assert that a processing result is valid."""
         assert result.email_id is not None
         if result.success:
-            assert result.processing_id is not None
-            assert result.output_location is not None
+            assert result.process_id is not None
+            assert result.storage_location is not None
             assert result.error is None
         else:
             assert result.error is not None
@@ -935,17 +935,17 @@ class TestMockAssertions:
         success_result = ProcessingResult(
             success=True,
             email_id="test-msg",
-            processing_id="test-proc",
-            processing_time_ms=100,
-            output_location="/test/path"
+            process_id="test-proc",
+            processing_duration_ms=100,
+            storage_location="/test/path"
         )
         assertions.assert_processing_result_valid(success_result)
         # Test failure result
         failure_result = ProcessingResult(
             success=False,
             email_id="test-msg",
-            processing_id="test-proc-fail",
-            processing_time_ms=50,
+            process_id="test-proc-fail",
+            processing_duration_ms=50,
             error="Test error"
         )
         assertions.assert_processing_result_valid(failure_result)

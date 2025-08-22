@@ -1,0 +1,170 @@
+# Core Development Configuration for Scenario Tracking System
+# ==========================================================
+
+# Database configuration for development environment
+database:
+  catalog: "dev_catalog"
+  schema: "inbox_monitor_dev"
+  warehouse_id: "${DATABRICKS_WAREHOUSE_ID}"
+  
+  # Development connection settings (more lenient)
+  connection:
+    max_connections: 4  # Fewer connections for dev
+    connection_timeout_seconds: 45  # Longer timeout for debugging
+    retry_attempts: 2  # Fewer retries in dev
+    retry_delay_seconds: 1.0
+    
+  # Development optimization (less aggressive)
+  optimization:
+    batch_insert_size: 20  # Smaller batches for testing
+    enable_auto_optimize: false  # Disable for faster iteration
+    enable_auto_compact: false
+    partition_by_date: true
+
+# Core deployment configuration for development
+core_deployment:
+  # Table naming for development
+  table_prefix: "inbox_monitor"
+  table_suffix: "_dev"
+  
+  # Relaxed deployment settings
+  validate_prerequisites: false  # Skip some validations for speed
+  create_backup: false  # No backup needed in dev
+  validate_deployment: true
+  
+  # Development logging
+  log_directory: "./logs/dev"
+  enable_performance_monitoring: true
+  health_check_interval_seconds: 600  # Less frequent checks
+  
+  # Error handling for development
+  max_deployment_retries: 1  # Fail fast in dev
+  rollback_on_failure: false  # Keep for debugging
+
+# Scenario tracking service configuration for development
+scenario_tracking:
+  enabled: true
+  
+  # Storage configuration (development settings)
+  storage:
+    batch_insert_size: 20
+    async_insert: true
+    retry_attempts: 2
+    connection_timeout_seconds: 45
+    
+  # Performance settings (relaxed)
+  performance:
+    monitoring_enabled: true
+    slow_query_threshold_ms: 10000  # Higher threshold for dev
+    circuit_breaker_threshold: 10  # Higher threshold
+    circuit_breaker_timeout_seconds: 60  # Shorter timeout
+    
+  # Development data management
+  data_management:
+    retention_days: 30  # Shorter retention in dev
+    archive_after_days: 7
+    cleanup_enabled: true  # Auto cleanup in dev
+    
+    # PII handling (same as production)
+    truncate_subject_length: 500
+    truncate_email_body_length: 255
+    mask_sensitive_data: false
+
+# Security configuration for development
+security:
+  # Authentication (same as production)
+  oauth:
+    client_id: "${DATABRICKS_OAUTH_CLIENT_ID}"
+    client_secret: "${DATABRICKS_OAUTH_CLIENT_SECRET}"
+    token_cache_enabled: true
+    
+  # Data protection (relaxed for development)
+  data_protection:
+    encrypt_sensitive_fields: false
+    audit_data_access: false  # Disable auditing in dev
+    log_pii_access: false
+    
+  # Access control (relaxed)
+  access_control:
+    require_https: false  # Allow HTTP for localhost
+    validate_certificates: false  # Skip cert validation for dev
+    enforce_tls_v12: false
+
+# Development environment settings
+development:
+  # Monitoring (verbose for debugging)
+  monitoring:
+    enable_detailed_logging: true
+    log_level: "DEBUG"  # Verbose logging in dev
+    structured_logging: true
+    
+    # Health checks
+    health_check_timeout_seconds: 30  # Longer timeout for debugging
+    enable_dependency_checks: false  # Skip some checks
+    
+  # Performance (less optimized)
+  performance:
+    connection_pool_size: 4  # Smaller pool
+    max_concurrent_operations: 10
+    request_timeout_seconds: 120  # Longer timeout for debugging
+    
+  # Reliability (less strict)
+  reliability:
+    enable_circuit_breaker: false  # Disable to see all errors
+    max_retry_attempts: 2
+    backoff_multiplier: 1.5
+    max_backoff_seconds: 10
+
+# Test configuration for development
+testing:
+  # Test data settings
+  test_data:
+    generate_sample_data: true
+    sample_record_count: 100
+    use_mock_services: true
+    
+  # Test isolation
+  isolation:
+    use_test_table_suffix: true
+    test_table_suffix: "_test"
+    cleanup_after_tests: true
+    
+  # Performance testing
+  performance_testing:
+    enable_benchmarks: true
+    max_test_records: 1000
+    performance_threshold_multiplier: 2.0  # More lenient in dev
+
+# Integration settings for development
+integration:
+  # Email processing integration
+  email_processing:
+    mock_email_data: true
+    simulate_scenarios: true
+    enable_debug_logging: true
+    
+  # External service integration  
+  external_services:
+    use_mock_databricks: false  # Use real Databricks in dev
+    mock_salesforce: true
+    mock_azure_ai: true
+    
+# Debug configuration
+debug:
+  # Detailed error reporting
+  error_reporting:
+    include_stack_traces: true
+    log_request_details: true
+    save_failed_records: true
+    
+  # Performance debugging
+  performance_debugging:
+    track_operation_timing: true
+    log_slow_operations: true
+    enable_query_profiling: true
+    
+  # Development utilities
+  dev_utilities:
+    enable_data_seeding: true
+    enable_schema_validation: true
+    auto_create_test_data: true

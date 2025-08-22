@@ -83,7 +83,7 @@ class CleanEmailContent(BaseModel):
     )
     original_length: int = Field(..., description="Original content length")
     cleaned_length: int = Field(..., description="Cleaned content length")
-    processing_success: bool = Field(..., description="Whether cleaning was successful")
+    process_success: bool = Field(..., description="Whether cleaning was successful")
     conversation_context: ConversationContext | None = Field(None, description="Conversation context if available")
 
 
@@ -643,7 +643,7 @@ class ContentFormatter:
             # Convert to clean text
             try:
                 clean_text = self.html_to_clean_text(original_content)
-                processing_success = True
+                process_success = True
             except Exception as e:
                 self.logger.warning(
                     "HTML cleaning failed, using fallback",
@@ -651,7 +651,7 @@ class ContentFormatter:
                     email_id=email.id
                 )
                 clean_text = original_content[:5000] + "..." if len(original_content) > 5000 else original_content
-                processing_success = False
+                process_success = False
             
             # Extract signature information if enabled - only from customer response section
             signature_info = {}
@@ -707,7 +707,7 @@ class ContentFormatter:
                 signature_info=signature_info,
                 original_length=original_length,
                 cleaned_length=len(clean_text),
-                processing_success=processing_success,
+                process_success=process_success,
                 conversation_context=conversation_context
             )
             
@@ -881,7 +881,7 @@ class ContentFormatter:
                 original_length=clean_content.original_length,
                 cleaned_length=clean_content.cleaned_length,
                 final_length=len(full_description),
-                processing_success=clean_content.processing_success,
+                process_success=clean_content.process_success,
                 has_conversation_context=has_conversation_context,
                 has_original_email=bool(
                     has_conversation_context and

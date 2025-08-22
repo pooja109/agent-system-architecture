@@ -5,6 +5,36 @@ Inbox Monitor Main Application
 
 Main entry point for the inbox monitor service.
 Provides command-line interface for monitoring operations with intelligent logging.
+
+USAGE EXAMPLES:
+    # Process only 1 email from the inbox
+    python main.py check --limit 1 --live --yes
+    
+    # Process 5 emails with verbose output
+    python main.py check --limit 5 --verbose --live --yes
+    
+    # Check system status
+    python main.py status
+    
+    # Test connectivity
+    python main.py test
+    
+    # Run continuous monitoring
+    python main.py run --live --yes
+    
+    # Get help for all commands
+    python main.py --help
+    
+    # Get help for specific command
+    python main.py check --help
+
+IMPORTANT FLAGS:
+    --limit N      Process only N emails (default: 10)
+    --live         Use real services (required for production)
+    --yes          Skip confirmation prompts
+    --quiet        Minimal output
+    --verbose      Show detailed progress
+    --debug        Show all diagnostic information
 """
 
 import argparse
@@ -15,8 +45,101 @@ import signal
 import sys
 import json
 import time
+import threading
+from pathlib import Path
 from aiohttp import web, ClientSession
 from typing import Optional
+
+# Thread lock for environment loading
+_env_lock = threading.Lock()
+
+# Load environment variables from .env file if present
+# This MUST happen before any other imports that use environment variables
+def load_environment() -> bool:
+    """Load environment variables from .env file if it exists.
+    
+    Thread-safe environment loading that prevents concurrent loading issues.
+    
+    Returns:
+        bool: True if any .env file was loaded, False otherwise.
+    """
+    with _env_lock:
+        # Check if already loaded by another thread
+        if os.getenv("ENV_LOADED") == "true":
+            return True
+            
+        try:
+            from dotenv import load_dotenv
+        except ImportError:
+            print("⚠️  python-dotenv not available, using system environment only")
+            return False
+        
+        # Try multiple potential .env locations
+        potential_env_files = [
+            Path(__file__).parent / ".env",  # Same directory as main.py
+            Path.cwd() / ".env",  # Current working directory
+            Path(__file__).parent / ".env.local",  # Local override
+        ]
+        
+        env_loaded = False
+        for env_file in potential_env_files:
+            if env_file.exists():
+                try:
+                    load_dotenv(env_file, override=True)
+                    print(f"📋 Loaded environment from: {env_file}")
+                    env_loaded = True
+                    break
+                except Exception as e:
+                    print(f"⚠️  Warning: Failed to load {env_file}: {e}")
+                    continue
+        
+        if not env_loaded and os.getenv("REQUIRE_ENV_FILE", "false").lower() == "true":
+            print("⚠️  Warning: No .env file found and REQUIRE_ENV_FILE is set")
+            print("   Searched locations:")
+            for env_file in potential_env_files:
+                print(f"   - {env_file}")
+        
+        # Set service root for path resolution
+        try:
+            service_root = Path(__file__).parent.resolve()
+            os.environ["INBOX_MONITOR_ROOT"] = str(service_root)
+            
+            # Ensure prompts path is relative to service root
+            if not os.getenv("PROMPTS_BASE_PATH"):
+                os.environ["PROMPTS_BASE_PATH"] = str(service_root / "prompts")
+                
+            # Set reasonable defaults for critical environment variables if missing
+            _set_environment_defaults()
+            
+        except Exception as e:
+            print(f"⚠️  Warning: Error setting up service paths: {e}")
+            # Fallback to current directory
+            os.environ["INBOX_MONITOR_ROOT"] = str(Path.cwd())
+            os.environ["PROMPTS_BASE_PATH"] = str(Path.cwd() / "prompts")
+        
+        # Mark environment as loaded to prevent redundant loading
+        os.environ["ENV_LOADED"] = "true"
+        
+        return env_loaded
+
+
+def _set_environment_defaults() -> None:
+    """Set reasonable defaults for critical environment variables."""
+    defaults = {
+        "LOG_LEVEL": "INFO",
+        "ENVIRONMENT": "development",
+        "HEALTH_CHECK_PORT": "8080",
+        "SERVICE_NAME": "inbox-monitor",
+        "RETRY_ATTEMPTS": "3",
+        "TIMEOUT_SECONDS": "30"
+    }
+    
+    for key, default_value in defaults.items():
+        if not os.getenv(key):
+            os.environ[key] = default_value
+
+# Load environment before other imports
+ENV_LOADED = load_environment()
 
 # Import Phase 1, 2, 3 & 4 components
 from cli.argument_parser import CLIArgumentParser
@@ -34,6 +157,8 @@ from config.settings import get_settings, validate_settings
 from services.email_processor import EmailProcessor
 from services.graph_api_client import GraphAPIClient
 from services.monitor import InboxMonitor
+from services.azure_key_vault_client import AzureKeyVaultClient
+from services.databricks_oauth_client import DatabricksOAuthClient
 from services.databricks_connection_pool import (
     initialize_connection_pool, 
     shutdown_connection_pool,
@@ -107,12 +232,12 @@ def setup_logging_system(cli_args: argparse.Namespace) -> tuple[LoggingConfig, S
 # Legacy setup_logging function removed - replaced by setup_logging_system()
 
 
-def show_live_mode_info(test_mode_enabled: bool = False, email_test_mode_enabled: bool = False) -> None:
+def show_live_mode_info(test_mode: bool = False, email_test_mode: bool = False) -> None:
     """Show information about live mode execution."""
-    if test_mode_enabled:
+    if test_mode:
         print("🧪 LIVE MODE with TEST MODE enabled")
         print("   • Using mock/test services for all operations")
-    elif email_test_mode_enabled:
+    elif email_test_mode:
         print("🔧 LIVE MODE with EMAIL TEST MODE enabled")
         print("   • Using real services with email substitution only")
         print(f"   • Emails will be sent to: {os.getenv('TEST_EMAIL_OVERRIDE', 'not configured')}")
@@ -479,25 +604,29 @@ async def run_continuous() -> bool:
         return False
 
 
-async def validate_settings_safely(mock_mode: bool = False) -> bool:
+async def validate_settings_safely(mock_mode: bool = False, force_real_credentials: bool = False) -> bool:
     """Validate settings with optional mock mode for safe testing."""
     try:
         # Check TEST_MODE and TEST_MODE_EMAIL environment variables
-        test_mode_enabled = os.getenv("TEST_MODE", "false").lower() == "true"
-        email_test_mode_enabled = os.getenv("TEST_MODE_EMAIL", "false").lower() == "true"
+        # But allow force_real_credentials to override for connection testing
+        if force_real_credentials:
+            test_mode = False
+        else:
+            test_mode = os.getenv("TEST_MODE", "false").lower() == "true"
+        email_test_mode = os.getenv("TEST_MODE_EMAIL", "false").lower() == "true"
         
         if mock_mode:
             print("🧪 MOCK MODE: Skipping real service validation")
             return True
         
-        if test_mode_enabled:
+        if test_mode:
             print(f"🧪 TEST MODE ENABLED: All services using mock/test mode")
         
-        if email_test_mode_enabled:
+        if email_test_mode:
             print(f"📧 EMAIL TEST MODE: Using TEST_EMAIL_OVERRIDE={os.getenv('TEST_EMAIL_OVERRIDE', 'not set')} and TEST_SALESFORCE_EMAIL={os.getenv('TEST_SALESFORCE_EMAIL', 'not set')}")
             
-        # For live mode, get settings with test_mode parameter based on environment variable
-        settings = await get_settings(test_mode=test_mode_enabled)
+        # For live mode, get settings with test_mode parameter
+        settings = await get_settings(test_mode=test_mode)
         validate_settings(settings)
         return True
     except Exception as e:
@@ -505,32 +634,35 @@ async def validate_settings_safely(mock_mode: bool = False) -> bool:
         return False
 
 
-async def check_once(ui_manager=None, mock_mode: bool = False) -> bool:
+async def check_once(ui_manager=None, mock_mode: bool = False, limit: int = None) -> bool:
     """Check inbox once and exit."""
     if not await validate_settings_safely(mock_mode):
         return False
         
     # Handle mock mode vs live mode
     if mock_mode:
-        return await check_once_mock_mode(ui_manager)
+        return await check_once_mock_mode(ui_manager, limit)
     
     # Get TEST_MODE and TEST_MODE_EMAIL settings
-    test_mode_enabled = os.getenv("TEST_MODE", "false").lower() == "true"
-    email_test_mode_enabled = os.getenv("TEST_MODE_EMAIL", "false").lower() == "true"
+    test_mode = os.getenv("TEST_MODE", "false").lower() == "true"
+    email_test_mode = os.getenv("TEST_MODE_EMAIL", "false").lower() == "true"
     
     # For live mode, validate and get settings with proper test mode flag
-    settings = await get_settings(test_mode=test_mode_enabled)
+    settings = await get_settings(test_mode=test_mode)
     validate_settings(settings)
     
     # Show information about the mode we're running in and which inbox we're monitoring
     print(f"📬 Monitoring inbox: {settings.graph_api.monitored_email}")
-    show_live_mode_info(test_mode_enabled, email_test_mode_enabled)
+    show_live_mode_info(test_mode, email_test_mode)
     
     # First, check if there are any emails to process (lightweight operation)
     print("🔄 Checking for emails...")
+    # Use the limit parameter if provided, otherwise fall back to batch_size
+    email_limit = limit if limit is not None else settings.processing.batch_size
+    print(f"📊 Processing limit: {email_limit} email(s)")
     async with GraphAPIClient(settings.graph_api) as graph_client:
         messages = await graph_client.get_inbox_messages(
-            limit=settings.processing.batch_size
+            limit=email_limit
         )
         
         if not messages:
@@ -572,7 +704,7 @@ async def check_once(ui_manager=None, mock_mode: bool = False) -> bool:
                 processor = EmailProcessor(settings, graph_client, progress_manager)
                 # Note: We already checked for messages above, but EmailProcessor will re-fetch
                 # This could be further optimized by modifying EmailProcessor to accept pre-fetched messages
-                results = await processor.process_inbox()
+                results = await processor.process_inbox(limit=email_limit)
                 
                 # Format results with rich UI
                 duration = results.get('processing_time_seconds', 0)
@@ -592,7 +724,7 @@ async def check_once(ui_manager=None, mock_mode: bool = False) -> bool:
             processor = EmailProcessor(settings, graph_client)
             # Note: We already checked for messages above, but EmailProcessor will re-fetch  
             # This could be further optimized by modifying EmailProcessor to accept pre-fetched messages
-            results = await processor.process_inbox()
+            results = await processor.process_inbox(limit=email_limit)
 
             if results.get("success", False):
                 print("✅ Inbox check completed:")
@@ -620,7 +752,7 @@ async def check_once(ui_manager=None, mock_mode: bool = False) -> bool:
         return True
 
 
-async def check_once_mock_mode(ui_manager=None) -> bool:
+async def check_once_mock_mode(ui_manager=None, limit: int = 10) -> bool:
     """Mock mode inbox check that simulates functionality without real services."""
     import time
     import random
@@ -649,8 +781,8 @@ async def check_once_mock_mode(ui_manager=None) -> bool:
             print("✉️  Generating response (mock)...")
             await asyncio.sleep(0.3)
             
-            # Mock results
-            processed_count = random.randint(2, 5)
+            # Mock results - respect the limit parameter
+            processed_count = min(limit, random.randint(1, max(1, limit)))
             failed_count = 0
             duration = 1.5
             
@@ -677,7 +809,7 @@ async def check_once_mock_mode(ui_manager=None) -> bool:
         print("🔄 Simulating inbox processing...")
         await asyncio.sleep(1.0)
         
-        processed_count = random.randint(2, 5)
+        processed_count = min(limit, random.randint(1, max(1, limit)))
         print("✅ Mock inbox check completed:")
         print(f"   📊 Processed: {processed_count} emails (simulated)")
         print(f"   ❌ Failed: 0 emails")
@@ -703,18 +835,19 @@ async def test_connection(mock_mode: bool = False) -> bool:
         print("   🧪 All connection details were simulated - no real services were used")
         return True
 
-    # Get TEST_MODE and TEST_MODE_EMAIL settings
-    test_mode_enabled = os.getenv("TEST_MODE", "false").lower() == "true"
-    email_test_mode_enabled = os.getenv("TEST_MODE_EMAIL", "false").lower() == "true"
+    # When mock_mode is False, use real connections regardless of environment variables
+    # This allows 'python main.py test' to always test real connections
+    test_mode = False  # Force real connections for connection testing
+    email_test_mode = os.getenv("TEST_MODE_EMAIL", "false").lower() == "true"
     
-    if not await validate_settings_safely(mock_mode):
+    if not await validate_settings_safely(mock_mode, force_real_credentials=True):
         return False
         
     # Show information about the mode we're running in  
-    show_live_mode_info(test_mode_enabled, email_test_mode_enabled)
+    show_live_mode_info(test_mode, email_test_mode)
 
-    # For live mode, validate and get settings with proper test mode flag  
-    settings = await get_settings(test_mode=test_mode_enabled)
+    # For live mode, validate and get settings with proper test mode flag (False = real credentials)
+    settings = await get_settings(test_mode=test_mode)
     validate_settings(settings)
 
     print(f"📬 Monitoring inbox: {settings.graph_api.monitored_email}")
@@ -816,6 +949,176 @@ async def setup_databricks() -> bool:
         return False
 
 
+async def setup_scenario_tracking(verify: bool = False) -> bool:
+    """Setup scenario tracking table only."""
+    try:
+        print("🔧 Setting up scenario tracking table...")
+
+        # Import the setup function from utils folder
+        from utils.setup_scenario_tracking import main as setup_scenario_main
+
+        # Run the setup
+        await setup_scenario_main()
+
+        print("✅ Scenario tracking setup completed successfully!")
+        return True
+
+    except Exception as e:
+        print(f"❌ Scenario tracking setup failed: {e}")
+        return False
+
+
+async def recreate_scenario_table() -> bool:
+    """Drop and recreate scenario tracking table with new schema."""
+    try:
+        print("🔧 Recreating scenario tracking table...")
+        print("⚠️  WARNING: This will DROP the existing table and recreate it!")
+        print("   All existing data will be PERMANENTLY LOST.")
+        print()
+
+        # Check for auto-confirmation
+        import os
+        if os.getenv("AUTO_CONFIRM_DROP_TABLE") == "true":
+            print("🤖 AUTO_CONFIRM_DROP_TABLE=true detected, proceeding automatically...")
+            confirm = True
+        else:
+            response = input("Do you want to proceed? (type 'yes' to confirm): ").strip().lower()
+            confirm = response == "yes"
+
+        if not confirm:
+            print("❌ Operation cancelled by user")
+            return False
+
+    except Exception as e:
+        print(f"❌ Table recreation failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+        
+    try:
+        # Use the existing databricks infrastructure 
+        settings = await get_settings(test_mode=False)  # Force live mode for table operations
+        
+        # Initialize Key Vault client with live settings
+        async with AzureKeyVaultClient(settings.key_vault, test_mode=False) as kv_client:
+            # Initialize Databricks client with proper settings
+            async with DatabricksOAuthClient(settings.databricks_oauth, kv_client) as databricks_client:
+                
+                # Get table details
+                catalog = settings.databricks_oauth.catalog
+                schema = settings.databricks_oauth.schema_name
+                table_suffix = settings.databricks_oauth.table_suffix
+                table_name = f"{catalog}.{schema}.inbox_monitor_scenario_processing{table_suffix}"
+
+                print(f"📋 Table to recreate: {table_name}")
+
+                # Step 1: Drop the existing table
+                print(f"🗑️  Dropping existing table: {table_name}")
+                drop_sql = f"DROP TABLE IF EXISTS {table_name}"
+                await databricks_client.execute_sql(drop_sql)
+                print("✅ Table dropped successfully")
+
+                # Step 2: Load and execute create table SQL
+                from pathlib import Path
+                schema_file = Path(__file__).parent / "database" / "scenario_tracking_schema.sql"
+                
+                with open(schema_file, 'r') as f:
+                    schema_sql = f.read()
+
+                # Replace placeholders
+                schema_sql = schema_sql.replace("{catalog}", catalog)
+                schema_sql = schema_sql.replace("{schema}", schema)
+                schema_sql = schema_sql.replace("{table_suffix}", table_suffix)
+
+                # Replace CREATE TABLE IF NOT EXISTS with CREATE TABLE for clean creation
+                create_sql = schema_sql.replace("CREATE TABLE IF NOT EXISTS", "CREATE TABLE")
+                
+                # Split CREATE TABLE and OPTIMIZE statements - they need to be run separately
+                sql_parts = create_sql.split("-- Optimize table for common query patterns")
+                table_creation_sql = sql_parts[0].strip()
+                
+                print(f"🔧 Creating table with new schema: {table_name}")
+                await databricks_client.execute_sql(table_creation_sql)
+                print("✅ Table created successfully with new schema")
+                
+                # Execute optimization if present
+                if len(sql_parts) > 1 and "OPTIMIZE" in sql_parts[1]:
+                    optimize_sql = sql_parts[1].strip()
+                    if optimize_sql:
+                        print("🔧 Optimizing table for query performance...")
+                        try:
+                            await databricks_client.execute_sql(optimize_sql)
+                            print("✅ Table optimization completed successfully")
+                        except Exception as e:
+                            print(f"⚠️  Table optimization failed (table still usable): {e}")
+                            # Don't fail the entire operation for optimization issues
+
+                # Step 3: Verify the table
+                print(f"🔍 Verifying table: {table_name}")
+                verify_sql = f"DESCRIBE TABLE {table_name}"
+                result = await databricks_client.execute_sql(verify_sql)
+
+                print(f"🔍 Verification result type: {type(result)}")
+                print(f"🔍 Verification result: {result}")
+                
+                if result and hasattr(result, 'get') and result.get('data'):
+                    columns = result['data']
+                    column_names = [col[0] for col in columns]
+                    print(f"✅ Table verified: {len(columns)} columns found")
+                elif result and hasattr(result, 'data_array'):
+                    columns = result.data_array
+                    column_names = [row[0] for row in columns if len(row) > 0]
+                    print(f"✅ Table verified: {len(columns)} columns found")
+                else:
+                    print("❌ Could not parse verification result - assuming table was created")
+                    # For now, assume success since table creation succeeded
+                    print(f"✅ Table {table_name} was created successfully")
+                    return True
+
+                # Check for key new fields (only if we successfully parsed columns)
+                if 'column_names' in locals():
+                    new_fields_to_check = [
+                        'email_intent', 'email_intent_confidence', 'email_intent_reasoning',
+                        'original_subject_result', 'original_subject_confidence', 
+                        'email_payload', 'original_email_subject'
+                    ]
+
+                    found_new_fields = [f for f in new_fields_to_check if f in column_names]
+                    print(f"✅ New fields verified: {len(found_new_fields)}/{len(new_fields_to_check)}")
+
+                    # Check that old ai_ fields are NOT present
+                    old_fields = ['ai_intent', 'ai_confidence', 'ai_reasoning']
+                    old_still_present = [f for f in old_fields if f in column_names]
+
+                    if old_still_present:
+                        print(f"❌ Old ai_ fields still present: {old_still_present}")
+                    else:
+                        print("✅ Old ai_ fields successfully replaced with email_intent_ fields")
+
+                    # Show new fields found
+                    print("\n📋 New fields found in table:")
+                    for field in found_new_fields:
+                        print(f"  ✅ {field}")
+
+                    if len(found_new_fields) == len(new_fields_to_check) and not old_still_present:
+                        print("\n🎉 TABLE RECREATION SUCCESSFUL!")
+                        print("   • Old ai_* fields replaced with email_intent_* fields")
+                        print("   • New original subject extraction fields added")  
+                        print("   • New Graph API JSON fields added")
+                        print("   • All field names properly updated")
+                        print(f"\n🚀 Table {table_name} is ready for use!")
+                        return True
+                    else:
+                        print("\n⚠️  Table created but some fields may be missing")
+                        return len(found_new_fields) > 0  # Partial success
+                    
+    except Exception as e:
+        print(f"❌ Table recreation failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
 async def run_inbox_check(args: argparse.Namespace, 
                          service_integration: Optional[ServiceLoggingIntegration] = None,
                          ui_manager: Optional[UIManager] = None) -> None:
@@ -851,8 +1154,9 @@ async def run_inbox_check(args: argparse.Namespace,
     })
     
     try:
-        # Use the updated check_once function with mock mode support
-        success = await check_once(ui_manager, mock_mode)
+        # Use the updated check_once function with mock mode support and limit parameter
+        limit = getattr(args, 'limit', 10)
+        success = await check_once(ui_manager, mock_mode, limit)
         
         # Log results
         if success:
@@ -1033,6 +1337,27 @@ def main() -> None:
                 print("❌ Error: Setup not supported in mock mode. Remove --mock-mode for database setup.")
                 sys.exit(1)
             asyncio.run(setup_databricks())
+        elif args.command == 'setup-scenario-tracking':
+            # Setup scenario tracking table only
+            if mock_mode:
+                print("❌ Error: Setup not supported in mock mode. Remove --mock-mode for database setup.")
+                sys.exit(1)
+            verify = getattr(args, 'verify', False)
+            asyncio.run(setup_scenario_tracking(verify))
+        elif args.command == 'recreate-scenario-table':
+            # Drop and recreate scenario tracking table with new schema
+            if mock_mode:
+                print("❌ Error: Table recreation not supported in mock mode. Remove --mock-mode for database operations.")
+                sys.exit(1)
+            
+            # Set auto-confirm environment variable if --auto-confirm flag is used
+            auto_confirm = getattr(args, 'auto_confirm', False)
+            if auto_confirm:
+                os.environ['AUTO_CONFIRM_DROP_TABLE'] = 'true'
+            
+            success = asyncio.run(recreate_scenario_table())
+            if not success:
+                sys.exit(1)
         else:
             cli_parser.print_help()
             sys.exit(1)

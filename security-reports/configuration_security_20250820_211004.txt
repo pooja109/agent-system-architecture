@@ -1,0 +1,60 @@
+Configuration Security Scan Results
+==================================
+Timestamp: Wed Aug 20 21:10:04 CDT 2025
+
+=== Environment Configuration Security ===
+--- File: /mnt/c/Repos/lowtouch_v8/aou-s01-lowtouch/agents/communication/.env.main ---
+File permissions: 777
+⚠️  File permissions may be too permissive
+⚠️  Potential secrets detected in file
+
+--- File: /mnt/c/Repos/lowtouch_v8/aou-s01-lowtouch/agents/communication/.env.sample ---
+File permissions: 777
+⚠️  File permissions may be too permissive
+⚠️  Potential secrets detected in file
+
+--- File: /mnt/c/Repos/lowtouch_v8/aou-s01-lowtouch/agents/email/.env ---
+File permissions: 777
+⚠️  File permissions may be too permissive
+⚠️  Potential secrets detected in file
+
+--- File: /mnt/c/Repos/lowtouch_v8/aou-s01-lowtouch/agents/email/.env.example ---
+File permissions: 777
+⚠️  File permissions may be too permissive
+⚠️  Potential secrets detected in file
+
+--- File: /mnt/c/Repos/lowtouch_v8/aou-s01-lowtouch/agents/email/.env.sample ---
+File permissions: 777
+⚠️  File permissions may be too permissive
+⚠️  Potential secrets detected in file
+
+--- File: /mnt/c/Repos/lowtouch_v8/aou-s01-lowtouch/agents/getdata/sample.env ---
+File permissions: 777
+⚠️  File permissions may be too permissive
+⚠️  Potential secrets detected in file
+
+--- File: /mnt/c/Repos/lowtouch_v8/aou-s01-lowtouch/agents/inbox_monitor/.env ---
+File permissions: 777
+⚠️  File permissions may be too permissive
+⚠️  Potential secrets detected in file
+
+--- File: /mnt/c/Repos/lowtouch_v8/aou-s01-lowtouch/agents/inbox_monitor/.env.example ---
+File permissions: 777
+⚠️  File permissions may be too permissive
+⚠️  Potential secrets detected in file
+
+--- File: /mnt/c/Repos/lowtouch_v8/aou-s01-lowtouch/agents/inbox_monitor/.env.sample ---
+File permissions: 777
+⚠️  File permissions may be too permissive
+⚠️  Potential secrets detected in file
+
+--- File: /mnt/c/Repos/lowtouch_v8/aou-s01-lowtouch/agents/inbox_monitor/.env.test ---
+File permissions: 777
+⚠️  File permissions may be too permissive
+⚠️  Potential secrets detected in file
+
+--- File: /mnt/c/Repos/lowtouch_v8/aou-s01-lowtouch/agents/research/sample.env ---
+File permissions: 777
+⚠️  File permissions may be too permissive
+⚠️  Potential secrets detected in file
+

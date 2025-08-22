@@ -240,9 +240,9 @@ def mock_graph_message():
 def mock_email_model():
     """Create a mock Email model."""
     processing_metadata = ProcessingMetadata(
-        inbox_monitor_version="1.0.0",
-        processing_id=str(uuid.uuid4()),
-        processing_timestamp=datetime.now(timezone.utc),
+        monitor_version="1.0.0",
+        process_id=str(uuid.uuid4()),
+        processed_at=datetime.now(timezone.utc),
         source_folder="Inbox",
     )
 
@@ -260,7 +260,7 @@ def mock_email_model():
             content_type="text/html",
             content="<html><body>Test email body</body></html>",
         ),
-        body_preview="This is a test email preview...",
+        email_body="This is a test email preview...",
         importance=EmailImportance.NORMAL,
         has_attachments=False,
         attachment_count=0,

@@ -648,3 +648,80 @@ def robust_service_integration(services: List[str],
                 config.retry_attempts = max(config.retry_attempts, 2)
     
     yield framework
+
+
+# Additional fixtures for Phase 6 compliance
+
+@pytest.fixture(scope="function")
+def integration_test_environment():
+    """Provide integration test environment fixture as expected by Phase 6 tests."""
+    framework = IntegrationTestFramework()
+    return {
+        'framework': framework,
+        'mock_mode': True,
+        'table_suffix': '_integration_test',
+        'test_mode': True
+    }
+
+
+@pytest.fixture(scope="function") 
+async def mock_databricks_connection():
+    """Mock Databricks connection for integration testing."""
+    from unittest.mock import AsyncMock, MagicMock
+    
+    # Create mock connection
+    mock_connection = AsyncMock()
+    
+    # Mock execute_query method
+    mock_result = MagicMock()
+    mock_result.fetchall.return_value = []
+    mock_result.fetchone.return_value = {'test': 1, 'count': 0}
+    mock_connection.execute_query.return_value = mock_result
+    
+    # Mock connection pool
+    mock_pool = AsyncMock()
+    mock_pool.get_connection.return_value.__aenter__.return_value = mock_connection
+    mock_pool.get_connection.return_value.__aexit__.return_value = None
+    
+    return mock_pool
+
+
+@pytest.fixture(scope="function")
+async def mock_scenario_processor():
+    """Mock scenario processor for integration testing.""" 
+    from unittest.mock import AsyncMock, MagicMock
+    
+    mock_processor = AsyncMock()
+    
+    # Mock processing result
+    mock_result = MagicMock()
+    mock_result.success = True
+    mock_result.process_id = "test_processing_123"
+    mock_result.scenario_result = MagicMock()
+    mock_result.scenario_result.scenario_type = "scenario_5"
+    mock_result.scenario_result.success = True
+    
+    mock_processor.process_email_scenario.return_value = mock_result
+    mock_processor.__aenter__.return_value = mock_processor
+    mock_processor.__aexit__.return_value = None
+    
+    return mock_processor
+
+
+@pytest.fixture(scope="function")
+def test_email_data():
+    """Provide test email data fixture for integration testing."""
+    from datetime import datetime, timezone
+    from unittest.mock import MagicMock
+    
+    # Create mock email data
+    email_data = MagicMock()
+    email_data.id = "test_email_123"
+    email_data.sender = MagicMock()
+    email_data.sender.email = "test@example.com"
+    email_data.sender.name = "Test User"
+    email_data.subject = "Test Email Subject"
+    email_data.received_datetime = datetime.now(timezone.utc)
+    email_data.body = "Test email body content"
+    
+    return email_data

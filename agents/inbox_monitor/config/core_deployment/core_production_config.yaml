@@ -1,0 +1,150 @@
+# Core Production Configuration for Scenario Tracking System
+# =========================================================
+
+# Database configuration for core system
+database:
+  catalog: "production_catalog"  # Replace with actual catalog
+  schema: "inbox_monitor"        # Replace with actual schema  
+  warehouse_id: "${DATABRICKS_WAREHOUSE_ID}"
+  
+  # Connection configuration
+  connection:
+    max_connections: 8
+    connection_timeout_seconds: 30
+    retry_attempts: 3
+    retry_delay_seconds: 2.0
+    
+  # Performance optimization
+  optimization:
+    batch_insert_size: 50
+    enable_auto_optimize: true
+    enable_auto_compact: true
+    partition_by_date: true
+
+# Core deployment configuration
+core_deployment:
+  # Table naming
+  table_prefix: "inbox_monitor"
+  table_suffix: ""  # Can be overridden via environment variable
+  
+  # Deployment settings
+  validate_prerequisites: true
+  create_backup: true
+  validate_deployment: true
+  
+  # Logging and monitoring
+  log_directory: "./logs"
+  enable_performance_monitoring: true
+  health_check_interval_seconds: 300
+  
+  # Error handling
+  max_deployment_retries: 3
+  rollback_on_failure: true
+
+# Scenario tracking service configuration
+scenario_tracking:
+  enabled: true
+  
+  # Storage configuration
+  storage:
+    batch_insert_size: 50
+    async_insert: true
+    retry_attempts: 3
+    connection_timeout_seconds: 30
+    
+  # Performance settings
+  performance:
+    monitoring_enabled: true
+    slow_query_threshold_ms: 5000
+    circuit_breaker_threshold: 5
+    circuit_breaker_timeout_seconds: 300
+    
+  # Data management
+  data_management:
+    retention_days: 365
+    archive_after_days: 90
+    cleanup_enabled: false  # Manual cleanup in production
+    
+    # PII handling
+    truncate_subject_length: 500
+    truncate_email_body_length: 255
+    mask_sensitive_data: false  # Keep raw data for analysis
+
+# Security configuration
+security:
+  # Authentication
+  oauth:
+    client_id: "${DATABRICKS_OAUTH_CLIENT_ID}"
+    client_secret: "${DATABRICKS_OAUTH_CLIENT_SECRET}"
+    token_cache_enabled: true
+    
+  # Data protection
+  data_protection:
+    encrypt_sensitive_fields: false  # Databricks handles encryption
+    audit_data_access: true
+    log_pii_access: false  # Prevent accidental PII logging
+    
+  # Access control
+  access_control:
+    require_https: true
+    validate_certificates: true
+    enforce_tls_v12: true
+
+# Production environment settings
+production:
+  # Monitoring
+  monitoring:
+    enable_detailed_logging: false
+    log_level: "INFO"
+    structured_logging: true
+    
+    # Health checks
+    health_check_timeout_seconds: 10
+    enable_dependency_checks: true
+    
+  # Performance
+  performance:
+    connection_pool_size: 8
+    max_concurrent_operations: 20
+    request_timeout_seconds: 60
+    
+  # Reliability  
+  reliability:
+    enable_circuit_breaker: true
+    max_retry_attempts: 3
+    backoff_multiplier: 2.0
+    max_backoff_seconds: 30
+
+# Environment-specific overrides
+environments:
+  development:
+    database:
+      catalog: "dev_catalog"
+      schema: "inbox_monitor_dev"
+    core_deployment:
+      table_suffix: "_dev"
+      validate_prerequisites: false
+    scenario_tracking:
+      data_management:
+        retention_days: 30
+        
+  staging:
+    database:
+      catalog: "staging_catalog"  
+      schema: "inbox_monitor_staging"
+    core_deployment:
+      table_suffix: "_staging"
+    scenario_tracking:
+      data_management:
+        retention_days: 90
+        
+  production:
+    database:
+      catalog: "production_catalog"
+      schema: "inbox_monitor_prod"
+    security:
+      data_protection:
+        audit_data_access: true
+    production:
+      monitoring:
+        enable_detailed_logging: true

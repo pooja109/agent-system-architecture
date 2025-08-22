@@ -8,14 +8,131 @@ import sys
 import os
 from pathlib import Path
 
-# Add current directory to path
+# Load environment variables from .env file
+from dotenv import load_dotenv
+
+# Load .env from the project root (two levels up from current directory)
 current_dir = Path(__file__).parent
+project_root = current_dir.parent.parent
+env_file = project_root / ".env"
+if env_file.exists():
+    load_dotenv(dotenv_path=env_file)
+    print(f"✅ Loaded environment from {env_file}")
+else:
+    print(f"⚠️  Environment file not found at {env_file}")
+
+# Add current directory to path
 sys.path.insert(0, str(current_dir))
 
 from e2e_demo.cli_parser import CLIParser
 from e2e_demo.config import ConfigManager
 from e2e_demo.output_manager import OutputManager
 from e2e_demo.runner import DemoRunner
+
+
+def verify_databricks_configuration():
+    """Verify that Databricks configuration is properly set for scenario tracking."""
+    print("\n" + "="*80)
+    print("🔍 DATABRICKS CONFIGURATION VERIFICATION")
+    print("="*80)
+    
+    # Check required environment variables
+    required_vars = {
+        'DATABRICKS_CATALOG': os.getenv('DATABRICKS_CATALOG'),
+        'DATABRICKS_SCHEMA': os.getenv('DATABRICKS_SCHEMA'),
+        'DATABRICKS_TABLE_SUFFIX': os.getenv('DATABRICKS_TABLE_SUFFIX'),
+        'DATABRICKS_SERVER_HOSTNAME': os.getenv('DATABRICKS_SERVER_HOSTNAME'),
+        'DATABRICKS_HTTP_PATH': os.getenv('DATABRICKS_HTTP_PATH')
+    }
+    
+    all_set = True
+    for var_name, value in required_vars.items():
+        if value:
+            print(f"✅ {var_name}: {value}")
+        else:
+            print(f"❌ {var_name}: NOT SET")
+            all_set = False
+    
+    # Calculate expected table name
+    catalog = required_vars['DATABRICKS_CATALOG'] or 'unknown'
+    schema = required_vars['DATABRICKS_SCHEMA'] or 'unknown'
+    suffix = required_vars['DATABRICKS_TABLE_SUFFIX'] or ''
+    expected_table = f"{catalog}.{schema}.inbox_monitor_scenario_processing{suffix}"
+    
+    print(f"\n📊 Expected table name: {expected_table}")
+    
+    if not all_set:
+        print("\n⚠️  WARNING: Some Databricks configuration is missing!")
+        print("   The demo may not be able to save data to the Databricks table.")
+    else:
+        print("\n✅ Databricks configuration appears complete!")
+    
+    print("="*80)
+    return all_set
+
+
+async def verify_scenario_tracking_data(results):
+    """Verify that scenario tracking data was properly saved to Databricks."""
+    print("\n" + "="*80)
+    print("📊 SCENARIO TRACKING VERIFICATION")
+    print("="*80)
+    
+    try:
+        # Import scenario tracking components
+        from services.scenario_tracking_integration import get_tracking_integration
+        from config.settings import get_settings
+        
+        # Get the tracking integration instance
+        tracking_integration = await get_tracking_integration()
+        
+        # Check health status
+        health_status = await tracking_integration.get_integration_health()
+        print(f"🔍 Tracking Integration Status: {health_status.get('status', 'unknown')}")
+        print(f"📈 Initialized: {health_status.get('initialized', False)}")
+        print(f"⚙️  Configuration Enabled: {health_status.get('config_enabled', False)}")
+        
+        if health_status.get('tracking_client'):
+            client_status = health_status['tracking_client'].get('status', 'unknown')
+            print(f"🔗 Tracking Client Status: {client_status}")
+            
+            # Get metrics if available
+            metrics = health_status['tracking_client'].get('metrics', {})
+            if metrics:
+                print(f"📊 Total Operations: {metrics.get('total_operations', 0)}")
+                print(f"✅ Successful Operations: {metrics.get('successful_operations', 0)}")
+                print(f"❌ Failed Operations: {metrics.get('failed_operations', 0)}")
+        
+        # Get settings to show table name
+        settings = await get_settings(test_mode=False)
+        catalog = settings.databricks_oauth.catalog
+        schema = settings.databricks_oauth.schema_name
+        suffix = settings.databricks_oauth.table_suffix
+        table_name = f"{catalog}.{schema}.inbox_monitor_scenario_processing{suffix}"
+        print(f"📋 Target Table: {table_name}")
+        
+        # Count successful scenarios
+        successful_scenarios = len([r for r in results if r.success])
+        print(f"🎯 Scenarios Executed Successfully: {successful_scenarios}")
+        
+        if successful_scenarios > 0 and health_status.get('status') == 'healthy':
+            print("\n✅ SCENARIO TRACKING VERIFICATION PASSED")
+            print(f"   → {successful_scenarios} scenarios were processed successfully")
+            print(f"   → Data should be saved to table: {table_name}")
+            print("   → Tracking integration is healthy and operational")
+        else:
+            print("\n⚠️  SCENARIO TRACKING VERIFICATION WARNING")
+            if successful_scenarios == 0:
+                print("   → No scenarios were executed successfully")
+            if health_status.get('status') != 'healthy':
+                print(f"   → Tracking integration status: {health_status.get('status')}")
+                print("   → Data may not have been saved to Databricks")
+        
+    except Exception as e:
+        print(f"\n❌ SCENARIO TRACKING VERIFICATION FAILED")
+        print(f"   Error: {e}")
+        print("   → Unable to verify if data was saved to Databricks table")
+    
+    print("="*80)
 
 
 def confirm_live_mode() -> bool:
@@ -64,6 +181,9 @@ async def main():
         
         # Get final configuration
         config = config_manager.get_final_config()
+        
+        # Verify Databricks configuration before proceeding
+        verify_databricks_configuration()
         
         # Handle save config
         if hasattr(args, 'save_config') and args.save_config:
@@ -144,6 +264,10 @@ async def main():
                         print(f"  • {rec}")
                 except Exception as e:
                     print(f"\n⚠️ Performance report failed: {e}")
+            
+            # Verify scenario tracking data was saved if in live mode
+            if not config.mock_mode:
+                await verify_scenario_tracking_data(results)
             
             # Success
             return 0

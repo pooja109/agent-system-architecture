@@ -1,0 +1,64 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  - networkpolicy.yaml
+  - servicemonitor.yaml
+  - inbox-monitor/configmap.yaml
+  - inbox-monitor/secret.yaml
+  - inbox-monitor/secretproviderclass.yaml
+  - inbox-monitor/deployment.yaml
+  - inbox-monitor/service.yaml
+  - inbox-monitor/hpa.yaml
+  - inbox-monitor/pdb.yaml
+  - email-agent/configmap.yaml
+  - email-agent/secret.yaml
+  - email-agent/secretproviderclass.yaml
+  - email-agent/deployment.yaml
+  - email-agent/service.yaml
+  - email-agent/hpa.yaml
+  - email-agent/pdb.yaml
+
+images:
+  - name: aoulowtouch.azurecr.io/inbox-monitor
+    newTag: latest
+  - name: aoulowtouch.azurecr.io/email-agent
+    newTag: latest
+
+configMapGenerator:
+  - name: inbox-monitor-env-overrides
+    envs:
+      - inbox-monitor/config.env
+  - name: email-agent-env-overrides
+    envs:
+      - email-agent/config.env
+
+secretGenerator:
+  - name: inbox-monitor-env-secrets
+    envs:
+      - inbox-monitor/secrets.env
+  - name: email-agent-env-secrets
+    envs:
+      - email-agent/secrets.env
+
+labels:
+  - pairs:
+      managed-by: kustomize
+      environment: production
+
+patches:
+  - target:
+      kind: Deployment
+      name: inbox-monitor
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+  - target:
+      kind: Deployment
+      name: email-agent
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2

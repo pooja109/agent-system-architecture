@@ -373,13 +373,13 @@ class GraphAPIClient(APIClientLoggerMixin):
         return importance_map.get(importance.lower(), EmailImportance.NORMAL)
 
     def convert_to_email_model(
-        self, message: dict[str, Any], processing_id: str, version: str = "1.0.0"
+        self, message: dict[str, Any], process_id: str, version: str = "1.0.0"
     ) -> Email:
         """Convert Graph API message to Email model.
 
         Args:
             message: Message data from Graph API
-            processing_id: Unique processing ID
+            process_id: Unique processing ID
             version: Inbox monitor version
 
         Returns:
@@ -403,6 +403,20 @@ class GraphAPIClient(APIClientLoggerMixin):
         for header in message.get("internetMessageHeaders", []):
             headers[header.get("name", "")] = header.get("value", "")
 
+        # Prepare raw Graph API JSON data for storage
+        import json
+        try:
+            # Store the complete Graph API message response as JSON
+            email_payload = json.dumps(message, ensure_ascii=False, separators=(',', ':'))
+            
+            # Store internetMessageHeaders separately as JSON for easier querying
+            internet_headers_data = message.get("internetMessageHeaders", [])
+            email_headers = json.dumps(internet_headers_data, ensure_ascii=False, separators=(',', ':'))
+        except (TypeError, ValueError) as e:
+            self.logger.warning(f"Failed to serialize Graph API JSON data: {e}")
+            email_payload = None
+            email_headers = None
+
         # Count attachments
         attachment_count = 0
         if message.get("hasAttachments"):
@@ -411,9 +425,9 @@ class GraphAPIClient(APIClientLoggerMixin):
 
         # Create processing metadata
         processing_metadata = ProcessingMetadata(
-            inbox_monitor_version=version,
-            processing_id=processing_id,
-            processing_timestamp=datetime.now(timezone.utc),
+            monitor_version=version,
+            process_id=process_id,
+            processed_at=datetime.now(timezone.utc),
         )
 
         return Email(
@@ -425,7 +439,7 @@ class GraphAPIClient(APIClientLoggerMixin):
             recipients=self._parse_recipients(message),
             subject=message.get("subject", ""),
             body=body,
-            body_preview=message.get("bodyPreview", ""),
+            email_body=body.content if body else "",  # Use full body content, not truncated preview
             importance=self._parse_importance(message.get("importance", "normal")),
             has_attachments=message.get("hasAttachments", False),
             attachment_count=attachment_count,
@@ -433,6 +447,8 @@ class GraphAPIClient(APIClientLoggerMixin):
             is_read=message.get("isRead", False),
             is_draft=message.get("isDraft", False),
             internet_message_headers=headers,
+            email_payload=email_payload,
+            email_headers=email_headers,
             processing_metadata=processing_metadata,
         )
 

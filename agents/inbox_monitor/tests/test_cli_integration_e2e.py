@@ -245,6 +245,8 @@ class TestCLIIntegrationIsolated:
         # Verify configuration isolation - no cross-test pollution
         # This is validated by the isolated_global_state fixture
     
+    @pytest.mark.fast
+    @pytest.mark.integration
     def test_cli_subprocess_isolation(self, isolated_filesystem, temp_log_dir):
         """Test that CLI subprocess operations don't interfere with each other."""
         
@@ -312,6 +314,8 @@ class TestCLIIntegrationIsolated:
 class TestCLIIsolationValidation:
     """Validate CLI isolation works correctly."""
     
+    @pytest.mark.medium
+    @pytest.mark.integration
     def test_cli_parallel_execution(self, isolated_filesystem):
         """Test CLI operations can run in parallel without conflicts."""
         import concurrent.futures
@@ -343,6 +347,8 @@ class TestCLIIsolationValidation:
         success_count = sum(1 for success, _ in results if success)
         assert success_count == 3, f"Only {success_count}/3 parallel CLI operations succeeded"
     
+    @pytest.mark.medium
+    @pytest.mark.integration
     def test_cli_isolation_cleanup(self, isolated_filesystem, performance_monitor):
         """Test that CLI operations clean up properly."""
         initial_files = set(Path.cwd().rglob('*.tmp'))

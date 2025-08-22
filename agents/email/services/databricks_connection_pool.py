@@ -17,14 +17,9 @@ import structlog
 from databricks.sdk.core import DatabricksError
 from pydantic import BaseModel, Field
 
-try:
-    from config.settings import DatabricksOAuthSettings, KeyVaultSettings
-    from services.databricks_oauth_client import DatabricksOAuthClient
-    from services.azure_key_vault_client import AzureKeyVaultClient
-except ImportError:
-    from ..config.settings import DatabricksOAuthSettings, KeyVaultSettings
-    from .databricks_oauth_client import DatabricksOAuthClient
-    from .azure_key_vault_client import AzureKeyVaultClient
+from config.settings import DatabricksOAuthSettings, KeyVaultSettings
+from services.databricks_oauth_client import DatabricksOAuthClient
+from services.azure_key_vault_client import AzureKeyVaultClient
 
 
 class PooledConnection(BaseModel):

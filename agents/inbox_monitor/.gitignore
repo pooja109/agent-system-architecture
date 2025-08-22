@@ -46,6 +46,9 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+.env.production
+.env.staging
+.env.development
 
 # Test coverage
 .coverage

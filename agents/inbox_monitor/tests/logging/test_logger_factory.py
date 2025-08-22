@@ -16,6 +16,7 @@ from tests.fixtures.performance_monitoring import performance_monitor, enforce_l
 from tests.fixtures.optimized_mocks import mock_pool
 
 
+@pytest.mark.usefixtures("isolated_logger")
 class TestLoggerFactory:
     """Test LoggerFactory functionality with logger isolation."""
     
@@ -110,7 +111,7 @@ class TestLoggerFactory:
     
     @pytest.mark.fast
     @pytest.mark.unit
-    def test_double_initialization_error(self, basic_config):
+    def test_double_initialization_error(self, basic_config, isolated_logger):
         """Test that double initialization raises an error."""
         factory = LoggerFactory()
         factory.initialize(basic_config)
@@ -120,7 +121,7 @@ class TestLoggerFactory:
     
     @pytest.mark.fast
     @pytest.mark.unit
-    def test_get_logger_before_initialization(self):
+    def test_get_logger_before_initialization(self, isolated_logger):
         """Test getting logger before initialization raises error."""
         factory = LoggerFactory()
         

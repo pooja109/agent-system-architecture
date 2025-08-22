@@ -9,12 +9,8 @@ Provides common patterns for connection management and error handling.
 import structlog
 from typing import Any
 
-try:
-    from services.databricks_connection_pool import get_connection_pool, DatabricksConnectionPool
-    from services.databricks_oauth_client import DatabricksOAuthClient
-except ImportError:
-    from .databricks_connection_pool import get_connection_pool, DatabricksConnectionPool
-    from .databricks_oauth_client import DatabricksOAuthClient
+from services.databricks_connection_pool import get_connection_pool, DatabricksConnectionPool
+from services.databricks_oauth_client import DatabricksOAuthClient
 
 
 class PooledServiceBase:

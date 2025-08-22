@@ -28,6 +28,7 @@ from tests.fixtures.performance_monitoring import performance_monitor, enforce_l
 from tests.fixtures.optimized_mocks import mock_pool
 
 
+@pytest.mark.usefixtures("isolated_logger")
 class TestLoggingIntegration:
     """Test end-to-end logging system integration with isolation."""
     
@@ -68,7 +69,7 @@ class TestLoggingIntegration:
     
     @pytest.mark.fast
     @pytest.mark.unit
-    def test_full_system_initialization(self, dual_stream_config):
+    def test_full_system_initialization(self, dual_stream_config, isolated_logger):
         """Test complete system initialization."""
         # Initialize the logging system
         initialize_logging(dual_stream_config)

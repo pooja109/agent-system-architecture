@@ -141,10 +141,12 @@ class EmailForwardingManager:
             self._error_count += 1
             self.logger.error(
                 "Failed to generate email forwarding content",
-                error=str(e),
-                recipient_email=recipient_email,
-                scenario_type=scenario_type,
-                error_count=self._error_count
+                extra={
+                    "error": str(e),
+                    "recipient_email": recipient_email,
+                    "scenario_type": scenario_type,
+                    "error_count": self._error_count
+                }
             )
             
             if isinstance(e, (TemplateRenderError, PromptNotFoundError)):
@@ -218,8 +220,10 @@ class EmailForwardingManager:
             self._error_count += 1
             self.logger.error(
                 "Failed to generate email forwarding script",
-                error=str(e),
-                recipient_email=recipient_email
+                extra={
+                    "error": str(e),
+                    "recipient_email": recipient_email
+                }
             )
             
             if isinstance(e, (TemplateRenderError, PromptValidationError)):
@@ -254,8 +258,10 @@ class EmailForwardingManager:
         except Exception as e:
             self.logger.warning(
                 "Failed to load scenario-specific configuration, using defaults",
-                scenario_type=scenario_type,
-                error=str(e)
+                extra={
+                    "scenario_type": scenario_type,
+                    "error": str(e)
+                }
             )
             
             # Return default configuration
@@ -298,7 +304,7 @@ class EmailForwardingManager:
         except Exception as e:
             self.logger.error(
                 "Failed to load base email forwarding template",
-                error=str(e)
+                extra={"error": str(e)}
             )
             raise PromptNotFoundError(
                 "Base email forwarding template not found",
@@ -324,7 +330,7 @@ class EmailForwardingManager:
         except Exception as e:
             self.logger.error(
                 "Failed to load script generation template",
-                error=str(e)
+                extra={"error": str(e)}
             )
             raise PromptNotFoundError(
                 "Script generation template not found",
@@ -365,8 +371,10 @@ class EmailForwardingManager:
         except Exception as e:
             self.logger.warning(
                 "Failed to load scenario-specific template",
-                scenario_type=scenario_type,
-                error=str(e)
+                extra={
+                    "scenario_type": scenario_type,
+                    "error": str(e)
+                }
             )
             # Return empty dict to trigger default behavior
             return {}

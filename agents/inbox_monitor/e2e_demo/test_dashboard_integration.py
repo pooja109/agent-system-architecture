@@ -23,6 +23,8 @@ from terminal_detector import TerminalDetector
 class TestTerminalCompatibility:
     """Test terminal compatibility edge cases."""
     
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_very_small_terminal(self):
         """Test behavior with very small terminal (< 80 chars)."""
         with patch.dict(os.environ, {'COLUMNS': '60', 'LINES': '10'}):
@@ -31,6 +33,8 @@ class TestTerminalCompatibility:
             assert detector.height == 10
             assert not detector.supports_rich()  # Should fallback for small terminals
     
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_exotic_terminal_types(self):
         """Test behavior with unusual terminal types."""
         test_cases = [
@@ -49,6 +53,8 @@ class TestTerminalCompatibility:
                 assert 'rich_support' in caps
                 assert isinstance(caps['rich_support'], bool)
     
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_ci_environment_detection(self):
         """Test CI environment detection with various CI systems."""
         ci_environments = [
@@ -66,6 +72,8 @@ class TestTerminalCompatibility:
                 assert detector.is_ci_environment()
                 assert not detector.supports_rich()  # Should disable rich in CI
     
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_missing_terminal_info(self):
         """Test behavior when terminal information is missing."""
         # Remove all terminal-related environment variables
@@ -82,6 +90,8 @@ class TestTerminalCompatibility:
 class TestAnimationPerformance:
     """Test animation controller performance under various conditions."""
     
+    @pytest.mark.medium
+    @pytest.mark.integration
     def test_high_cpu_load_degradation(self):
         """Test performance degradation under high CPU load."""
         controller = create_dashboard_controller()
@@ -104,6 +114,8 @@ class TestAnimationPerformance:
         
         controller.stop_all_animations()
     
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_animation_cleanup_on_error(self):
         """Test proper cleanup when animations fail."""
         controller = AnimationController()
@@ -123,6 +135,8 @@ class TestAnimationPerformance:
         
         controller.stop_all_animations()
     
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_frame_rate_limits(self):
         """Test that frame rate limits are respected."""
         from animation_controller import AnimationConfig
@@ -150,6 +164,8 @@ class TestAnimationPerformance:
 class TestServiceMonitorEdgeCases:
     """Test service monitor edge cases and error conditions."""
     
+    @pytest.mark.medium
+    @pytest.mark.integration
     def test_concurrent_operations(self):
         """Test concurrent operations on the same service."""
         monitor = ServiceMonitor()
@@ -171,6 +187,8 @@ class TestServiceMonitorEdgeCases:
         
         monitor.stop_monitoring()
     
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_stale_operation_cleanup(self):
         """Test cleanup of stale operations."""
         monitor = ServiceMonitor()
@@ -194,6 +212,8 @@ class TestServiceMonitorEdgeCases:
         
         monitor.stop_monitoring()
     
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_service_health_assessment(self):
         """Test service health assessment logic."""
         monitor = ServiceMonitor()
@@ -258,6 +278,8 @@ class TestDashboardIntegrationStress:
             # Should either recover or disable dashboard
             assert integration.can_use_dashboard or not integration.live_display
     
+    @pytest.mark.slow
+    @pytest.mark.integration
     def test_memory_usage_under_load(self):
         """Test memory usage doesn't grow unbounded."""
         import psutil
@@ -289,6 +311,8 @@ class TestDashboardIntegrationStress:
 class TestErrorRecovery:
     """Test comprehensive error recovery scenarios."""
     
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_import_failure_recovery(self):
         """Test graceful handling when Rich library missing."""
         with patch.dict('sys.modules', {'rich': None, 'rich.console': None}):
@@ -307,6 +331,8 @@ class TestErrorRecovery:
                 # If import fails completely, that's also acceptable
                 pass
     
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_thread_failure_recovery(self):
         """Test recovery when background threads fail."""
         controller = AnimationController()
@@ -321,6 +347,8 @@ class TestErrorRecovery:
             controller.start_animation_loop()
             assert not controller.is_running  # Should not claim to be running
     
+    @pytest.mark.medium
+    @pytest.mark.integration
     def test_queue_overflow_protection(self):
         """Test protection against queue overflow."""
         from dashboard_integration import DashboardIntegration, DashboardUpdate
@@ -384,6 +412,8 @@ class TestIntegrationScenarios:
         # Should complete without errors
         assert True  # If we get here, test passed
     
+    @pytest.mark.slow
+    @pytest.mark.e2e
     def test_performance_under_realistic_load(self):
         """Test system performance under realistic load."""
         start_time = time.time()

@@ -300,7 +300,7 @@ class LoggingScenarios:
             try:
                 await email_processor.process_inbox()
             except Exception as e:
-                errors_logged.append("processing_error")
+                errors_logged.append("process_error")
             
             return {
                 "errors_logged": errors_logged,

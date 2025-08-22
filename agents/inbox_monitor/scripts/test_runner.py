@@ -34,10 +34,18 @@ if str(parent_dir) not in sys.path:
 # Import our modules (handle both direct execution and module import)
 if __name__ == "__main__":
     # When run directly as a script
-    from config.runner_config import RunnerConfig, ExecutionMode
-    from test_execution import TestExecutor
-    from progress_reporter import ProgressReporter, TestResult
-    from cli_validators import CLIValidator, CLIOptions
+    try:
+        from config.runner_config import RunnerConfig, ExecutionMode
+        from test_execution import TestExecutor
+        from progress_reporter import ProgressReporter, TestResult
+        from cli_validators import CLIValidator, CLIOptions
+    except ImportError:
+        # Fallback for direct execution from scripts directory
+        sys.path.insert(0, str(current_dir))
+        from config.runner_config import RunnerConfig, ExecutionMode
+        from test_execution import TestExecutor
+        from progress_reporter import ProgressReporter, TestResult
+        from cli_validators import CLIValidator, CLIOptions
 else:
     # When imported as a module
     from .config.runner_config import RunnerConfig, ExecutionMode
@@ -53,7 +61,7 @@ try:
         from ci_integration import CIIntegration
         from test_analyzer import TestAnalyzer
         from config.config_profiles import ConfigProfileManager
-        from monitoring import TestRunnerMonitor
+        # Phase 4 monitoring system removed - TestRunnerMonitor no longer available
         from plugin_manager import PluginManager
         from export_utilities import ExportUtilities, ExportFormat
     else:

@@ -1,0 +1,56 @@
+template: |
+  Please analyze this email and extract the original subject line:
+
+  EMAIL DETAILS:
+  From: {sender_email}
+  Subject: {subject}
+  {conversation_context}Body: {body_content}
+
+  CONTEXT ANALYSIS:
+  Domain: {domain}
+  Received: {received_datetime}
+  Thread Analysis: This email may be part of a conversation thread
+
+  Analyze the subject line and email content to extract the original subject that started this conversation. Remove any email client prefixes and identify the core topic. Provide your extraction in the JSON format specified in your instructions.
+
+template_version: "1.0.0"
+
+metadata:
+  version: "1.0.0"
+  name: "Original Subject Extraction Template"
+  description: "Template for creating original subject extraction prompts"
+  author: "Inbox Monitor System"
+  created: "2025-08-15"
+  last_modified: "2025-08-15"
+  
+variables:
+  sender_email:
+    name: "sender_email"
+    description: "Email address of the sender"
+    type: "string"
+    required: true
+  subject:
+    name: "subject"
+    description: "Subject line of the email"
+    type: "string"
+    required: true
+  conversation_context:
+    name: "conversation_context"
+    description: "Context information about the conversation"
+    type: "string"
+    required: false
+  body_content:
+    name: "body_content"
+    description: "Body content of the email"
+    type: "string"
+    required: true
+  domain:
+    name: "domain"
+    description: "Domain of the sender's email"
+    type: "string"
+    required: true
+  received_datetime:
+    name: "received_datetime"
+    description: "DateTime when the email was received"
+    type: "string"
+    required: true

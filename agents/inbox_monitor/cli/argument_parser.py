@@ -412,6 +412,32 @@ class CLIArgumentParser:
             action='store_true',
             help='Force setup even if tables exist'
         )
+        
+        # Setup scenario tracking command
+        setup_scenario_parser = subparsers.add_parser(
+            'setup-scenario-tracking',
+            help='Setup scenario tracking table only',
+            description='Initialize the scenario processing tracking table in Databricks',
+            parents=[parent_parser]
+        )
+        setup_scenario_parser.add_argument(
+            '--verify',
+            action='store_true',
+            help='Verify table structure and run tests after creation'
+        )
+        
+        # Recreate scenario tracking table command
+        recreate_scenario_parser = subparsers.add_parser(
+            'recreate-scenario-table',
+            help='Drop and recreate scenario tracking table with new schema',
+            description='Drop existing scenario tracking table and recreate with updated schema (replaces ai_* fields with email_intent_* fields)',
+            parents=[parent_parser]
+        )
+        recreate_scenario_parser.add_argument(
+            '--auto-confirm',
+            action='store_true',
+            help='Skip confirmation prompt (use with caution - will permanently delete existing data)'
+        )
     
     def parse_args(self, args: Optional[List[str]] = None) -> argparse.Namespace:
         """Parse command line arguments with validation."""
@@ -433,8 +459,7 @@ class CLIArgumentParser:
             return  # No subcommand specified, skip validation
             
         # Validate format and verbosity combinations
-        if hasattr(args, 'format') and hasattr(args, 'quiet') and args.format == 'json' and args.quiet:
-            self.parser.error("--quiet and --format json are incompatible")
+        # Note: --quiet with --format json is allowed for automation scenarios
         
         if hasattr(args, 'format') and hasattr(args, 'debug') and args.format == 'minimal' and args.debug:
             self.parser.error("--debug and --format minimal are incompatible")
@@ -471,7 +496,9 @@ class CLIArgumentParser:
         # Apply verbosity flags
         if getattr(args, 'quiet', False):
             config['console_level'] = LogLevel.WARNING
-            config['console_format'] = OutputFormat.MINIMAL
+            # Only override format if user didn't specify one explicitly
+            if not hasattr(args, 'format') or not args.format:
+                config['console_format'] = OutputFormat.MINIMAL
             config['progress_enabled'] = False  # Disable progress in quiet mode
         elif getattr(args, 'verbose', False):
             config['console_level'] = LogLevel.INFO
