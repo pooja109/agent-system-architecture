@@ -32,6 +32,11 @@ class TestPerformanceValidation:
         )
     
     @pytest.fixture
+    @pytest.mark.slow
+    @pytest.mark.unit
+    @pytest.mark.email
+    @pytest.mark.slow
+    @pytest.mark.unit
     def test_emails(self):
         """Create test emails for validation."""
         return create_test_emails(count=50)
@@ -97,6 +102,8 @@ class TestPerformanceValidation:
         return processor
     
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_performance_validator_initialization(self, performance_validator):
         """Test performance validator initialization."""
         
@@ -105,6 +112,8 @@ class TestPerformanceValidation:
         assert performance_validator.warmup_samples == 5
     
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_performance_validation_success(
         self, 
         performance_validator,
@@ -135,6 +144,8 @@ class TestPerformanceValidation:
         assert metrics.passed_threshold is True
     
     @pytest.mark.asyncio  
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_performance_validation_insufficient_emails(
         self,
         performance_validator,
@@ -157,6 +168,8 @@ class TestPerformanceValidation:
         assert "Provide more test emails" in result.recommendation
     
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_email_to_message_dict_conversion(self, performance_validator, test_emails):
         """Test conversion of Email model to message dict."""
         
@@ -173,6 +186,8 @@ class TestPerformanceValidation:
         assert len(message_dict["toRecipients"]) == len(email.recipients.to)
     
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_performance_metrics_calculation(self, performance_validator):
         """Test performance metrics calculation."""
         
@@ -194,6 +209,8 @@ class TestPerformanceValidation:
         assert metrics.sample_size == 5
     
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_recommendation_generation(self, performance_validator):
         """Test recommendation generation for different performance levels."""
         
@@ -242,6 +259,8 @@ class TestPerformanceValidation:
         assert "too high" in recommendation
     
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_convenience_function(self, mock_email_processor, test_emails):
         """Test the convenience function for performance validation."""
         
@@ -256,6 +275,8 @@ class TestPerformanceValidation:
         assert result.metrics is not None
     
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_create_test_emails_utility(self):
         """Test the create_test_emails utility function."""
         
@@ -281,12 +302,16 @@ class TestRealPerformanceValidation:
         True,  # Always skip for now
         reason="Integration tests require --run-integration flag"
     )
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_real_performance_validation(self):
         """Test performance validation with real components (integration test)."""
         
         # This test requires real system setup
         pytest.skip("Real integration test - requires full system setup")
     
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_performance_validation_benchmark(self):
         """Benchmark performance validation overhead."""
         

@@ -10,6 +10,7 @@ Comprehensive tests for the 7 critical missing field implementations:
 """
 
 import pytest
+from tests.fixtures.async_helpers import AsyncTestHelper
 from unittest.mock import Mock, MagicMock, patch
 from utils.ai_metadata_extractor import (
     extract_ai_metadata,
@@ -36,6 +37,7 @@ class TestAIMetadataExtraction:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_extract_model_version_from_intent_response(self):
         """Test model version extraction from intent result."""
         intent_result = Mock()
@@ -48,6 +50,7 @@ class TestAIMetadataExtraction:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_extract_ai_model_version_from_intent(self):
         """Test ai_model_version extraction from intent result."""
         intent_result = Mock()
@@ -61,6 +64,7 @@ class TestAIMetadataExtraction:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_extract_ai_model_version_from_processing(self):
         """Test ai_model_version extraction from processing result."""
         intent_result = None
@@ -74,6 +78,7 @@ class TestAIMetadataExtraction:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_ai_metadata_fallback_when_no_model_data(self):
         """Test fallback behavior when no model data available."""
         intent_result = Mock()
@@ -90,6 +95,7 @@ class TestCustomerIdentification:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_generate_consistent_customer_id(self):
         """Test that same email always generates same customer ID."""
         email = "john.smith@company.com"
@@ -103,6 +109,7 @@ class TestCustomerIdentification:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_generate_different_ids_for_different_emails(self):
         """Test that different emails generate different customer IDs."""
         email1 = "john@company.com"
@@ -115,6 +122,7 @@ class TestCustomerIdentification:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_extract_organization_from_business_email(self):
         """Test organization extraction from business email domain."""
         email = "employee@acmecorp.com"
@@ -125,6 +133,7 @@ class TestCustomerIdentification:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_detect_personal_email_provider(self):
         """Test detection of personal email providers."""
         email = "user@gmail.com"
@@ -136,6 +145,7 @@ class TestCustomerIdentification:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_extract_customer_metadata_complete(self):
         """Test complete customer metadata extraction."""
         email_data = Mock()
@@ -156,6 +166,7 @@ class TestSystemMetadata:
     @patch('utils.system_metadata.socket.gethostname')
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_get_processing_node_id_with_hostname(self, mock_hostname):
         """Test processing node ID generation with hostname."""
         mock_hostname.return_value = "worker-node-01"
@@ -172,6 +183,7 @@ class TestSystemMetadata:
     @patch('utils.system_metadata.socket.gethostname')
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_get_processing_node_id_with_container(self, mock_hostname):
         """Test processing node ID generation in container environment."""
         mock_hostname.return_value = "container-host"
@@ -186,6 +198,7 @@ class TestSystemMetadata:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_extract_system_metadata_complete(self):
         """Test complete system metadata extraction."""
         with patch('utils.system_metadata.get_processing_node_id', return_value='test-node-123'):
@@ -201,6 +214,7 @@ class TestEmailMetadata:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_count_attachments_from_list(self):
         """Test attachment counting from attachments list."""
         email_data = Mock()
@@ -212,6 +226,7 @@ class TestEmailMetadata:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_count_attachments_from_boolean(self):
         """Test attachment counting from has_attachments boolean."""
         email_data = Mock()
@@ -224,6 +239,7 @@ class TestEmailMetadata:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_no_attachments(self):
         """Test handling of emails with no attachments."""
         email_data = Mock()
@@ -235,6 +251,7 @@ class TestEmailMetadata:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_extract_thread_id_from_conversation_id(self):
         """Test thread ID extraction from conversation ID."""
         email_data = Mock()
@@ -246,6 +263,7 @@ class TestEmailMetadata:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_extract_thread_id_from_headers(self):
         """Test thread ID extraction from email headers."""
         email_data = Mock()
@@ -260,6 +278,7 @@ class TestEmailMetadata:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_extract_email_metadata_complete(self):
         """Test complete email metadata extraction."""
         email_data = Mock()
@@ -277,6 +296,7 @@ class TestIntegrationScenarios:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_partial_data_availability(self):
         """Test handling when only some data sources are available."""
         # AI metadata available, but customer data missing
@@ -294,6 +314,7 @@ class TestIntegrationScenarios:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_error_handling_in_extraction(self):
         """Test error handling when extraction functions fail."""
         # Malformed data that causes extraction errors
@@ -310,6 +331,7 @@ class TestIntegrationScenarios:
 
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.medium
     def test_factory_method_integration(self):
         """Test that factory method integrates all missing field extractors."""
         from database.scenario_tracking_models import ScenarioProcessingRecord
@@ -336,11 +358,11 @@ class TestIntegrationScenarios:
         
         # Create record using factory method
         with patch('utils.system_metadata.get_processing_node_id', return_value='test-node'):
-            record = ScenarioProcessingRecord.from_processing_results(
+            record = AsyncTestHelper.run_sync(ScenarioProcessingRecord.from_processing_results(
                 email_data=email_data,
                 processing_result=processing_result,
                 intent_result=intent_result
-            )
+            ))
         
         # Verify missing critical fields are populated
         assert record.customer_id is not None
@@ -359,6 +381,7 @@ class TestDataQualityValidation:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_customer_id_consistency(self):
         """Test customer ID generation is deterministic."""
         email = "test@example.com"
@@ -372,6 +395,7 @@ class TestDataQualityValidation:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_customer_id_uniqueness(self):
         """Test different emails generate different customer IDs."""
         emails = [
@@ -387,6 +411,7 @@ class TestDataQualityValidation:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_field_data_types(self):
         """Test extracted fields match expected data types."""
         # Test AI metadata
@@ -433,6 +458,7 @@ class TestIntegrationResilience:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_mock_object_detection(self):
         """Test Mock object detection function."""
         from database.scenario_tracking_models import is_mock_object
@@ -452,6 +478,7 @@ class TestIntegrationResilience:
     
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.fast
     def test_factory_method_with_mock_objects(self):
         """Test factory method handles Mock objects gracefully."""
         from database.scenario_tracking_models import ScenarioProcessingRecord
@@ -477,11 +504,11 @@ class TestIntegrationResilience:
         
         # This should NOT fail due to Mock objects
         with patch('utils.system_metadata.get_processing_node_id', return_value='test-node'):
-            record = ScenarioProcessingRecord.from_processing_results(
+            record = AsyncTestHelper.run_sync(ScenarioProcessingRecord.from_processing_results(
                 email_data=email_data,
                 processing_result=processing_result,
                 intent_result=intent_result
-            )
+            ))
         
         # Record should be created successfully
         assert record is not None
@@ -502,6 +529,7 @@ class TestIntegrationResilience:
     
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.fast
     def test_validation_error_recovery(self):
         """Test validation error recovery mechanism."""
         from database.scenario_tracking_models import ScenarioProcessingRecord
@@ -524,11 +552,11 @@ class TestIntegrationResilience:
         }
         
         # This should handle validation errors gracefully
-        record = ScenarioProcessingRecord.from_processing_results(
+        record = AsyncTestHelper.run_sync(ScenarioProcessingRecord.from_processing_results(
             email_data=email_data,
             processing_result=processing_result,
             **kwargs
-        )
+        ))
         
         # Record should still be created
         assert record is not None
@@ -542,6 +570,7 @@ class TestIntegrationResilience:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_minimal_record_creation(self):
         """Test minimal record creation for extreme error cases."""
         from database.scenario_tracking_models import ScenarioProcessingRecord, get_minimal_record_data
@@ -575,6 +604,8 @@ class TestPerformanceValidation:
     
     @pytest.mark.fast
     @pytest.mark.performance
+    @pytest.mark.unit
+    @pytest.mark.slow
     def test_extraction_performance(self):
         """Test field extraction completes within reasonable time."""
         import time
@@ -614,6 +645,8 @@ class TestPerformanceValidation:
     
     @pytest.mark.fast
     @pytest.mark.performance
+    @pytest.mark.unit
+    @pytest.mark.slow
     def test_system_metadata_caching_performance(self):
         """Test system metadata LRU caching improves performance."""
         import time

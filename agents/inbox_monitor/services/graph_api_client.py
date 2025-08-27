@@ -479,3 +479,140 @@ class GraphAPIClient(APIClientLoggerMixin):
         except Exception as e:
             self.logger.error(f"Failed to send email: {e}")
             return False, None, str(e)
+    
+    async def get_conversation_messages(
+        self, conversation_id: str, limit: int = 50
+    ) -> list[dict[str, Any]]:
+        """Get all messages in a conversation thread.
+        
+        Args:
+            conversation_id: The conversation ID to fetch messages for
+            limit: Maximum number of messages to retrieve (default 50)
+            
+        Returns:
+            List of message dictionaries ordered by received datetime (oldest first)
+        """
+        try:
+            # Query for all messages - we'll filter by conversation ID after retrieval
+            # Graph API doesn't support efficient filtering by conversationId directly
+            endpoint = f"/users/{self.settings.monitored_email}/messages"
+            params = {
+                "$top": 250,  # Get more messages to ensure we find the conversation
+                "$orderby": "receivedDateTime desc",
+                "$select": "id,conversationId,subject,body,from,toRecipients,receivedDateTime,sentDateTime"
+            }
+            
+            self.logger.info(
+                "Fetching conversation messages",
+                extra={
+                    "conversation_id": conversation_id,
+                    "limit": limit
+                }
+            )
+            
+            response = await self._make_request("GET", endpoint, params=params)
+            all_messages = response.get("value", [])
+            
+            # Filter messages by conversation ID
+            messages = [
+                msg for msg in all_messages 
+                if msg.get("conversationId") == conversation_id
+            ]
+            
+            # Sort by received datetime (oldest first)
+            messages.sort(key=lambda x: x.get("receivedDateTime", ""))
+            
+            # Limit to requested amount
+            messages = messages[:limit]
+            
+            self.logger.info(
+                "Retrieved conversation messages",
+                extra={
+                    "conversation_id": conversation_id,
+                    "total_fetched": len(all_messages),
+                    "conversation_count": len(messages)
+                }
+            )
+            
+            return messages
+            
+        except Exception as e:
+            self.logger.error(
+                "Failed to fetch conversation messages",
+                extra={
+                    "conversation_id": conversation_id,
+                    "error": str(e)
+                }
+            )
+            return []
+    
+    def combine_conversation_thread(
+        self, messages: list[dict[str, Any]], current_message_id: str = None
+    ) -> str:
+        """Combine messages from a conversation thread into a single formatted string.
+        
+        Args:
+            messages: List of message dictionaries from the conversation
+            current_message_id: ID of the current message to exclude from thread
+            
+        Returns:
+            Formatted string containing the full conversation thread
+        """
+        if not messages:
+            return ""
+        
+        combined_content = []
+        
+        for message in messages:
+            # Skip the current message if specified
+            if current_message_id and message.get("id") == current_message_id:
+                continue
+            
+            # Extract message details
+            from_field = message.get("from", {})
+            sender_info = from_field.get("emailAddress", {})
+            sender_email = sender_info.get("address", "Unknown")
+            sender_name = sender_info.get("name", sender_email)
+            
+            subject = message.get("subject", "No Subject")
+            
+            # Parse datetime
+            received_dt_str = message.get("receivedDateTime", "")
+            if received_dt_str:
+                try:
+                    from datetime import datetime
+                    received_dt = datetime.fromisoformat(received_dt_str.replace("Z", "+00:00"))
+                    date_str = received_dt.strftime("%A, %B %d, %Y %I:%M %p")
+                except:
+                    date_str = received_dt_str
+            else:
+                date_str = "Unknown Date"
+            
+            # Get body content
+            body_data = message.get("body", {})
+            body_content = body_data.get("content", "")
+            
+            # Convert HTML to plain text if needed
+            if body_data.get("contentType", "").lower() == "html" and body_content:
+                # Import ContentFormatter for HTML cleaning
+                try:
+                    from utils.content_formatter import ContentFormatter
+                    formatter = ContentFormatter()
+                    body_content = formatter.html_to_clean_text(body_content)
+                except Exception as e:
+                    self.logger.warning(f"Failed to clean HTML content: {e}")
+                    # Basic fallback cleaning
+                    import re
+                    body_content = re.sub(r'<[^>]+>', '', body_content)
+            
+            # Add separator and message to combined content
+            if combined_content:
+                combined_content.append("\n\n-----Original Message-----")
+            
+            combined_content.append(f"From: {sender_name} <{sender_email}>")
+            combined_content.append(f"Sent: {date_str}")
+            combined_content.append(f"Subject: {subject}")
+            combined_content.append("")
+            combined_content.append(body_content.strip())
+        
+        return "\n".join(combined_content)

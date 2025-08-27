@@ -40,12 +40,18 @@ class TestServiceLoggingIntegration:
         """Clean up test environment."""
         cleanup_logging()
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.medium
     def test_logging_system_initialization(self):
         """Test that the logging system initializes correctly."""
         logger = get_logger("test")
         assert logger is not None
         assert logger.name == "test"
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.medium
     def test_service_integration_creation(self):
         """Test that service integration can be created."""
         assert self.service_integration is not None
@@ -53,6 +59,11 @@ class TestServiceLoggingIntegration:
         assert hasattr(self.service_integration, 'sensitive_filter')
     
     @patch('services.azure_key_vault_client.ClientSecretCredential')
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.azure
+    @pytest.mark.medium
+    @pytest.mark.integration
     def test_azure_key_vault_logging_integration(self, mock_credential):
         """Test Azure Key Vault client logging integration."""
         # Mock the credential to avoid real authentication
@@ -76,6 +87,9 @@ class TestServiceLoggingIntegration:
             # If initialization fails, that's OK for this test - we're testing the logging integration
             pass
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.medium
     def test_http_logging_suppression(self):
         """Test HTTP logging suppression functionality."""
         suppressor = HTTPClientLogSuppressor(self.logging_config)
@@ -93,6 +107,9 @@ class TestServiceLoggingIntegration:
             # Configuration might fail in test environment, that's OK
             pass
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.medium
     def test_correlation_id_system(self):
         """Test correlation ID generation and context."""
         from utils.custom_logging.correlation import generate_correlation_id, get_correlation_id, set_correlation_id
@@ -107,6 +124,9 @@ class TestServiceLoggingIntegration:
         retrieved_id = get_correlation_id()
         assert retrieved_id == correlation_id
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.medium
     def test_sensitive_data_filtering(self):
         """Test sensitive data filtering."""
         from utils.custom_logging.sensitive_data_filter import SensitiveDataFilter
@@ -124,6 +144,9 @@ class TestServiceLoggingIntegration:
         # User email should be present (not considered highly sensitive in this context)
         assert "user" in filtered_data
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.medium
     def test_service_logger_mixins(self):
         """Test service logger mixin functionality."""
         from services.logging.service_logger_mixin import ServiceLoggerMixin
@@ -155,11 +178,19 @@ class TestServiceLoggingIntegration:
 class TestMainIntegration:
     """Test main.py integration with logging system."""
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.medium
     def test_setup_logging_system_function_exists(self):
         """Test that the setup_logging_system function exists and can be imported."""
         from main import setup_logging_system
         assert setup_logging_system is not None
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.cli
+    @pytest.mark.medium
+    @pytest.mark.integration
     def test_enhanced_command_handlers_exist(self):
         """Test that enhanced command handlers exist."""
         from main import run_inbox_check, run_system_status

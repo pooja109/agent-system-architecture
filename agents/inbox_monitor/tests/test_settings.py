@@ -23,6 +23,7 @@ class TestGraphAPISettings:
     """Test GraphAPISettings model."""
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_graph_api_settings_creation(self):
         """Test creating Graph API settings."""
         settings = GraphAPISettings(
@@ -40,6 +41,7 @@ class TestGraphAPISettings:
         assert settings.scopes == ["https://graph.microsoft.com/.default"]
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_graph_api_settings_custom_urls(self):
         """Test Graph API settings with custom URLs."""
         settings = GraphAPISettings(
@@ -57,6 +59,7 @@ class TestProcessingSettings:
     @pytest.mark.retry
     @pytest.mark.medium
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_processing_settings_defaults(self):
         """Test processing settings with defaults."""
         settings = ProcessingSettings()
@@ -68,6 +71,7 @@ class TestProcessingSettings:
     @pytest.mark.retry
     @pytest.mark.medium
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_processing_settings_custom(self):
         """Test processing settings with custom values."""
         settings = ProcessingSettings(
@@ -86,6 +90,7 @@ class TestLoggingSettings:
     """Test LoggingSettings model."""
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_logging_settings_defaults(self):
         """Test logging settings with defaults."""
         settings = LoggingSettings()
@@ -93,6 +98,7 @@ class TestLoggingSettings:
         assert settings.format == "json"
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_logging_settings_valid_level(self):
         """Test logging settings with valid level."""
         settings = LoggingSettings(level="DEBUG", format="standard")
@@ -103,6 +109,7 @@ class TestLoggingSettings:
     @pytest.mark.fast
     @pytest.mark.edge_case
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_logging_settings_invalid_level(self):
         """Test logging settings with invalid level."""
         with pytest.raises(ValueError, match="Invalid logging level"):
@@ -112,6 +119,7 @@ class TestOutputSettings:
     @pytest.mark.email
     @pytest.mark.medium
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_output_settings_file_storage(self):
         """Test output settings for file storage."""
         settings = OutputSettings(storage_type="file", output_directory="/tmp/emails")
@@ -122,6 +130,7 @@ class TestOutputSettings:
     @pytest.mark.email
     @pytest.mark.medium
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_output_settings_api_storage(self):
         """Test output settings for API storage."""
         settings = OutputSettings(
@@ -141,6 +150,8 @@ class TestOutputSettings:
     @pytest.mark.email
     @pytest.mark.salesforce
     @pytest.mark.databricks
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_output_settings_api_missing_endpoint(self):
         """Test API storage without endpoint raises error."""
         with pytest.raises(ValueError, match="api_endpoint is required"):
@@ -150,6 +161,7 @@ class TestAppSettings:
     @pytest.mark.azure
     @pytest.mark.integration
     @pytest.mark.medium
+    @pytest.mark.unit
     def test_app_settings_creation(self, mock_settings):
         """Test creating app settings."""
         assert mock_settings.environment == "test"
@@ -160,6 +172,7 @@ class TestAppSettings:
         assert mock_settings.output.storage_type == "file"
     @pytest.mark.integration
     @pytest.mark.medium
+    @pytest.mark.unit
     def test_app_settings_dry_run(self, mock_settings):
         """Test app settings with dry run enabled."""
         mock_settings.dry_run = True
@@ -196,6 +209,8 @@ class TestGetSettings:
     @pytest.mark.ci_safe
     @patch("services.azure_key_vault_client.AzureKeyVaultClient")
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_get_settings_from_env(self, mock_key_vault_client):
         """Test getting settings from environment variables."""
         # Mock Key Vault client and its methods
@@ -260,6 +275,8 @@ class TestGetSettings:
     @pytest.mark.azure
     @patch("services.azure_key_vault_client.AzureKeyVaultClient")
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_get_settings_defaults(self, mock_key_vault_client):
         """Test getting settings with defaults when env vars not set."""
         # Mock Key Vault client and its methods
@@ -299,6 +316,7 @@ class TestValidateSettings:
     """Test validate_settings function."""
     @pytest.mark.integration
     @pytest.mark.medium
+    @pytest.mark.unit
     def test_validate_settings_valid(self, mock_settings):
         """Test validating valid settings."""
         assert validate_settings(mock_settings) is True
@@ -307,6 +325,8 @@ class TestValidateSettings:
     @pytest.mark.integration
     @pytest.mark.medium
     @pytest.mark.prompt
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_validate_settings_missing_databricks(self):
         """Test validation fails with missing Databricks settings."""
         from config.settings import (
@@ -372,6 +392,8 @@ class TestValidateSettings:
     @pytest.mark.email
     @pytest.mark.salesforce
     @pytest.mark.databricks
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_validate_settings_missing_api_endpoint(self):
         """Test validation fails with API storage but no endpoint."""
         # Test that Pydantic validation catches this at model creation

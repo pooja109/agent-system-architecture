@@ -15,10 +15,13 @@ import time
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.core import Config, DatabricksError
 # Databricks SDK imports - handling different versions
+SDK_IMPORT_ERROR = None
 try:
     from databricks.sdk.service.sql import ExecuteStatementRequest, StatementResponse
     from databricks.sdk.service.sql import StatementState, StatementStatus, StatementParameterListItem, State
-except ImportError:
+except ImportError as e:
+    # Capture import error for detailed troubleshooting
+    SDK_IMPORT_ERROR = str(e)
     # Fallback for different SDK versions
     ExecuteStatementRequest = None
     StatementResponse = None
@@ -159,6 +162,36 @@ class DatabricksOAuthClient:
     async def _initialize_client(self) -> None:
         """Initialize OAuth client with service principal authentication."""
         try:
+            # Check SDK imports first
+            if StatementState is None:
+                error_details = [
+                    "❌ CONTAINER SETUP ERROR: Databricks SDK not properly installed",
+                    "",
+                    "🔧 DEBUG COMMANDS - Run these in your container:",
+                    "",
+                    "# Check if SDK is installed",
+                    "docker exec <container_name> pip list | grep databricks",
+                    "docker exec <container_name> pip show databricks-sdk",
+                    "",
+                    "# Test basic imports",
+                    "docker exec <container_name> python -c \"import databricks.sdk; print('SDK base imported')\"",
+                    "docker exec <container_name> python -c \"from databricks.sdk.service.sql import StatementState; print('SQL imports OK')\"",
+                    "",
+                    "# Check Python environment",
+                    "docker exec <container_name> python --version",
+                    "docker exec <container_name> which python",
+                    "docker exec <container_name> pip --version",
+                    "",
+                    "# Install SDK if missing",
+                    "docker exec <container_name> pip install 'databricks-sdk>=0.28.0'",
+                    "",
+                    "# Check for dependency conflicts",
+                    "docker exec <container_name> pip check",
+                    "",
+                    f"🔍 Original import error: {SDK_IMPORT_ERROR}" if SDK_IMPORT_ERROR else "🔍 SDK imports failed without specific error"
+                ]
+                raise OAuthAuthenticationError("\n".join(error_details))
+            
             self.logger.info("Initializing Databricks OAuth client")
             
             # Get service principal credentials from Key Vault
@@ -188,15 +221,37 @@ class DatabricksOAuthClient:
                 }
             )
             
+        except OAuthAuthenticationError:
+            # Re-raise our detailed error messages
+            raise
         except Exception as e:
-            self.logger.error(
-                "Failed to initialize Databricks OAuth client",
-                extra={
-                    "error": str(e),
-                    "host": self.databricks_settings.server_hostname
-                }
-            )
-            raise OAuthAuthenticationError(f"Failed to initialize OAuth client: {e}") from e
+            error_details = [
+                "❌ DATABRICKS CONNECTION FAILED",
+                "",
+                f"🔍 Error: {str(e)}",
+                f"🎯 Host: {self.databricks_settings.server_hostname}",
+                "",
+                "🔧 DEBUG COMMANDS - Run these in your container:",
+                "",
+                "# Test network connectivity",
+                f"docker exec <container_name> ping {self.databricks_settings.server_hostname}",
+                f"docker exec <container_name> curl -I https://{self.databricks_settings.server_hostname}",
+                "",
+                "# Check SDK and Azure libs",
+                "docker exec <container_name> pip list | grep -E '(databricks|azure)'",
+                "docker exec <container_name> python -c \"from databricks.sdk import WorkspaceClient; print('WorkspaceClient OK')\"",
+                "",
+                "# Test Azure authentication",
+                "docker exec <container_name> python -c \"from azure.identity import DefaultAzureCredential; cred = DefaultAzureCredential(); print('Azure cred OK')\"",
+                "",
+                "# Check environment variables",
+                "docker exec <container_name> env | grep -E '(AZURE_|DATABRICKS_)'",
+                "",
+                "# Test full Databricks connection",
+                "docker exec <container_name> python -c \"from databricks.sdk import WorkspaceClient; from databricks.sdk.core import Config; c = Config(); print(f'Config: {c}')\""
+            ]
+            self.logger.error("\n".join(error_details))
+            raise OAuthAuthenticationError("\n".join(error_details)) from e
     
     async def _setup_sql_warehouse(self) -> None:
         """Setup SQL warehouse connection from http_path."""
@@ -258,14 +313,37 @@ class DatabricksOAuthClient:
             )
             
         except Exception as e:
-            self.logger.error(
-                "Failed to setup SQL warehouse",
-                extra={
-                    "error": str(e),
-                    "http_path": self.databricks_settings.http_path
-                }
-            )
-            raise OAuthException(f"SQL warehouse setup failed: {e}") from e
+            # Extract warehouse ID from http_path for debugging
+            warehouse_id = "unknown"
+            if hasattr(self.databricks_settings, 'http_path') and "/warehouses/" in self.databricks_settings.http_path:
+                warehouse_id = self.databricks_settings.http_path.split("/warehouses/")[-1]
+            
+            error_details = [
+                "❌ SQL WAREHOUSE SETUP FAILED",
+                "",
+                f"🔍 Error: {str(e)}",
+                f"🎯 HTTP Path: {self.databricks_settings.http_path}",
+                f"🏢 Warehouse ID: {warehouse_id}",
+                "",
+                "🔧 DEBUG COMMANDS - Run these in your container:",
+                "",
+                "# Test basic Databricks connection",
+                "docker exec <container_name> python -c \"from databricks.sdk import WorkspaceClient; client = WorkspaceClient(); print('Client created')\"",
+                "",
+                "# List available warehouses",
+                "docker exec <container_name> python -c \"from databricks.sdk import WorkspaceClient; client = WorkspaceClient(); warehouses = list(client.warehouses.list()); print([w.id for w in warehouses])\"",
+                "",
+                f"# Check specific warehouse status",
+                f"docker exec <container_name> python -c \"from databricks.sdk import WorkspaceClient; client = WorkspaceClient(); w = client.warehouses.get('{warehouse_id}'); print(f'State: {{w.state}}, Name: {{w.name}}')\"",
+                "",
+                "# Test SQL execution",
+                f"docker exec <container_name> python -c \"from databricks.sdk import WorkspaceClient; client = WorkspaceClient(); result = client.statement_execution.execute_statement(warehouse_id='{warehouse_id}', statement='SELECT 1'); print(result)\"",
+                "",
+                "# Check service principal permissions",
+                "docker exec <container_name> python -c \"from databricks.sdk import WorkspaceClient; client = WorkspaceClient(); user = client.current_user.me(); print(f'User: {{user.user_name}}, Groups: {{[g.display_name for g in user.groups or []]}}')\"",
+            ]
+            self.logger.error("\n".join(error_details))
+            raise OAuthException("\n".join(error_details)) from e
     
     async def wait_for_warehouse_ready(
         self, 
@@ -485,9 +563,22 @@ class DatabricksOAuthClient:
                     wait_timeout=wait_timeout
                 )
                 
+                # Check if SDK imports are available before accessing StatementState
+                if StatementState is None:
+                    error_details = [
+                        "Databricks SDK not properly installed or accessible in container",
+                        f"Import error: {SDK_IMPORT_ERROR}" if SDK_IMPORT_ERROR else "SDK imports failed",
+                        "Troubleshooting steps:",
+                        "1. Verify databricks-sdk>=0.28.0 is installed: pip list | grep databricks",
+                        "2. Test import: python -c 'from databricks.sdk.service.sql import StatementState'",
+                        "3. Check container Python environment and package installation",
+                        "4. Ensure all SDK dependencies are available in Docker image"
+                    ]
+                    raise SQLExecutionError("\n".join(error_details))
+                
                 # If response comes back as PENDING, the warehouse might not be running
                 # or the query is taking longer than wait_timeout to start
-                if response.status and response.status.state == StatementState.PENDING:
+                if response and response.status and response.status.state == StatementState.PENDING:
                     if attempt < max_retries:
                         self.logger.warning(
                             "SQL execution pending - warehouse may be starting, will retry after waiting",
@@ -547,6 +638,23 @@ class DatabricksOAuthClient:
                             f"Check if warehouse {self._warehouse_id} is running and accessible."
                         )
                 
+                # Verify we have a valid response object
+                if not response:
+                    error_details = [
+                        "Databricks SQL execution returned None response",
+                        "This typically indicates:",
+                        "1. Databricks SDK not properly initialized in container",
+                        "2. Missing or incompatible SDK version (requires >=0.28.0)",
+                        "3. Authentication or connection issues",
+                        "4. Container environment missing required dependencies",
+                        "",
+                        "Debug commands to run in container:",
+                        "- pip list | grep databricks",
+                        "- python -c 'from databricks.sdk.service.sql import StatementState; print(\"SDK OK\")'" ,
+                        "- python -c 'from databricks.sdk import WorkspaceClient; print(\"Client OK\")'"
+                    ]
+                    raise SQLExecutionError("\n".join(error_details))
+                
                 # Check for execution errors first
                 if response.status and response.status.state:
                     state = response.status.state
@@ -581,7 +689,7 @@ class DatabricksOAuthClient:
                         self.logger.error("SQL execution closed", extra={"query_preview": query[:100], "attempt": attempt + 1})
                         raise SQLExecutionError(error_msg)
                     
-                    elif state not in [StatementState.SUCCEEDED, StatementState.RUNNING]:
+                    elif StatementState and state not in [StatementState.SUCCEEDED, StatementState.RUNNING]:
                         error_msg = f"SQL execution in unexpected state: {state}"
                         self.logger.error("SQL execution in unexpected state", extra={"state": str(state), "query_preview": query[:100], "attempt": attempt + 1})
                         raise SQLExecutionError(error_msg)
@@ -755,7 +863,20 @@ class DatabricksOAuthClient:
             return success
             
         except Exception as e:
-            self.logger.error(f"Databricks OAuth connection test failed: {e}")
+            error_details = [
+                "❌ DATABRICKS CONNECTION TEST FAILED",
+                "",
+                f"🔍 Error: {str(e)}",
+                "",
+                "🔧 QUICK DEBUG - Run in container:",
+                "",
+                "# Basic connection test",
+                "docker exec <container_name> python -c \"from databricks.sdk import WorkspaceClient; client = WorkspaceClient(); print('Connected:', client.current_user.me().user_name)\"",
+                "",
+                "# Test simple query",
+                "docker exec <container_name> python -c \"from databricks.sdk import WorkspaceClient; client = WorkspaceClient(); result = client.statement_execution.execute_statement(warehouse_id='YOUR_WAREHOUSE_ID', statement='SELECT 1'); print('Query result:', result)\""
+            ]
+            self.logger.error("\n".join(error_details))
             return False
     
     async def get_current_token_info(self) -> Optional[Dict[str, Any]]:

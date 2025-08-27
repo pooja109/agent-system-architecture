@@ -40,6 +40,7 @@ class TestStructuredFormatter:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_basic_json_formatting(self, basic_config):
         """Test basic JSON formatting."""
         formatter = StructuredFormatter(basic_config)
@@ -71,6 +72,7 @@ class TestStructuredFormatter:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_timestamp_inclusion(self, basic_config):
         """Test timestamp inclusion/exclusion."""
         # Test with timestamp enabled
@@ -107,6 +109,7 @@ class TestStructuredFormatter:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_logger_name_inclusion(self):
         """Test logger name inclusion/exclusion."""
         record = logging.LogRecord(
@@ -139,6 +142,7 @@ class TestStructuredFormatter:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_thread_info_inclusion(self, detailed_config):
         """Test thread info inclusion."""
         formatter = StructuredFormatter(detailed_config)
@@ -165,6 +169,7 @@ class TestStructuredFormatter:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_process_info_inclusion(self, detailed_config):
         """Test process info inclusion."""
         formatter = StructuredFormatter(detailed_config)
@@ -190,6 +195,7 @@ class TestStructuredFormatter:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_exception_formatting(self, basic_config):
         """Test exception information formatting."""
         formatter = StructuredFormatter(basic_config)
@@ -221,6 +227,7 @@ class TestStructuredFormatter:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_extra_fields_handling(self, basic_config):
         """Test handling of extra fields in log records."""
         formatter = StructuredFormatter(basic_config)
@@ -255,6 +262,7 @@ class TestStructuredFormatter:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_different_log_levels(self, basic_config):
         """Test formatting for different log levels."""
         formatter = StructuredFormatter(basic_config)
@@ -287,6 +295,7 @@ class TestStructuredFormatter:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_formatting_error_handling(self, basic_config):
         """Test error handling when formatting fails."""
         formatter = StructuredFormatter(basic_config)
@@ -325,6 +334,7 @@ class TestStructuredFormatter:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_json_serialization_check(self, basic_config):
         """Test JSON serialization checking."""
         formatter = StructuredFormatter(basic_config)
@@ -363,6 +373,7 @@ class TestStructuredHandler:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_handler_initialization(self, structured_config, mock_stream):
         """Test handler initialization."""
         handler = StructuredHandler(structured_config, stream=mock_stream)
@@ -374,6 +385,7 @@ class TestStructuredHandler:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_basic_structured_output(self, structured_config, mock_stream):
         """Test basic structured output."""
         handler = StructuredHandler(structured_config, stream=mock_stream)
@@ -403,6 +415,7 @@ class TestStructuredHandler:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_multiple_structured_messages(self, structured_config, mock_stream):
         """Test multiple structured message output."""
         handler = StructuredHandler(structured_config, stream=mock_stream)
@@ -434,6 +447,7 @@ class TestStructuredHandler:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_error_handling(self, structured_config):
         """Test handler behavior when errors occur."""
         # Use a mock stream that raises an exception
@@ -462,6 +476,7 @@ class TestStructuredHandler:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_level_filtering(self, mock_stream):
         """Test log level filtering."""
         config = StructuredConfig(level=LogLevel.WARNING)
@@ -504,6 +519,7 @@ class TestStructuredHandler:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_handler_cleanup(self, structured_config, mock_stream):
         """Test handler cleanup."""
         handler = StructuredHandler(structured_config, stream=mock_stream)
@@ -516,6 +532,7 @@ class TestStructuredHandler:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_concurrent_structured_logging(self, structured_config, mock_stream):
         """Test concurrent logging to the same handler."""
         import threading

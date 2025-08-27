@@ -193,6 +193,8 @@ class TestPerformanceOptimization:
     @pytest.mark.asyncio
     @pytest.mark.slow
     @pytest.mark.performance
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_performance_optimization_meets_requirement(self, validator):
         """Test that performance optimizations meet the <5% overhead requirement."""
         
@@ -241,6 +243,8 @@ class TestPerformanceOptimization:
     @pytest.mark.asyncio 
     @pytest.mark.medium
     @pytest.mark.performance
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_async_mode_performance_characteristics(self):
         """Test that async mode provides minimal blocking overhead."""
         
@@ -291,6 +295,8 @@ class TestPerformanceOptimization:
     @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.performance
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_circuit_breaker_performance_protection(self):
         """Test that circuit breaker protects against performance degradation."""
         

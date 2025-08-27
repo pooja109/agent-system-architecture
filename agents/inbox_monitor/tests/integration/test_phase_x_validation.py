@@ -12,6 +12,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 class TestPhaseXImplementation:
     """Validate that Phase X implementation is complete."""
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.medium
     def test_phase_1_components_available(self):
         """Test Phase 1 logging infrastructure is available."""
         # Test core logging components
@@ -27,6 +30,9 @@ class TestPhaseXImplementation:
         assert get_console_logger is not None
         assert get_structured_logger is not None
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.medium
     def test_phase_2_components_available(self):
         """Test Phase 2 CLI infrastructure is available."""
         from cli.argument_parser import CLIArgumentParser
@@ -37,6 +43,9 @@ class TestPhaseXImplementation:
         assert ConfigurationManager is not None
         assert EnvironmentDetector is not None
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.medium
     def test_phase_3_new_components_available(self):
         """Test Phase 3 (Phase X) new components are available."""
         # Test correlation system
@@ -67,6 +76,9 @@ class TestPhaseXImplementation:
         assert BusinessLogicLoggerMixin is not None
         assert DatabaseLoggerMixin is not None
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.medium
     def test_main_integration_available(self):
         """Test main.py integration components are available."""
         from main import setup_logging_system, run_inbox_check, run_system_status
@@ -75,6 +87,9 @@ class TestPhaseXImplementation:
         assert run_inbox_check is not None
         assert run_system_status is not None
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.medium
     def test_service_retrofit_basic_functionality(self):
         """Test basic service retrofit functionality."""
         from services.azure_key_vault_client import AzureKeyVaultClient
@@ -90,6 +105,11 @@ class TestPhaseXImplementation:
             # The important thing is that the import worked
             pass
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.cli
+    @pytest.mark.medium
+    @pytest.mark.integration
     def test_cli_integration_basic_functionality(self):
         """Test basic CLI integration functionality."""
         from cli.argument_parser import CLIArgumentParser
@@ -102,6 +122,9 @@ class TestPhaseXImplementation:
         # Test that parser has expected methods
         assert hasattr(parser, 'parse_args')
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.medium
     def test_http_suppression_basic_functionality(self):
         """Test basic HTTP suppression functionality."""
         from utils.custom_logging.http_client_config import quick_suppress_http_logging
@@ -120,6 +143,9 @@ class TestPhaseXImplementation:
         suppressor = HTTPClientLogSuppressor(config)
         assert suppressor is not None
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.medium
     def test_integration_completeness(self):
         """Test that integration is complete enough for basic operation."""
         # This test validates that all the major components can work together
@@ -151,6 +177,9 @@ class TestPhaseXImplementation:
 class TestPerformanceValidation:
     """Basic performance validation tests."""
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.medium
     def test_logging_overhead_reasonable(self):
         """Test that logging doesn't add excessive overhead."""
         import time
@@ -177,6 +206,9 @@ class TestPerformanceValidation:
         
         cleanup_logging()
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.slow
     def test_correlation_id_performance(self):
         """Test correlation ID generation performance."""
         import time

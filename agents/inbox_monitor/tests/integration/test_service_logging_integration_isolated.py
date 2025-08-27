@@ -28,6 +28,8 @@ class TestServiceLoggingIntegrationIsolated:
     @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_monitor_logging_integration_isolated(
         self, 
         isolated_logger, 
@@ -109,6 +111,8 @@ class TestServiceLoggingIntegrationIsolated:
             test_logger.handlers.clear()
     
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     @pytest.mark.medium
     @pytest.mark.integration
     async def test_email_processor_logging_integration_isolated(
@@ -207,6 +211,7 @@ class TestServiceLoggingIntegrationIsolated:
     
     @pytest.mark.fast
     @pytest.mark.integration
+    @pytest.mark.medium
     def test_service_configuration_isolation(
         self, 
         isolated_global_state, 
@@ -294,6 +299,8 @@ class TestServiceLoggingIntegrationIsolated:
     @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_service_lifecycle_isolation(
         self, 
         isolated_global_state,
@@ -370,6 +377,7 @@ class TestServiceLoggingIntegrationIsolated:
     
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.medium
     def test_logging_configuration_isolation(
         self, 
         temp_log_dir,
@@ -468,6 +476,7 @@ class TestServiceLoggingIntegrationIsolated:
     
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.slow
     def test_service_isolation_performance_impact(
         self,
         performance_monitor,
@@ -522,6 +531,7 @@ class TestServiceIsolationValidation:
     
     @pytest.mark.fast
     @pytest.mark.integration
+    @pytest.mark.medium
     def test_service_state_isolation(self, isolated_global_state, no_singleton_conflicts):
         """Test that service state doesn't leak between tests."""
         
@@ -556,6 +566,8 @@ class TestServiceIsolationValidation:
         # This is validated by the isolated_global_state fixture
     
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     @pytest.mark.medium
     @pytest.mark.integration
     async def test_async_service_isolation(
@@ -613,6 +625,7 @@ class TestServicePhase2Recovery:
     
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.slow
     def test_service_phase2_performance_targets(
         self,
         performance_monitor,

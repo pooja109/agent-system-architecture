@@ -13,6 +13,8 @@ class TestRetryOperation:
     @pytest.mark.retry
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_retry_operation_success_first_try(self):
         """Test retry operation that succeeds on first try."""
         async def successful_operation():
@@ -28,6 +30,8 @@ class TestRetryOperation:
     @pytest.mark.retry
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_retry_operation_success_after_retries(self):
         """Test retry operation that succeeds after retries."""
         call_count = 0
@@ -49,6 +53,8 @@ class TestRetryOperation:
     @pytest.mark.retry
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     async def test_retry_operation_failure_max_attempts(self):
         """Test retry operation that fails after max attempts."""
         call_count = 0
@@ -68,6 +74,8 @@ class TestRetryOperation:
     @pytest.mark.retry
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_retry_operation_with_different_exceptions(self):
         """Test retry operation with different exception types."""
         call_count = 0
@@ -90,6 +98,8 @@ class TestRetryOperation:
     @pytest.mark.asyncio
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_retry_operation_with_args_and_kwargs(self):
         """Test retry operation with function arguments."""
         async def operation_with_args(arg1, arg2, kwarg1=None, kwarg2=None):
@@ -108,6 +118,8 @@ class TestRetryOperation:
         assert result == "args: value1, value2, kwargs: kwvalue1, kwvalue2"
         assert error is None
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     @pytest.mark.fast
     @pytest.mark.unit
     async def test_retry_operation_with_zero_delay(self):
@@ -131,6 +143,8 @@ class TestRetryOperation:
     @pytest.mark.asyncio
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_retry_operation_with_single_attempt(self):
         """Test retry operation with single attempt."""
         async def single_attempt():
@@ -142,6 +156,8 @@ class TestRetryOperation:
         assert result is None
         assert "Single failure" in error
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.unit
     @pytest.mark.medium
     @pytest.mark.unit
     async def test_retry_operation_with_async_exception(self):
@@ -171,6 +187,8 @@ class TestRetryWithBackoffDecorator:
     @pytest.mark.asyncio
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_decorator_success_first_try(self):
         """Test decorator with successful first try."""
         @retry_with_backoff(max_attempts=3, delay_seconds=0.01)
@@ -180,6 +198,8 @@ class TestRetryWithBackoffDecorator:
         assert result == "decorator success"
     @pytest.mark.asyncio
     @pytest.mark.medium
+    @pytest.mark.unit
+    @pytest.mark.fast
     @pytest.mark.unit
     async def test_decorator_success_after_retries(self):
         """Test decorator with success after retries."""
@@ -197,6 +217,8 @@ class TestRetryWithBackoffDecorator:
     @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.unit
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     async def test_decorator_failure_max_attempts(self):
         """Test decorator with failure after max attempts."""
         call_count = 0
@@ -211,6 +233,8 @@ class TestRetryWithBackoffDecorator:
     @pytest.mark.asyncio
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_decorator_with_function_arguments(self):
         """Test decorator with function arguments."""
         @retry_with_backoff(max_attempts=3, delay_seconds=0.01)
@@ -219,6 +243,8 @@ class TestRetryWithBackoffDecorator:
         result = await function_with_args("value1", "value2", kwarg1="kwvalue1")
         assert result == "args: value1, value2, kwarg: kwvalue1"
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     @pytest.mark.fast
     @pytest.mark.unit
     async def test_decorator_preserves_function_metadata(self):
@@ -231,6 +257,8 @@ class TestRetryWithBackoffDecorator:
         assert "This function has documentation." in documented_function.__doc__
     @pytest.mark.asyncio
     @pytest.mark.medium
+    @pytest.mark.unit
+    @pytest.mark.fast
     @pytest.mark.unit
     async def test_decorator_with_different_exception_types(self):
         """Test decorator with different exception types."""
@@ -253,6 +281,8 @@ class TestRetryWithBackoffDecorator:
     @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.unit
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_decorator_with_exponential_backoff(self):
         """Test decorator with exponential backoff timing."""
         call_count = 0
@@ -273,6 +303,8 @@ class TestRetryWithBackoffDecorator:
     @pytest.mark.asyncio
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_decorator_with_max_attempts_one(self):
         """Test decorator with max_attempts=1."""
         @retry_with_backoff(max_attempts=1, delay_seconds=0.01)
@@ -282,6 +314,8 @@ class TestRetryWithBackoffDecorator:
             await single_attempt_function()
     @pytest.mark.asyncio
     @pytest.mark.medium
+    @pytest.mark.unit
+    @pytest.mark.fast
     @pytest.mark.unit
     async def test_decorator_nested_calls(self):
         """Test decorator with nested function calls."""
@@ -305,6 +339,8 @@ class TestRetryUtilityIntegration:
     @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_retry_with_real_network_simulation(self):
         """Test retry with simulated network conditions."""
         call_count = 0
@@ -334,6 +370,8 @@ class TestRetryUtilityIntegration:
     @pytest.mark.asyncio
     @pytest.mark.fast
     @pytest.mark.integration
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_retry_with_logging_verification(self):
         """Test retry with logging verification."""
         call_count = 0
@@ -354,6 +392,8 @@ class TestRetryUtilityIntegration:
     @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_retry_with_resource_cleanup(self):
         """Test retry with resource cleanup simulation."""
         call_count = 0
@@ -384,6 +424,8 @@ class TestRetryUtilityIntegration:
     @pytest.mark.asyncio
     @pytest.mark.slow
     @pytest.mark.integration
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_retry_performance_characteristics(self):
         """Test retry performance characteristics."""
         call_count = 0

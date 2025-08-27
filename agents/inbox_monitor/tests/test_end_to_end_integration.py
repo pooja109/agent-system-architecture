@@ -97,6 +97,8 @@ class TestEndToEndIntegration:
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_complete_positive_email_workflow(self, complete_prompt_system, sample_email):
         """Test complete workflow for positive email classification and processing."""
         services = await complete_prompt_system.__anext__()
@@ -130,6 +132,8 @@ class TestEndToEndIntegration:
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_complete_email_forwarding_workflow(self, complete_prompt_system, sample_email):
         """Test complete email forwarding workflow with external templates."""
         services = await complete_prompt_system.__anext__()
@@ -166,6 +170,8 @@ class TestEndToEndIntegration:
     @pytest.mark.email
     @pytest.mark.prompt
     @pytest.mark.ci_safe
+    @pytest.mark.medium
+    @pytest.mark.integration
     # async def test_scenario_processor_integration(self, complete_prompt_system, sample_email):
     #     """Test scenario processor integration with external prompts."""
     #     # Temporarily commented out due to import issues
@@ -177,6 +183,8 @@ class TestEndToEndIntegration:
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.integration
     async def test_caching_performance_integration(self, complete_prompt_system):
         """Test that caching works correctly across the entire system."""
         services = await complete_prompt_system.__anext__()
@@ -204,6 +212,8 @@ class TestEndToEndIntegration:
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_error_handling_and_fallbacks(self, complete_prompt_system, sample_email):
         """Test error handling and fallback mechanisms."""
         services = await complete_prompt_system.__anext__()
@@ -233,6 +243,8 @@ class TestEndToEndIntegration:
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_concurrent_prompt_operations(self, complete_prompt_system):
         """Test concurrent prompt operations for thread safety."""
         services = await complete_prompt_system.__anext__()
@@ -256,6 +268,8 @@ class TestEndToEndIntegration:
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_memory_usage_optimization(self, complete_prompt_system):
         """Test memory usage with multiple prompt operations."""
         import psutil
@@ -427,6 +441,8 @@ class TestSecurityValidation:
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_template_injection_prevention(self):
         """Test that template injection attacks are prevented."""
         template_renderer = TemplateRenderer()
@@ -455,6 +471,8 @@ class TestSecurityValidation:
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_file_path_validation(self):
         """Test file path validation prevents directory traversal."""
         from services.email_forwarding_manager import EmailForwardingManager
@@ -476,6 +494,8 @@ class TestSecurityValidation:
     @pytest.mark.email
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_email_content_sanitization(self):
         """Test email content sanitization prevents XSS and injection."""
         from services.email_forwarding_manager import EmailForwardingManager
@@ -496,6 +516,8 @@ class TestSecurityValidation:
     @pytest.mark.integration
     @pytest.mark.email
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_python_code_escaping(self):
         """Test Python code generation properly escapes all content."""
         from services.email_forwarding_manager import EmailForwardingManager
@@ -525,6 +547,8 @@ class TestPerformanceValidation:
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.integration
     async def test_prompt_loading_performance(self):
         """Test prompt loading performance meets requirements."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -552,6 +576,8 @@ class TestPerformanceValidation:
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.integration
     async def test_concurrent_performance(self):
         """Test performance under concurrent load."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -583,6 +609,8 @@ class TestPerformanceValidation:
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_memory_efficiency(self):
         """Test memory usage efficiency."""
         import psutil
@@ -701,6 +729,8 @@ class TestEndToEndIntegrationResourceManaged:
     @pytest.mark.asyncio
     @memory_limit(200.0)  # 200MB memory limit
     @with_cpu_throttling(throttle_threshold=60.0)  # CPU throttling at 60%
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_memory_usage_optimization_resource_managed(
         self, complete_prompt_system_managed, memory_manager, cpu_manager, performance_monitor
     ):
@@ -762,6 +792,8 @@ class TestEndToEndIntegrationResourceManaged:
     @pytest.mark.prompt
     @pytest.mark.medium
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_concurrent_prompt_loading_resource_managed(
         self, complete_prompt_system_managed, connection_manager, cpu_intensive_manager, performance_monitor
     ):
@@ -807,6 +839,8 @@ class TestEndToEndIntegrationResourceManaged:
     @pytest.mark.integration
     @pytest.mark.medium
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_system_resource_monitoring_integration(
         self, complete_prompt_system_managed, system_monitor, system_health_checker
     ):
@@ -867,6 +901,8 @@ class TestEndToEndIntegrationResourceManaged:
     @pytest.mark.integration
     @pytest.mark.medium
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_comprehensive_resource_coordination(
         self, comprehensive_resource_management, coordinated_data_sampler, performance_monitor
     ):

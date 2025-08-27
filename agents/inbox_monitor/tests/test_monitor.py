@@ -6,9 +6,16 @@ Unit tests for the main monitoring service.
 import asyncio
 import os
 import sys
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, MagicMock
 import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+# Mock the async cleanup utilities to prevent import issues
+mock_cleanup = MagicMock()
+mock_cleanup.graceful_shutdown = AsyncMock()
+mock_cleanup.suppress_future_warnings = MagicMock()
+sys.modules['utils.async_cleanup'] = mock_cleanup
+
 from services.monitor import InboxMonitor  # noqa: E402
 class TestInboxMonitor:
     """Test InboxMonitor class."""
@@ -19,39 +26,49 @@ class TestInboxMonitor:
     @pytest.mark.fast
     @pytest.mark.unit
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_start_stop(self, monitor):
         """Test starting and stopping the monitor."""
-        # Mock the monitor loop to exit after one iteration
-        async def mock_monitor_loop():
-            monitor._running = False
         # Mock GraphAPIClient
         with patch("services.monitor.GraphAPIClient") as mock_graph_class:
             mock_graph_client = AsyncMock()
+            mock_graph_client.initialize = AsyncMock()
+            mock_graph_client.cleanup = AsyncMock()
             mock_graph_class.return_value = mock_graph_client
+            
             # Mock EmailProcessor
-            with patch(
-                "services.monitor.EmailProcessor"
-            ) as mock_processor_class:
+            with patch("services.monitor.EmailProcessor") as mock_processor_class:
                 mock_processor = AsyncMock()
                 mock_processor_class.return_value = mock_processor
-                # Replace the monitor loop with our mock
-                monitor._monitor_loop = mock_monitor_loop
-                # Start the monitor
-                await monitor.start()
-                # Verify initialization
-                assert monitor.graph_client is not None
-                assert monitor.email_processor is not None
-                # The mock_graph_client should have had initialize called
-                mock_graph_client.initialize.assert_called_once()
-                # Stop the monitor
-                await monitor.stop()
-                # The mock_graph_client should have had cleanup called  
-                mock_graph_client.cleanup.assert_called_once()
+                
+                # Mock signal handling to prevent event loop interference
+                with patch("signal.signal") as mock_signal:
+                    # Mock the monitor loop to exit immediately
+                    async def mock_monitor_loop():
+                        monitor._running = False
+                        return
+                    
+                    monitor._monitor_loop = mock_monitor_loop
+                    
+                    # Start the monitor
+                    await monitor.start()
+                    
+                    # Verify initialization
+                    assert monitor.graph_client is not None
+                    assert monitor.email_processor is not None
+                    mock_graph_client.initialize.assert_called_once()
+                    
+                    # Stop the monitor
+                    await monitor.stop()
+                    
+                    # Verify cleanup was called
+                    mock_graph_client.cleanup.assert_called_once()
     @pytest.mark.slow
     @pytest.mark.integration
-    @pytest.mark.email
-    @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_monitor_loop_success(self, monitor):
         """Test successful monitoring loop iteration."""
         monitor._running = True
@@ -82,9 +99,9 @@ class TestInboxMonitor:
         mock_processor.process_inbox.assert_called_once()
     @pytest.mark.slow
     @pytest.mark.integration
-    @pytest.mark.email
-    @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     async def test_monitor_loop_with_failures(self, monitor):
         """Test monitoring loop with processing failures."""
         monitor._running = True
@@ -115,10 +132,10 @@ class TestInboxMonitor:
         assert monitor._running is False
         assert iteration_count < max_iterations  # Stopped before max iterations
     @pytest.mark.slow
-    @pytest.mark.integration
-    @pytest.mark.email
-    @pytest.mark.ci_safe
+    @pytest.mark.edge_case
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_monitor_loop_exception_handling(self, monitor):
         """Test exception handling in monitor loop."""
         monitor._running = True
@@ -139,8 +156,9 @@ class TestInboxMonitor:
         assert monitor._running is False
     @pytest.mark.slow
     @pytest.mark.integration
-    @pytest.mark.email
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_monitor_loop_shutdown_during_wait(self, monitor):
         """Test shutdown signal during wait period."""
         monitor._running = True
@@ -163,10 +181,9 @@ class TestInboxMonitor:
         await monitor._monitor_loop()
         # Should have processed once and then stopped
         mock_processor.process_inbox.assert_called_once()
-    @pytest.mark.azure
-    @pytest.mark.ci_safe
-    @pytest.mark.integration
-    @pytest.mark.slow
+    @pytest.mark.fast
+    @pytest.mark.unit
+    @pytest.mark.fast
     def test_signal_handlers(self, monitor):
         """Test signal handler setup."""
         with patch("signal.signal") as mock_signal:
@@ -179,11 +196,11 @@ class TestInboxMonitor:
             with patch("asyncio.create_task") as mock_create_task:
                 handler(2, None)  # SIGINT
                 mock_create_task.assert_called_once()
-    @pytest.mark.slow
+    @pytest.mark.medium
     @pytest.mark.integration
-    @pytest.mark.azure
-    @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_health_check_healthy(self, monitor):
         """Test health check when service is healthy."""
         monitor._running = True
@@ -196,11 +213,11 @@ class TestInboxMonitor:
         assert health["graph_api_connected"] is True
         assert health["last_error"] is None
         assert "timestamp" in health
-    @pytest.mark.slow
-    @pytest.mark.integration
-    @pytest.mark.azure
-    @pytest.mark.ci_safe
+    @pytest.mark.medium
+    @pytest.mark.edge_case
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_health_check_unhealthy(self, monitor):
         """Test health check when service is unhealthy."""
         monitor._running = True
@@ -212,10 +229,11 @@ class TestInboxMonitor:
         assert health["status"] == "unhealthy"
         assert health["graph_api_connected"] is False
         assert health["last_error"] == "Connection failed"
-    @pytest.mark.slow
-    @pytest.mark.integration
-    @pytest.mark.azure
+    @pytest.mark.fast
+    @pytest.mark.unit
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_health_check_stopped(self, monitor):
         """Test health check when service is stopped."""
         monitor._running = False

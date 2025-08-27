@@ -29,7 +29,8 @@ class CLIArgumentParser:
             and generates appropriate responses through integration with various services.
             
             VERBOSITY LEVELS:
-              --quiet     Show only essential results and errors
+              --quiet     Show only essential results and errors (uses clean format by default, 
+                         only switches to minimal format if no explicit --format specified)
               --verbose   Show structured progress information with progress indicators
               --debug     Show all diagnostic information including HTTP requests
               

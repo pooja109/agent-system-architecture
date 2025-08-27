@@ -238,6 +238,8 @@ class TestRealPerformanceValidation:
     """Test cases for real performance validation."""
     
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_performance_impact_with_simulated_storage(self):
         """Test performance impact with simulated realistic storage operations."""
         validator = RealPerformanceValidator()
@@ -286,6 +288,8 @@ class TestRealPerformanceValidation:
     
     @pytest.mark.skipif(True, reason="Requires real Databricks connection - enable manually for validation")
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_performance_impact_with_real_storage(self):
         """Test performance impact with real Databricks storage operations."""
         validator = RealPerformanceValidator()
@@ -327,6 +331,8 @@ class TestRealPerformanceValidation:
         assert performance_result['performance_impact']['meets_requirement']
     
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_performance_validation_framework(self):
         """Test that the performance validation framework itself works correctly."""
         validator = RealPerformanceValidator()
@@ -357,6 +363,8 @@ class TestRealPerformanceValidation:
 
 
 @pytest.mark.asyncio
+@pytest.mark.slow
+@pytest.mark.integration
 async def test_integration_performance_benchmark():
     """Benchmark test to establish performance baseline for future regression detection."""
     validator = RealPerformanceValidator()

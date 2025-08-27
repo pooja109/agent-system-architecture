@@ -22,6 +22,7 @@ class TestEmailAddress:
     @pytest.mark.email
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_email_address_creation(self):
         """Test creating email address with all fields."""
         address = EmailAddress(email="test@example.com", name="Test User")
@@ -30,6 +31,7 @@ class TestEmailAddress:
     @pytest.mark.email
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_email_address_minimal(self):
         """Test creating email address with only required fields."""
         address = EmailAddress(email="test@example.com")
@@ -43,6 +45,7 @@ class TestEmailBody:
     @pytest.mark.email
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_email_body_html(self):
         """Test creating HTML email body."""
         body = EmailBody(content_type="text/html", content="<html><body>Test</body></html>")
@@ -51,6 +54,7 @@ class TestEmailBody:
     @pytest.mark.email
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_email_body_plain(self):
         """Test creating plain text email body."""
         body = EmailBody(content_type="text/plain", content="Plain text content")
@@ -59,7 +63,7 @@ class TestEmailBody:
     @pytest.mark.edge_case
     @pytest.mark.email
     @pytest.mark.fast
-    @pytest.mark.unit
+    @pytest.mark.edge_case
     def test_email_body_invalid_type(self):
         """Test invalid content type raises error."""
         with pytest.raises(ValueError, match="Invalid content type"):
@@ -73,6 +77,7 @@ class TestEmailRecipients:
     @pytest.mark.email
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_recipients_all_fields(self):
         """Test recipients with all fields populated."""
         recipients = EmailRecipients(
@@ -107,6 +112,8 @@ class TestProcessingMetadata:
     @pytest.mark.fast
     @pytest.mark.unit
     @pytest.mark.email
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_processing_metadata_defaults(self):
         """Test processing metadata with defaults."""
         metadata = ProcessingMetadata(monitor_version="1.0.0", process_id="test-id-123")
@@ -127,6 +134,8 @@ class TestEmail:
     @pytest.mark.integration
     @pytest.mark.medium
     @pytest.mark.email
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_email_creation_full(self, mock_email_model):
         """Test creating email with all fields."""
         email = mock_email_model
@@ -141,6 +150,8 @@ class TestEmail:
     @pytest.mark.fast
     @pytest.mark.integration
     @pytest.mark.email
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_email_to_ai_format(self, mock_email_model):
         """Test converting email to AI format."""
         email = mock_email_model
@@ -158,13 +169,15 @@ class TestEmail:
     @pytest.mark.fast
     @pytest.mark.integration
     @pytest.mark.email
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_email_datetime_serialization(self, mock_email_model):
         """Test datetime fields are properly serialized."""
         email = mock_email_model
         ai_format = email.to_ai_format()
         # Check datetime fields end with 'Z' for UTC
         assert ai_format["received_datetime"].endswith("Z")
-        assert ai_format["processed_timestamp"].endswith("Z")
+        assert ai_format["processed_at"].endswith("Z")
 
 
 @pytest.mark.fast
@@ -173,6 +186,7 @@ class TestProcessingResult:
     @pytest.mark.email
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_processing_result_success(self):
         """Test successful processing result."""
         result = ProcessingResult(
@@ -190,7 +204,7 @@ class TestProcessingResult:
     @pytest.mark.edge_case
     @pytest.mark.email
     @pytest.mark.fast
-    @pytest.mark.unit
+    @pytest.mark.edge_case
     def test_processing_result_failure(self):
         """Test failed processing result."""
         result = ProcessingResult(
@@ -213,6 +227,7 @@ class TestEmailImportance:
     @pytest.mark.email
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_importance_values(self):
         """Test importance enum values."""
         assert EmailImportance.LOW.value == "low"
@@ -221,6 +236,7 @@ class TestEmailImportance:
     @pytest.mark.email
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_importance_comparison(self):
         """Test importance enum comparison."""
         assert EmailImportance.LOW != EmailImportance.HIGH

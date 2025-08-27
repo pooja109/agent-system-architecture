@@ -51,6 +51,7 @@ CREATE TABLE `mld01_sandbox_de`.`ai_garage`.`inbox_monitor_scenario_processing_d
     agent_actions_log ARRAY<STRING> COMMENT 'Agent Actions Log',
 
     -- Expert assignment
+    assignment_id STRING COMMENT 'Foreign key to expert_lead_assignments table',
     expert_assigned STRING COMMENT 'Expert name (PII)',
     expert_id STRING COMMENT 'Expert system ID',
     expert_email STRING COMMENT 'Expert email address (PII)',
@@ -107,7 +108,7 @@ CREATE TABLE `mld01_sandbox_de`.`ai_garage`.`inbox_monitor_scenario_processing_d
     updated_at TIMESTAMP COMMENT 'Updated At',
     created_by STRING COMMENT 'Created By',
     data_version INT COMMENT 'Data Version',
-    processing_date TIMESTAMP COMMENT 'Date partition field for the table'
+    processing_date DATE COMMENT 'Date partition field for the table'
 )
 USING DELTA
 TBLPROPERTIES (

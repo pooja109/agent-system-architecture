@@ -12,7 +12,7 @@ import sys
 import asyncio
 from pathlib import Path
 from typing import Dict, Any
-from datetime import datetime
+from datetime import datetime, date
 
 # Add project to path
 project_root = Path(__file__).parent.parent
@@ -78,9 +78,11 @@ def get_sql_type_from_pydantic_field(field_name: str, field_info: FieldInfo, ann
     if annotation is float:
         return "DOUBLE"
     
-    # Handle datetime
+    # Handle datetime and date
     if annotation is datetime or str(annotation) == 'datetime.datetime':
         return "TIMESTAMP"
+    elif annotation is date or str(annotation) == 'datetime.date':
+        return "DATE"
     
     # Handle List types
     if origin is list or str(origin) == 'typing.List':
@@ -106,10 +108,11 @@ def get_sql_type_from_pydantic_field(field_name: str, field_info: FieldInfo, ann
 def generate_create_table_sql(catalog: str, schema: str, table_suffix: str) -> str:
     """Generate CREATE TABLE SQL from ScenarioProcessingRecord model."""
     
-    table_name = f"`{catalog}`.`{schema}`.`inbox_monitor_scenario_processing{table_suffix}`"
+    # Fixed: Use proper table name generation
+    quoted_table_name = f"`{catalog}`.`{schema}`.`inbox_monitor_scenario_processing{table_suffix}`"
     
     sql_parts = [
-        f"CREATE TABLE {table_name} (",
+        f"CREATE TABLE {quoted_table_name} (",
     ]
     
     # Get model fields
@@ -124,7 +127,7 @@ def generate_create_table_sql(catalog: str, schema: str, table_suffix: str) -> s
         "Original Subject Extraction": ["original_subject_result", "original_subject_confidence", "original_subject_reasoning", "original_subject_extraction_method", "original_subject_processing_duration_ms", "original_subject_model_version"],
         "Scenario processing": ["scenario_type", "scenario_success", "scenario_processing_duration_ms", "scenario_error_message"],
         "Actions and results": ["agent_actions_log"],
-        "Expert assignment": ["expert_assigned", "expert_id", "expert_email", "assignment_method"],
+        "Expert assignment": ["assignment_id", "expert_assigned", "expert_id", "expert_email", "assignment_method"],
         "Salesforce integration": ["case_created", "case_subject", "case_status", "sf_contact_id", "sf_account_id", "account_name"],
         "Email forwarding": ["emails_forwarded", "forwarding_reason", "forwarding_success", "forwarding_error"],
         "Database updates": ["external_operations_status", "status_updates"],
@@ -304,32 +307,29 @@ async def main():
         )
         print("✅ Fallback logger configuration applied")
     
-    # Validate environment variables
-    required_vars = [
-        "DATABRICKS_SERVER_HOSTNAME",
-        "DATABRICKS_HTTP_PATH", 
-        "DATABRICKS_CATALOG",
-        "DATABRICKS_SCHEMA",
-        "AZURE_TENANT_ID",
-        "AZURE_CLIENT_ID", 
-        "AZURE_CLIENT_SECRET",
-        "AZURE_KEY_VAULT_URL"
-    ]
-    
-    missing_vars = [var for var in required_vars if not os.getenv(var)]
-    
-    if missing_vars:
-        print(f"❌ Missing required environment variables:")
-        for var in missing_vars:
-            print(f"   {var}")
+    # Load and validate settings using the proper pattern
+    print("🔧 Loading configuration...")
+    try:
+        from config.settings import get_settings, validate_settings
+        settings = await get_settings()
+        if not validate_settings(settings):
+            print("❌ Configuration validation failed")
+            return False
+    except Exception as e:
+        print(f"❌ Configuration validation error: {e}")
         return False
+
+    print("✅ Configuration validated")
+    print(f"   Environment: {settings.environment}")
+    print(f"   Databricks: {settings.databricks_oauth.server_hostname}")
+    print(f"   Catalog: {settings.databricks_oauth.catalog}")
+    print(f"   Schema: {settings.databricks_oauth.schema_name}")
+    print(f"   Table Suffix: {settings.databricks_oauth.table_suffix or '(none)'}")
     
-    print("✅ Environment variables validated")
-    
-    # Get table details
-    catalog = os.getenv("DATABRICKS_CATALOG")
-    schema = os.getenv("DATABRICKS_SCHEMA") 
-    table_suffix = os.getenv("DATABRICKS_TABLE_SUFFIX", "")
+    # Get table details from settings
+    catalog = settings.databricks_oauth.catalog
+    schema = settings.databricks_oauth.schema_name 
+    table_suffix = settings.databricks_oauth.table_suffix or ""
     table_name = f"{catalog}.{schema}.inbox_monitor_scenario_processing{table_suffix}"
     
     print(f"📋 Table to recreate: {table_name}")
@@ -365,143 +365,114 @@ async def main():
         print("❌ Operation cancelled by user")
         return False
     
-    # Use proper DatabricksOAuthClient with settings
-    print("\n🔑 Initializing Databricks OAuth client...")
+    # Initialize connection pool using the proper pattern
+    print("\n🔑 Initializing Databricks connection pool...")
     try:
-        from services.databricks_oauth_client import DatabricksOAuthClient
-        from services.azure_key_vault_client import AzureKeyVaultClient
-        from config.settings import DatabricksOAuthSettings, get_settings
+        from services.databricks_connection_pool import initialize_connection_pool, get_connection_pool, ConnectionPoolConfig
         
-        # Get settings which includes proper production credentials
-        settings = await get_settings()
-        
-        # Create Key Vault client manually to avoid test mode
-        from azure.identity import ClientSecretCredential  
-        from azure.keyvault.secrets import SecretClient
-        
-        # Initialize Azure Key Vault client with production credentials
-        credential = ClientSecretCredential(
-            tenant_id=os.getenv("AZURE_TENANT_ID"),
-            client_id=os.getenv("AZURE_CLIENT_ID"),
-            client_secret=os.getenv("AZURE_CLIENT_SECRET")
+        # Create connection pool configuration
+        pool_config = ConnectionPoolConfig(
+            min_connections=1,
+            max_connections=3,
+            connection_timeout_seconds=30
         )
         
-        kv_secret_client = SecretClient(
-            vault_url=os.getenv("AZURE_KEY_VAULT_URL"),
-            credential=credential
-        )
-        
-        # Create a minimal Key Vault client wrapper that bypasses the class's test mode
-        class SimpleKeyVaultClient:
-            def __init__(self, secret_client):
-                self.secret_client = secret_client
-                
-            async def get_databricks_service_principal_credentials(self):
-                from services.azure_key_vault_client import ServicePrincipalCredentials
-                
-                client_id = kv_secret_client.get_secret("sales-engagement-service-principal-clientid").value
-                client_secret = kv_secret_client.get_secret("sales-engagement-service-principal-secretid").value
-                tenant_id = os.getenv("AZURE_TENANT_ID")  # Use real tenant ID
-                
-                return ServicePrincipalCredentials(
-                    client_id=client_id,
-                    client_secret=client_secret,
-                    tenant_id=tenant_id
-                )
-            
-            async def get_databricks_credentials(self):
-                # Alias for the method the OAuth client expects
-                return await self.get_databricks_service_principal_credentials()
-        
-        kv_client = SimpleKeyVaultClient(kv_secret_client)
-        
-        # Initialize Databricks OAuth client with proper settings
-        client = DatabricksOAuthClient(
+        # Initialize the connection pool with production settings
+        await initialize_connection_pool(
             databricks_settings=settings.databricks_oauth,
-            key_vault_client=kv_client,
-            test_mode=False  # Use production mode
+            key_vault_settings=settings.key_vault,
+            pool_config=pool_config,
+            test_mode=False  # Use production mode for actual table creation
         )
         
-        # Use async context manager
-        await client.__aenter__()
-        print("✅ Connected to Databricks with OAuth")
+        # Get the initialized pool
+        pool = await get_connection_pool()
+        print("✅ Connected to Databricks with connection pool")
         
     except Exception as e:
-        print(f"❌ Failed to initialize Databricks client: {e}")
+        print(f"❌ Failed to initialize Databricks connection pool: {e}")
         return False
     
     try:
         # Step 1: Drop the existing table
         print(f"\n🗑️  Dropping existing table: {table_name}")
-        drop_sql = f"DROP TABLE IF EXISTS {table_name}"
-        await client.execute_sql(drop_sql)
-        print("✅ Table dropped successfully")
+        drop_sql = f"DROP TABLE IF EXISTS `{catalog}`.`{schema}`.`inbox_monitor_scenario_processing{table_suffix}`"
         
-        # Step 2: Create the new table using model-generated SQL
-        print(f"🔧 Creating table with model-generated schema: {table_name}")
-        await client.execute_sql(create_sql)
-        print("✅ Table created successfully with model schema")
-        
-        # Step 3: Verify the table was created
-        print(f"🔍 Verifying table: {table_name}")
-        verify_sql = f"DESCRIBE TABLE {table_name}"
-        result = await client.execute_sql(verify_sql)
-        
-        if hasattr(result, 'rows') and result.rows:
-            columns = result.rows
-            column_names = [row.get('col_name', '') for row in columns]
-            print(f"✅ Table verified: {len(columns)} columns found")
+        async with pool.get_connection() as connection:
+            await connection.execute_sql(drop_sql)
+            print("✅ Table dropped successfully")
             
-            # Check for key model fields
-            model_fields_to_check = [
-                'email_intent', 'email_intent_confidence', 'email_intent_reasoning',
-                'original_subject_result', 'original_subject_confidence', 
-                'email_payload', 'original_email_subject', 'processing_id', 'sender_email'
-            ]
+            # Step 2: Create the new table using model-generated SQL
+            print(f"🔧 Creating table with model-generated schema: {table_name}")
+            await connection.execute_sql(create_sql)
+            print("✅ Table created successfully with model schema")
             
-            found_model_fields = [f for f in model_fields_to_check if f in column_names]
-            print(f"✅ Model fields verified: {len(found_model_fields)}/{len(model_fields_to_check)}")
+            # Step 3: Verify the table was created
+            print(f"🔍 Verifying table: {table_name}")
+            verify_sql = f"DESCRIBE TABLE `{catalog}`.`{schema}`.`inbox_monitor_scenario_processing{table_suffix}`"
+            result = await connection.execute_sql(verify_sql)
             
-            # Check total field count matches model
-            model_fields = list(ScenarioProcessingRecord.model_fields.keys())
-            expected_field_count = len(model_fields)
-            actual_field_count = len(column_names)
-            
-            print(f"📊 Field count: {actual_field_count} actual vs {expected_field_count} expected")
-            
-            # Show some of the fields found
-            print("\n📋 Key model fields found in table:")
-            for field in found_model_fields:
-                print(f"  ✅ {field}")
-            
-            # Clean up connection
-            await client.__aexit__(None, None, None)
-            
-            if len(found_model_fields) == len(model_fields_to_check):
-                print("\n🎉 TABLE RECREATION SUCCESSFUL!")
-                print("   • Table schema generated directly from ScenarioProcessingRecord model")
-                print("   • All field types automatically mapped from Pydantic types")
-                print("   • Schema is guaranteed to match Python model")
-                print(f"\n🚀 Table {table_name} is ready for use!")
-                return True
+            if hasattr(result, 'rows') and result.rows:
+                columns = result.rows
+                column_names = [row.get('col_name', '') for row in columns]
+                print(f"✅ Table verified: {len(columns)} columns found")
+                
+                # Check for key model fields
+                model_fields_to_check = [
+                    'email_intent', 'email_intent_confidence', 'email_intent_reasoning',
+                    'original_subject_result', 'original_subject_confidence', 
+                    'email_payload', 'original_email_subject', 'processing_id', 'sender_email'
+                ]
+                
+                found_model_fields = [f for f in model_fields_to_check if f in column_names]
+                print(f"✅ Model fields verified: {len(found_model_fields)}/{len(model_fields_to_check)}")
+                
+                # Check total field count matches model
+                model_fields = list(ScenarioProcessingRecord.model_fields.keys())
+                expected_field_count = len(model_fields)
+                actual_field_count = len(column_names)
+                
+                print(f"📊 Field count: {actual_field_count} actual vs {expected_field_count} expected")
+                
+                # Show some of the fields found
+                print("\n📋 Key model fields found in table:")
+                for field in found_model_fields:
+                    print(f"  ✅ {field}")
+                
+                # Clean up connection pool
+                try:
+                    from services.databricks_connection_pool import shutdown_connection_pool
+                    await shutdown_connection_pool()
+                    print("✅ Connection pool cleaned up")
+                except Exception as e:
+                    print(f"⚠️ Connection pool cleanup warning: {e}")
+                
+                if len(found_model_fields) == len(model_fields_to_check):
+                    print("\n🎉 TABLE RECREATION SUCCESSFUL!")
+                    print("   • Table schema generated directly from ScenarioProcessingRecord model")
+                    print("   • All field types automatically mapped from Pydantic types")
+                    print("   • Schema is guaranteed to match Python model")
+                    print(f"   • Total fields: {actual_field_count} (expected: {expected_field_count})")
+                    print(f"\n🚀 Table {table_name} is ready for use!")
+                    return True
+                else:
+                    print("\n⚠️  Table created but schema validation failed")
+                    missing_fields = [f for f in model_fields_to_check if f not in column_names]
+                    if missing_fields:
+                        print(f"   Missing fields: {missing_fields}")
+                    return False
             else:
-                print("\n⚠️  Table created but schema validation failed")
-                missing_fields = [f for f in model_fields_to_check if f not in column_names]
-                if missing_fields:
-                    print(f"   Missing fields: {missing_fields}")
+                print("❌ Could not verify table creation")
                 return False
-        else:
-            print("❌ Could not verify table creation")
-            await client.__aexit__(None, None, None)
-            return False
             
     except Exception as e:
         print(f"❌ Table recreation failed: {e}")
         import traceback
         traceback.print_exc()
-        # Clean up connection on error
+        # Clean up connection pool on error
         try:
-            await client.__aexit__(None, None, None)
+            from services.databricks_connection_pool import shutdown_connection_pool
+            await shutdown_connection_pool()
         except:
             pass
         return False

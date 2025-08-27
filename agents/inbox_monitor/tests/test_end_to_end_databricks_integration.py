@@ -170,6 +170,8 @@ class TestEndToEndDatabricksIntegration:
     @pytest.mark.asyncio
     @pytest.mark.slow
     @pytest.mark.integration
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_single_email_end_to_end_processing(
         self, 
         real_integration_service, 
@@ -206,6 +208,8 @@ class TestEndToEndDatabricksIntegration:
     
     @pytest.mark.asyncio
     @pytest.mark.slow
+    @pytest.mark.integration
+    @pytest.mark.medium
     @pytest.mark.integration
     async def test_batch_processing_integration(self, real_integration_service, sample_email):
         """Test batch processing with multiple emails."""
@@ -268,6 +272,8 @@ class TestEndToEndDatabricksIntegration:
     @pytest.mark.slow
     @pytest.mark.e2e
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_retry_mechanism_with_transient_failures(self, real_integration_service, sample_email):
         """Test retry mechanism with simulated transient failures."""
         service, is_real = real_integration_service
@@ -311,6 +317,8 @@ class TestEndToEndDatabricksIntegration:
             assert result.success is True
     
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     @pytest.mark.medium
     @pytest.mark.integration
     async def test_data_sanitization_integration(self, real_integration_service):
@@ -370,6 +378,8 @@ class TestEndToEndDatabricksIntegration:
     @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_health_check_integration(self, real_integration_service):
         """Test health check integration with main health system."""
         service, is_real = real_integration_service
@@ -399,6 +409,8 @@ class TestEndToEndDatabricksIntegration:
         assert scenario_tracking_component.get("status") in ["HEALTHY", "DEGRADED", "UNKNOWN"]
     
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.integration
     @pytest.mark.slow
     @pytest.mark.integration
     async def test_performance_under_load(self, real_integration_service, sample_email):
@@ -458,6 +470,8 @@ class TestEndToEndDatabricksIntegration:
     @pytest.mark.asyncio
     @pytest.mark.slow
     @pytest.mark.integration
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_error_recovery_and_degraded_mode(self, real_integration_service, sample_email):
         """Test system behavior under error conditions and degraded mode."""
         service, is_real = real_integration_service
@@ -498,6 +512,8 @@ class TestEndToEndDatabricksIntegration:
     @pytest.mark.asyncio
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_configuration_validation(self):
         """Test configuration validation and edge cases."""
         # Test with invalid configuration - should raise ValidationError
@@ -526,6 +542,8 @@ class TestEndToEndDatabricksIntegration:
         await service.close()
     
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_memory_usage_and_cleanup(self, real_integration_service):
         """Test memory usage patterns and resource cleanup."""
         service, is_real = real_integration_service
@@ -576,6 +594,9 @@ class TestEndToEndDatabricksIntegration:
 class TestRealDatabricksIntegration:
     """Tests that require real Databricks connections."""
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.medium
     def test_databricks_connection_available(self):
         """Verify Databricks connection is available for integration tests."""
         if not os.getenv("RUN_DATABRICKS_INTEGRATION_TESTS", "false").lower() == "true":
@@ -592,6 +613,8 @@ class TestRealDatabricksIntegration:
             pytest.skip(f"Missing required environment variables: {missing_vars}")
     
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_real_table_creation_and_operations(self):
         """Test actual table creation and data operations in Databricks."""
         if not os.getenv("RUN_DATABRICKS_INTEGRATION_TESTS", "false").lower() == "true":

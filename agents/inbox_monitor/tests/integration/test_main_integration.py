@@ -60,6 +60,7 @@ class TestMainLoggingIntegration:
     
     @pytest.mark.integration
     @pytest.mark.fast
+    @pytest.mark.integration
     def test_setup_logging_system_success(self, mock_cli_args):
         """Test successful logging system setup."""
         from main import setup_logging_system
@@ -82,6 +83,7 @@ class TestMainLoggingIntegration:
     
     @pytest.mark.integration
     @pytest.mark.fast
+    @pytest.mark.integration
     def test_setup_logging_system_failure_fallback(self, mock_cli_args, caplog):
         """Test logging system setup failure fallback."""
         from main import setup_logging_system
@@ -100,6 +102,8 @@ class TestMainLoggingIntegration:
     @pytest.mark.asyncio
     @pytest.mark.integration
     @pytest.mark.fast
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_run_inbox_check_with_logging(self, mock_cli_args, mock_settings):
         """Test inbox check command with logging integration."""
         from main import run_inbox_check
@@ -131,6 +135,8 @@ class TestMainLoggingIntegration:
     @pytest.mark.asyncio
     @pytest.mark.integration
     @pytest.mark.fast
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_run_inbox_check_error_handling(self, mock_cli_args, mock_settings):
         """Test inbox check error handling with logging."""
         from main import run_inbox_check
@@ -159,6 +165,8 @@ class TestMainLoggingIntegration:
     @pytest.mark.asyncio
     @pytest.mark.integration
     @pytest.mark.fast
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_run_system_status_detailed(self, mock_cli_args, mock_settings):
         """Test system status command with detailed output."""
         from main import run_system_status
@@ -203,6 +211,8 @@ class TestMainLoggingIntegration:
     @pytest.mark.asyncio
     @pytest.mark.integration
     @pytest.mark.fast
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_run_system_status_summary(self, mock_cli_args, mock_settings):
         """Test system status command with summary output."""
         from main import run_system_status
@@ -241,6 +251,7 @@ class TestMainLoggingIntegration:
     
     @pytest.mark.integration
     @pytest.mark.fast
+    @pytest.mark.integration
     def test_main_entry_point_check_command(self):
         """Test main entry point with check command."""
         from main import main
@@ -268,6 +279,7 @@ class TestMainLoggingIntegration:
     
     @pytest.mark.integration
     @pytest.mark.fast
+    @pytest.mark.integration
     def test_main_entry_point_status_command(self):
         """Test main entry point with status command."""
         from main import main
@@ -295,6 +307,7 @@ class TestMainLoggingIntegration:
     
     @pytest.mark.integration
     @pytest.mark.fast
+    @pytest.mark.integration
     def test_main_entry_point_keyboard_interrupt(self):
         """Test main entry point handling KeyboardInterrupt."""
         from main import main
@@ -314,6 +327,7 @@ class TestMainLoggingIntegration:
     
     @pytest.mark.integration
     @pytest.mark.fast
+    @pytest.mark.integration
     def test_main_entry_point_general_exception(self):
         """Test main entry point handling general exceptions."""
         from main import main
@@ -333,6 +347,7 @@ class TestMainLoggingIntegration:
     
     @pytest.mark.integration
     @pytest.mark.fast
+    @pytest.mark.integration
     def test_signal_handlers_setup(self):
         """Test signal handlers are properly set up."""
         from main import setup_signal_handlers
@@ -360,6 +375,7 @@ class TestCLIVerbosityIntegration:
     
     @pytest.mark.integration
     @pytest.mark.fast
+    @pytest.mark.integration
     def test_quiet_mode_configuration(self):
         """Test quiet mode produces minimal logging configuration."""
         parser = CLIArgumentParser()
@@ -371,6 +387,7 @@ class TestCLIVerbosityIntegration:
     
     @pytest.mark.integration
     @pytest.mark.fast
+    @pytest.mark.integration
     def test_verbose_mode_configuration(self):
         """Test verbose mode produces appropriate logging configuration."""
         parser = CLIArgumentParser()
@@ -382,6 +399,7 @@ class TestCLIVerbosityIntegration:
     
     @pytest.mark.integration
     @pytest.mark.fast
+    @pytest.mark.integration
     def test_debug_mode_configuration(self):
         """Test debug mode produces detailed logging configuration."""
         parser = CLIArgumentParser()
@@ -393,6 +411,7 @@ class TestCLIVerbosityIntegration:
     
     @pytest.mark.integration
     @pytest.mark.fast
+    @pytest.mark.integration
     def test_all_cli_commands_available(self):
         """Test that all CLI commands are available and work with logging."""
         parser = CLIArgumentParser()
@@ -410,6 +429,7 @@ class TestCLIVerbosityIntegration:
     
     @pytest.mark.integration
     @pytest.mark.fast
+    @pytest.mark.integration
     def test_environment_detection_flags(self):
         """Test environment detection flags are available."""
         parser = CLIArgumentParser()
@@ -419,6 +439,7 @@ class TestCLIVerbosityIntegration:
     
     @pytest.mark.integration
     @pytest.mark.fast
+    @pytest.mark.integration
     def test_logging_configuration_flags(self):
         """Test logging configuration flags are available."""
         parser = CLIArgumentParser()

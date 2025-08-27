@@ -18,6 +18,7 @@ class TestLogLevel:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_log_level_values(self):
         """Test LogLevel enum values."""
         assert LogLevel.DEBUG == "DEBUG"
@@ -32,6 +33,7 @@ class TestOutputFormat:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_output_format_values(self):
         """Test OutputFormat enum values."""
         assert OutputFormat.CLEAN == "clean"
@@ -45,6 +47,10 @@ class TestConsoleConfig:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
+    @pytest.mark.fast
+    @pytest.mark.fast
+    @pytest.mark.fast
     def test_default_values(self):
         """Test default configuration values."""
         config = ConsoleConfig()
@@ -57,6 +63,8 @@ class TestConsoleConfig:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
+    @pytest.mark.fast
     def test_custom_values(self):
         """Test custom configuration values."""
         config = ConsoleConfig(
@@ -130,6 +138,7 @@ class TestFileConfig:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_file_path_validation(self):
         """Test file path validation."""
         # Test string path conversion
@@ -144,6 +153,7 @@ class TestFileConfig:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_enabled_file_config(self):
         """Test enabled file configuration."""
         config = FileConfig(
@@ -183,6 +193,7 @@ class TestLoggingConfig:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_environment_validation(self):
         """Test environment validation."""
         # Valid environments
@@ -196,6 +207,7 @@ class TestLoggingConfig:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_get_python_log_level(self):
         """Test Python log level conversion."""
         config = LoggingConfig()
@@ -209,6 +221,7 @@ class TestLoggingConfig:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_is_production(self):
         """Test production environment detection."""
         dev_config = LoggingConfig(environment="development")
@@ -222,6 +235,7 @@ class TestLoggingConfig:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_is_containerized(self):
         """Test containerized environment detection."""
         config = LoggingConfig()
@@ -231,6 +245,7 @@ class TestLoggingConfig:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_custom_configuration(self):
         """Test complete custom configuration."""
         console_config = ConsoleConfig(
@@ -273,6 +288,7 @@ class TestLoggingConfig:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_extra_fields_forbidden(self):
         """Test that extra fields are forbidden."""
         with pytest.raises(ValidationError):

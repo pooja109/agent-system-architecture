@@ -88,6 +88,8 @@ class TestRealDatabasePerformance:
     @pytest.mark.performance
     @pytest.mark.medium
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.integration
     async def test_real_database_single_record_performance(self):
         """Test single record performance against real database."""
         
@@ -131,6 +133,8 @@ class TestRealDatabasePerformance:
     @pytest.mark.performance
     @pytest.mark.medium
     @pytest.mark.asyncio 
+    @pytest.mark.slow
+    @pytest.mark.integration
     async def test_real_database_batch_performance(self):
         """Test batch operations performance against real database."""
         
@@ -178,6 +182,8 @@ class TestRealDatabasePerformance:
     @pytest.mark.performance
     @pytest.mark.medium
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.integration
     async def test_real_database_query_performance(self):
         """Test query operations performance against real database."""
         
@@ -245,6 +251,8 @@ class TestStoragePerformance:
     
     @pytest.mark.performance
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_single_record_latency_benchmark(self):
         """Benchmark single record storage latency."""
         
@@ -289,6 +297,8 @@ class TestStoragePerformance:
     
     @pytest.mark.performance
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_batch_storage_throughput_benchmark(self):
         """Benchmark batch storage throughput."""
         
@@ -351,6 +361,8 @@ class TestStoragePerformance:
     @pytest.mark.performance
     @pytest.mark.slow
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_concurrent_storage_performance(self):
         """Test performance under concurrent storage operations."""
         
@@ -432,6 +444,8 @@ class TestStoragePerformance:
     
     @pytest.mark.performance
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_large_batch_processing_limits(self):
         """Test performance limits with very large batches."""
         
@@ -502,6 +516,8 @@ class TestStoragePerformance:
     @pytest.mark.performance
     @pytest.mark.slow
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_memory_usage_under_load(self):
         """Test memory usage during high-load operations."""
         
@@ -569,6 +585,8 @@ class TestStoragePerformance:
     @pytest.mark.benchmark
     @pytest.mark.medium
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_retrieval_performance_benchmark(self):
         """Test performance of data retrieval operations."""
         
@@ -644,6 +662,8 @@ class TestStoragePerformance:
     @pytest.mark.performance
     @pytest.mark.slow
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_sustained_load_endurance(self):
         """Test performance under sustained load over time."""
         
@@ -735,6 +755,8 @@ class TestStorageScalability:
     """Test scalability characteristics of the storage system."""
     
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_connection_pool_scalability(self):
         """Test performance scaling with connection pool usage."""
         

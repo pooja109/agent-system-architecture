@@ -48,7 +48,7 @@ class TestSalesforceClient:
     
     @pytest.mark.fast
     @pytest.mark.unit
-    @pytest.mark.smoke
+    @pytest.mark.medium
     def test_init(self, salesforce_settings):
         """Test client initialization."""
         client = SalesforceClient(salesforce_settings)
@@ -57,10 +57,11 @@ class TestSalesforceClient:
         assert client._access_token is None
         assert client._token_expires_at is None
     
-    @pytest.mark.slow
+    @pytest.mark.medium
     @pytest.mark.integration
-    @pytest.mark.email
-    @pytest.mark.ci_safe
+    @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_refresh_token_success(self, salesforce_client, mock_token_response):
         """Test successful token refresh."""
         mock_response = MagicMock()
@@ -73,10 +74,11 @@ class TestSalesforceClient:
         assert salesforce_client._access_token == "test_access_token"
         assert salesforce_client._token_expires_at is not None
         assert salesforce_client._token_expires_at > datetime.now(timezone.utc)
-    @pytest.mark.slow
-    @pytest.mark.integration
-    @pytest.mark.email
-    @pytest.mark.ci_safe
+    @pytest.mark.medium
+    @pytest.mark.edge_case
+    @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.edge_case
     async def test_refresh_token_failure(self, salesforce_client):
         """Test token refresh failure."""
         mock_response = MagicMock()
@@ -88,10 +90,11 @@ class TestSalesforceClient:
         with pytest.raises(Exception) as exc_info:
             await salesforce_client._refresh_token()
         assert "Token request failed with status 400" in str(exc_info.value)
-    @pytest.mark.slow
-    @pytest.mark.integration
-    @pytest.mark.email
-    @pytest.mark.ci_safe
+    @pytest.mark.fast
+    @pytest.mark.unit
+    @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_get_access_token_valid(self, salesforce_client):
         """Test getting valid access token."""
         # Set up existing valid token
@@ -99,10 +102,11 @@ class TestSalesforceClient:
         salesforce_client._token_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
         token = await salesforce_client._get_access_token()
         assert token == "existing_token"
-    @pytest.mark.slow
+    @pytest.mark.medium
     @pytest.mark.integration
-    @pytest.mark.email
-    @pytest.mark.ci_safe
+    @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_get_access_token_expired(self, salesforce_client, mock_token_response):
         """Test getting access token when expired."""
         # Set up expired token
@@ -114,10 +118,11 @@ class TestSalesforceClient:
             token = await salesforce_client._get_access_token()
             mock_refresh.assert_called_once()
             assert token == "new_token"
-    @pytest.mark.slow
+    @pytest.mark.medium
     @pytest.mark.integration
-    @pytest.mark.email
-    @pytest.mark.ci_safe
+    @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_create_case_success(self, salesforce_client):
         """Test successful case creation."""
         case_request = CaseCreateRequest(
@@ -140,10 +145,11 @@ class TestSalesforceClient:
             assert result.success is True
             assert result.id == "500000000000000"
             assert result.errors == []
-    @pytest.mark.slow
-    @pytest.mark.integration
-    @pytest.mark.email
-    @pytest.mark.ci_safe
+    @pytest.mark.medium
+    @pytest.mark.edge_case
+    @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.edge_case
     async def test_create_case_failure(self, salesforce_client):
         """Test case creation failure."""
         case_request = CaseCreateRequest(
@@ -166,10 +172,11 @@ class TestSalesforceClient:
             assert result.success is False
             assert result.id == ""
             assert len(result.errors) > 0
-    @pytest.mark.slow
+    @pytest.mark.medium
     @pytest.mark.integration
-    @pytest.mark.email
-    @pytest.mark.ci_safe
+    @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.edge_case
     async def test_update_contact_invalid_email_success(self, salesforce_client):
         """Test successful contact update."""
         contact_update = ContactUpdateRequest(contact_id="003000000000000", is_email_invalid=True)
@@ -181,10 +188,11 @@ class TestSalesforceClient:
         with patch.object(salesforce_client, "_get_access_token", return_value="test_token"):
             result = await salesforce_client.update_contact_invalid_email(contact_update)
             assert result is True
-    @pytest.mark.slow
-    @pytest.mark.integration
-    @pytest.mark.email
-    @pytest.mark.ci_safe
+    @pytest.mark.medium
+    @pytest.mark.edge_case
+    @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.edge_case
     async def test_update_contact_invalid_email_failure(self, salesforce_client):
         """Test contact update failure."""
         contact_update = ContactUpdateRequest(contact_id="003000000000000", is_email_invalid=True)
@@ -197,10 +205,11 @@ class TestSalesforceClient:
         with patch.object(salesforce_client, "_get_access_token", return_value="test_token"):
             result = await salesforce_client.update_contact_invalid_email(contact_update)
             assert result is False
-    @pytest.mark.slow
+    @pytest.mark.medium
     @pytest.mark.integration
-    @pytest.mark.email
-    @pytest.mark.ci_safe
+    @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_get_contact_details_success(self, salesforce_client):
         """Test successful contact details retrieval."""
         contact_id = "003000000000000"
@@ -222,9 +231,11 @@ class TestSalesforceClient:
             result = await salesforce_client.get_contact_details(contact_id)
             assert result == mock_contact_data
             assert result["Email"] == "test@example.com"
-    @pytest.mark.slow
-    @pytest.mark.integration
-    @pytest.mark.ci_safe
+    @pytest.mark.fast
+    @pytest.mark.edge_case
+    @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_get_contact_details_not_found(self, salesforce_client):
         """Test contact details retrieval when contact not found."""
         contact_id = "003000000000000"
@@ -236,9 +247,11 @@ class TestSalesforceClient:
         with patch.object(salesforce_client, "_get_access_token", return_value="test_token"):
             result = await salesforce_client.get_contact_details(contact_id)
             assert result is None
-    @pytest.mark.slow
+    @pytest.mark.medium
     @pytest.mark.integration
-    @pytest.mark.ci_safe
+    @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_test_connection_success(self, salesforce_client):
         """Test successful connection test."""
         mock_response = MagicMock()
@@ -250,9 +263,11 @@ class TestSalesforceClient:
         with patch.object(salesforce_client, "_get_access_token", return_value="test_token"):
             result = await salesforce_client.test_connection()
             assert result is True
-    @pytest.mark.slow
-    @pytest.mark.integration
-    @pytest.mark.ci_safe
+    @pytest.mark.fast
+    @pytest.mark.edge_case
+    @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.edge_case
     async def test_test_connection_failure(self, salesforce_client):
         """Test connection test failure."""
         mock_response = MagicMock()
@@ -263,9 +278,11 @@ class TestSalesforceClient:
         with patch.object(salesforce_client, "_get_access_token", return_value="test_token"):
             result = await salesforce_client.test_connection()
             assert result is False
-    @pytest.mark.slow
-    @pytest.mark.integration
-    @pytest.mark.ci_safe
+    @pytest.mark.fast
+    @pytest.mark.edge_case
+    @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_test_connection_exception(self, salesforce_client):
         """Test connection test with exception."""
         with patch.object(
@@ -273,6 +290,8 @@ class TestSalesforceClient:
         ):
             result = await salesforce_client.test_connection()
             assert result is False
+    @pytest.mark.medium
+    @pytest.mark.integration
     @pytest.mark.medium
     @pytest.mark.integration
     async def test_context_manager(self, salesforce_client):
@@ -283,6 +302,7 @@ class TestSalesforceClient:
         assert salesforce_client.client is None
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_salesforce_token_response_model(self):
         """Test Salesforce token response model."""
         token_data = {
@@ -298,6 +318,7 @@ class TestSalesforceClient:
         assert token_response.instance_url == "https://test.salesforce.com"
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_case_create_request_model(self):
         """Test case create request model."""
         case_data = {
@@ -318,9 +339,9 @@ class TestSalesforceClient:
         assert case_request.origin == "AI Agent"
         assert case_request.status == "Assigned"
         assert case_request.priority == "Medium"
-    @pytest.mark.email
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_contact_update_request_model(self):
         """Test contact update request model."""
         update_data = {"contact_id": "003000000000000", "is_email_invalid": True}

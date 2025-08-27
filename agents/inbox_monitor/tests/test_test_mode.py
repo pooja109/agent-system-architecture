@@ -12,6 +12,7 @@ class TestTestModeSettings:
     @pytest.mark.email
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_test_mode_disabled_by_default(self):
         """Test that test mode is disabled by default."""
         settings = TestModeSettings()
@@ -21,6 +22,7 @@ class TestTestModeSettings:
     @pytest.mark.email
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_test_mode_validation_when_enabled(self):
         """Test validation when test mode is enabled."""
         with pytest.raises(ValueError, match="test_sender_email is required"):
@@ -30,6 +32,7 @@ class TestTestModeSettings:
     @pytest.mark.email
     @pytest.mark.medium
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_test_mode_valid_configuration(self):
         """Test valid test mode configuration."""
         settings = TestModeSettings(
@@ -63,6 +66,8 @@ class TestContactLookupServiceTestMode:
     @pytest.mark.fast
     @pytest.mark.unit
     @pytest.fixture
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_mode_settings_disabled(self):
         """Test mode settings with test mode disabled."""
         return TestModeSettings(enabled=False)
@@ -89,6 +94,8 @@ class TestContactLookupServiceTestMode:
     @pytest.mark.email
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_email_substitution_when_test_mode(
         self, databricks_settings, enabled_test_mode_settings, mock_databricks_connection
     ):
@@ -126,6 +133,8 @@ class TestContactLookupServiceTestMode:
     @pytest.mark.email
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_no_substitution_when_test_mode_disabled(
         self, databricks_settings, test_mode_settings_disabled, mock_databricks_connection
     ):
@@ -157,6 +166,8 @@ class TestContactLookupServiceTestMode:
     @pytest.mark.email
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_no_substitution_for_non_test_email(
         self, databricks_settings, enabled_test_mode_settings, mock_databricks_connection
     ):
@@ -188,6 +199,8 @@ class TestContactLookupServiceTestMode:
     @pytest.mark.email
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_case_insensitive_email_matching(
         self, databricks_settings, enabled_test_mode_settings, mock_databricks_connection
     ):
@@ -220,6 +233,8 @@ class TestContactLookupServiceTestMode:
     @pytest.mark.integration
     @pytest.mark.email
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_contact_not_found_with_test_mode(
         self, databricks_settings, enabled_test_mode_settings, mock_databricks_connection
     ):
@@ -247,6 +262,8 @@ class TestEnvironmentVariableMapping:
     @pytest.mark.integration
     @pytest.mark.email
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_environment_variables_parsed_correctly(self):
         """Test that environment variables are parsed correctly."""
         import os

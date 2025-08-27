@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS `{catalog}`.`{schema}`.`inbox_monitor_scenario_proces
     agent_actions_log ARRAY<STRING> COMMENT 'List of actions performed during processing',
 
     -- Expert assignment (Scenario 5) - PII: Contains expert names and contact info
+    assignment_id STRING COMMENT 'Foreign key to expert_lead_assignments table',
     expert_assigned STRING COMMENT 'Expert name (PII)',
     expert_id STRING COMMENT 'Expert system ID',
     expert_email STRING COMMENT 'Expert email address (PII)',
@@ -111,7 +112,7 @@ CREATE TABLE IF NOT EXISTS `{catalog}`.`{schema}`.`inbox_monitor_scenario_proces
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP() COMMENT 'When this record was last modified',
     created_by STRING DEFAULT 'inbox_monitor' COMMENT 'System/user that created this record',
     data_version INT DEFAULT 1 COMMENT 'Schema version for data migration tracking',
-    processing_date TIMESTAMP COMMENT 'Date partition field for the table'
+    processing_date DATE COMMENT 'Date partition field for the table'
 )
 USING DELTA
 PARTITIONED BY (DATE(processed_at))

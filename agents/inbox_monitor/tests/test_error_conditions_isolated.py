@@ -21,6 +21,9 @@ from tests.fixtures.performance_monitoring import performance_monitor
 class TestErrorConditionsIsolated:
     """Error condition tests with architectural isolation."""
     
+    @pytest.mark.fast
+    @pytest.mark.edge_case
+    @pytest.mark.fast
     def test_system_hang_conditions_isolated(self, execution_isolation):
         """Test system hang conditions in complete isolation."""
         # Execute test in isolated process to prevent system impact
@@ -57,6 +60,9 @@ class TestErrorConditionsIsolated:
         
         assert test_iterations > 0  # Verify test actually ran
     
+    @pytest.mark.fast
+    @pytest.mark.edge_case
+    @pytest.mark.fast
     def test_memory_exhaustion_conditions_isolated(self, execution_isolation):
         """Test memory exhaustion in isolated environment."""
         result = execution_isolation.execute_isolated_test(
@@ -95,6 +101,8 @@ class TestErrorConditionsIsolated:
             memory_blocks.clear()
     
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.edge_case
     async def test_async_deadlock_conditions_managed(self, async_operation_manager, async_test_patterns):
         """Test async deadlock conditions with sophisticated management."""
         # Set up async test context
@@ -143,6 +151,11 @@ class TestErrorConditionsIsolated:
         await asyncio.sleep(0.1)  # Simulate processing
         return "operation_2_result"
     
+    @pytest.mark.fast
+    @pytest.mark.edge_case
+    @pytest.mark.cli
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     def test_recursive_cli_execution_isolated(self, execution_isolation):
         """Test recursive CLI execution that could cause system conflicts."""
         # Execute test that attempts recursive CLI calls in isolation
@@ -176,6 +189,8 @@ class TestErrorConditionsIsolated:
             pass
     
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     async def test_complex_error_cascade_managed(self, async_operation_manager):
         """Test complex error cascading scenarios with management."""
         
@@ -221,6 +236,9 @@ class TestErrorConditionsIsolated:
             if 'error' in result:
                 assert len(result['error']) > 0
     
+    @pytest.mark.fast
+    @pytest.mark.edge_case
+    @pytest.mark.fast
     def test_resource_exhaustion_isolated(self, execution_isolation, system_monitor):
         """Test resource exhaustion scenarios in isolation."""
         # Configure system limits for test
@@ -282,6 +300,9 @@ class TestErrorConditionsIsolated:
 class TestRetryUtilityErrorConditions:
     """Test error conditions for retry utility in isolation."""
     
+    @pytest.mark.fast
+    @pytest.mark.edge_case
+    @pytest.mark.fast
     def test_retry_operation_with_all_attempts_failing_isolated(self, execution_isolation):
         """Test retry operation where all attempts fail - executed in isolation."""
         result = execution_isolation.execute_isolated_test(
@@ -307,6 +328,8 @@ class TestRetryUtilityErrorConditions:
             assert "This operation always fails" in str(e)
     
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.edge_case
     async def test_async_retry_with_timeout_managed(self, async_operation_manager):
         """Test async retry operations with timeout management."""
         
@@ -327,6 +350,8 @@ class TestGraphAPIClientErrorConditions:
     """Test error conditions for Graph API client in isolation."""
     
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     async def test_get_inbox_messages_with_circuit_breaker(self, async_operation_manager):
         """Test Graph API with circuit breaker pattern."""
         from tests.fixtures.async_architecture import AsyncCircuitBreaker
@@ -349,6 +374,11 @@ class TestGraphAPIClientErrorConditions:
         assert failure_count >= 3
         assert circuit_breaker.state in ['OPEN', 'HALF_OPEN']
     
+    @pytest.mark.fast
+    @pytest.mark.edge_case
+    @pytest.mark.email
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     def test_get_inbox_messages_with_empty_response_isolated(self, execution_isolation):
         """Test Graph API empty response handling in isolation."""
         result = execution_isolation.execute_isolated_test(
@@ -370,6 +400,8 @@ class TestGraphAPIClientErrorConditions:
         
         # Test empty response handling
         import asyncio
+        @pytest.mark.fast
+        @pytest.mark.edge_case
         async def test_empty_response():
             result = await client.get_inbox_messages()
             assert result == []
@@ -382,6 +414,9 @@ class TestGraphAPIClientErrorConditions:
 class TestInboxMonitorErrorConditions:
     """Test error conditions for InboxMonitor in isolation."""
     
+    @pytest.mark.fast
+    @pytest.mark.edge_case
+    @pytest.mark.fast
     def test_monitor_with_continuous_failures_isolated(self, execution_isolation):
         """Test monitor behavior with continuous failures in isolation."""
         result = execution_isolation.execute_isolated_test(
@@ -410,6 +445,8 @@ class TestInboxMonitorErrorConditions:
         max_failures = 5
         
         import asyncio
+        @pytest.mark.fast
+        @pytest.mark.edge_case
         async def test_continuous_failures():
             nonlocal failure_count
             for _ in range(max_failures):
@@ -424,6 +461,9 @@ class TestInboxMonitorErrorConditions:
         # Verify failure handling
         assert failure_count == max_failures
     
+    @pytest.mark.fast
+    @pytest.mark.edge_case
+    @pytest.mark.fast
     def test_stop_with_cleanup_failure_isolated(self, execution_isolation):
         """Test monitor stop with cleanup failure in isolation."""
         result = execution_isolation.execute_isolated_test(

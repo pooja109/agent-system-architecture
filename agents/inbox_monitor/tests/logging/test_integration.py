@@ -69,6 +69,7 @@ class TestLoggingIntegration:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_full_system_initialization(self, dual_stream_config, isolated_logger):
         """Test complete system initialization."""
         # Initialize the logging system
@@ -84,6 +85,7 @@ class TestLoggingIntegration:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_dual_stream_output(self, dual_stream_config):
         """Test that messages go to both console and structured handlers."""
         # Capture outputs
@@ -139,6 +141,7 @@ class TestLoggingIntegration:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_console_only_logger(self, dual_stream_config):
         """Test console-only logger functionality."""
         console_stream = StringIO()
@@ -163,6 +166,7 @@ class TestLoggingIntegration:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_structured_only_logger(self, dual_stream_config):
         """Test structured-only logger functionality."""
         console_stream = StringIO()
@@ -193,6 +197,7 @@ class TestLoggingIntegration:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_third_party_suppression(self, dual_stream_config):
         """Test that third-party loggers are properly suppressed."""
         console_stream = StringIO()
@@ -229,6 +234,7 @@ class TestLoggingIntegration:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_error_with_exception_info(self, dual_stream_config):
         """Test error logging with exception information."""
         console_stream = StringIO()
@@ -263,6 +269,7 @@ class TestLoggingIntegration:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_concurrent_multi_logger_usage(self, dual_stream_config):
         """Test concurrent usage of multiple loggers."""
         initialize_logging(dual_stream_config)
@@ -307,6 +314,7 @@ class TestLoggingIntegration:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_configuration_validation_integration(self):
         """Test that configuration validation works in integration."""
         with pytest.raises(Exception):  # Should be ValidationError from pydantic
@@ -315,6 +323,7 @@ class TestLoggingIntegration:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_cleanup_and_reinitialization(self, dual_stream_config):
         """Test cleanup and reinitialization."""
         # First initialization
@@ -344,6 +353,7 @@ class TestLoggingIntegration:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_file_logging_integration(self):
         """Test file logging integration."""
         with tempfile.NamedTemporaryFile(mode='w+', delete=False) as temp_file:
@@ -391,6 +401,7 @@ class TestLoggingIntegration:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_message_formatting_consistency(self, dual_stream_config):
         """Test that message formatting is consistent across handlers."""
         console_stream = StringIO()

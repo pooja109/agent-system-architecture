@@ -22,6 +22,7 @@ class TestPerformanceBenchmarks:
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.integration
+    @pytest.mark.slow
     def test_performance_regression_detection_integrated(self, performance_framework):
         """Test integrated performance regression detection - RECOVERED."""
         # Run all registered performance benchmarks
@@ -59,6 +60,8 @@ class TestPerformanceBenchmarks:
     @pytest.mark.fast
     @pytest.mark.unit
     @pytest.mark.prompt
+    @pytest.mark.slow
+    @pytest.mark.integration
     def test_performance_architecture_integration(self, performance_framework):
         """Test that performance architecture is properly integrated - RECOVERED."""
         # Verify framework is configured
@@ -85,6 +88,8 @@ class TestPerformanceBenchmarks:
     @pytest.mark.fast
     @pytest.mark.unit
     @pytest.mark.prompt
+    @pytest.mark.slow
+    @pytest.mark.unit
     def test_baseline_management_utilities(self, performance_framework):
         """Test baseline management utilities for CI/CD consistency - ADDED for 100% compliance."""
         # Test default baseline initialization

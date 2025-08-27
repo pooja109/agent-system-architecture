@@ -14,6 +14,7 @@ class TestColorCodes:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_color_code_values(self):
         """Test that color codes are properly defined."""
         assert ColorCodes.RESET == '\033[0m'
@@ -63,6 +64,7 @@ class TestConsoleFormatter:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_clean_format(self, clean_config):
         """Test clean formatting."""
         formatter = ConsoleFormatter(clean_config)
@@ -84,6 +86,7 @@ class TestConsoleFormatter:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_minimal_format(self, minimal_config):
         """Test minimal formatting."""
         formatter = ConsoleFormatter(minimal_config)
@@ -103,6 +106,7 @@ class TestConsoleFormatter:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_detailed_format(self, detailed_config):
         """Test detailed formatting."""
         formatter = ConsoleFormatter(detailed_config)
@@ -125,6 +129,7 @@ class TestConsoleFormatter:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_different_log_levels(self, clean_config):
         """Test formatting for different log levels."""
         formatter = ConsoleFormatter(clean_config)
@@ -153,6 +158,7 @@ class TestConsoleFormatter:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_exception_formatting(self, clean_config):
         """Test exception formatting."""
         formatter = ConsoleFormatter(clean_config)
@@ -175,6 +181,7 @@ class TestConsoleFormatter:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_thread_safety(self, clean_config):
         """Test thread safety of formatter."""
         import threading
@@ -243,6 +250,7 @@ class TestConsoleHandler:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_handler_initialization(self, console_config, mock_stream):
         """Test handler initialization."""
         handler = ConsoleHandler(console_config, stream=mock_stream)
@@ -254,6 +262,7 @@ class TestConsoleHandler:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_basic_message_output(self, console_config, mock_stream):
         """Test basic message output."""
         handler = ConsoleHandler(console_config, stream=mock_stream)
@@ -277,6 +286,7 @@ class TestConsoleHandler:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_multiple_messages(self, console_config, mock_stream):
         """Test multiple message output."""
         handler = ConsoleHandler(console_config, stream=mock_stream)
@@ -302,6 +312,7 @@ class TestConsoleHandler:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_error_handling(self, console_config):
         """Test handler behavior when errors occur."""
         # Use a mock stream that raises an exception
@@ -328,6 +339,7 @@ class TestConsoleHandler:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_level_filtering(self, mock_stream):
         """Test log level filtering."""
         config = ConsoleConfig(level=LogLevel.WARNING, color_enabled=False)
@@ -365,6 +377,7 @@ class TestConsoleHandler:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_handler_cleanup(self, console_config, mock_stream):
         """Test handler cleanup."""
         handler = ConsoleHandler(console_config, stream=mock_stream)
@@ -377,6 +390,7 @@ class TestConsoleHandler:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_concurrent_logging(self, console_config, mock_stream):
         """Test concurrent logging to the same handler."""
         import threading

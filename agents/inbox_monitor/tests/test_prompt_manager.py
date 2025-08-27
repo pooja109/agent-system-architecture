@@ -86,6 +86,7 @@ class TestPromptManagerInitialization:
     @pytest.mark.fast
     @pytest.mark.prompt
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_default_initialization(self):
         """Test PromptManager with default settings."""
         manager = PromptManager()
@@ -99,6 +100,7 @@ class TestPromptManagerInitialization:
     @pytest.mark.fast
     @pytest.mark.prompt
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_custom_initialization(self):
         """Test PromptManager with custom settings."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -117,6 +119,7 @@ class TestPromptManagerInitialization:
     @pytest.mark.fast
     @pytest.mark.prompt
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_base_directory_creation(self):
         """Test that base directory is created if it doesn't exist."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -132,6 +135,8 @@ class TestPromptConfigLoading:
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.integration
     async def test_successful_config_loading(self, temp_prompts_dir):
         """Test successful loading of prompt configuration."""
         manager = PromptManager(prompts_base_path=temp_prompts_dir)
@@ -147,6 +152,8 @@ class TestPromptConfigLoading:
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.integration
     async def test_config_not_found_error(self, temp_prompts_dir):
         """Test error when prompt configuration doesn't exist."""
         manager = PromptManager(prompts_base_path=temp_prompts_dir)
@@ -158,6 +165,8 @@ class TestPromptConfigLoading:
     @pytest.mark.edge_case
     @pytest.mark.prompt
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.integration
     async def test_empty_config_validation_error(self, temp_prompts_dir):
         """Test error when configuration file is empty."""
         manager = PromptManager(prompts_base_path=temp_prompts_dir)
@@ -177,6 +186,8 @@ class TestSystemInstructionsRetrieval:
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.integration
     async def test_get_system_instructions_success(self, temp_prompts_dir):
         """Test successful retrieval of system instructions."""
         manager = PromptManager(prompts_base_path=temp_prompts_dir)
@@ -188,6 +199,8 @@ class TestSystemInstructionsRetrieval:
     @pytest.mark.unit
     @pytest.mark.prompt
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.integration
     async def test_get_system_instructions_not_found(self, temp_prompts_dir):
         """Test error when prompt not found."""
         manager = PromptManager(prompts_base_path=temp_prompts_dir)
@@ -201,6 +214,8 @@ class TestCachingBehavior:
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.integration
     async def test_cache_hit_behavior(self, temp_prompts_dir):
         """Test that second load uses cache."""
         manager = PromptManager(prompts_base_path=temp_prompts_dir)
@@ -221,6 +236,8 @@ class TestCachingBehavior:
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.integration
     async def test_cache_ttl_expiration(self, temp_prompts_dir):
         """Test that cache expires after TTL."""
         manager = PromptManager(
@@ -238,6 +255,7 @@ class TestCachingBehavior:
     @pytest.mark.fast
     @pytest.mark.prompt
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_manual_cache_clearing(self, temp_prompts_dir):
         """Test manual cache clearing functionality."""
         manager = PromptManager(prompts_base_path=temp_prompts_dir)
@@ -252,6 +270,7 @@ class TestCachingBehavior:
     @pytest.mark.fast
     @pytest.mark.prompt
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_cache_statistics(self, temp_prompts_dir):
         """Test cache statistics calculation."""
         manager = PromptManager(prompts_base_path=temp_prompts_dir)
@@ -272,6 +291,7 @@ class TestSpecificCacheClearing:
     @pytest.mark.fast
     @pytest.mark.prompt
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_clear_specific_prompt_cache(self, temp_prompts_dir):
         """Test clearing cache for specific prompt."""
         manager = PromptManager(prompts_base_path=temp_prompts_dir)
@@ -297,6 +317,8 @@ class TestErrorHandling:
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.integration
     async def test_file_permission_error(self, temp_prompts_dir):
         """Test handling of file permission errors."""
         manager = PromptManager(prompts_base_path=temp_prompts_dir)
@@ -315,6 +337,8 @@ class TestErrorHandling:
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.integration
     async def test_yaml_parsing_error(self, temp_prompts_dir):
         """Test handling of malformed YAML files."""
         manager = PromptManager(prompts_base_path=temp_prompts_dir)
@@ -329,6 +353,8 @@ class TestErrorHandling:
     @pytest.mark.edge_case
     @pytest.mark.prompt
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.integration
     async def test_validation_error_handling(self, temp_prompts_dir):
         """Test handling of Pydantic validation errors."""
         manager = PromptManager(prompts_base_path=temp_prompts_dir)
@@ -357,6 +383,8 @@ class TestTemplateLoading:
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.integration
     async def test_successful_template_loading(self, temp_prompts_with_template):
         """Test successful loading of template configuration."""
         manager = PromptManager(prompts_base_path=temp_prompts_with_template)
@@ -371,6 +399,8 @@ class TestTemplateLoading:
     @pytest.mark.email
     @pytest.mark.prompt
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.integration
     async def test_template_not_found_error(self, temp_prompts_with_template):
         """Test error when template file doesn't exist."""
         manager = PromptManager(prompts_base_path=temp_prompts_with_template)
@@ -385,6 +415,8 @@ class TestValidationFramework:
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.integration
     async def test_validate_all_prompts_success(self, temp_prompts_dir):
         """Test validation of all prompts when they're valid."""
         manager = PromptManager(prompts_base_path=temp_prompts_dir)
@@ -396,6 +428,8 @@ class TestValidationFramework:
     @pytest.mark.email
     @pytest.mark.prompt
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.integration
     async def test_validate_all_prompts_with_failures(self, temp_prompts_dir):
         """Test validation when some prompts are invalid."""
         manager = PromptManager(prompts_base_path=temp_prompts_dir)
@@ -422,6 +456,8 @@ class TestCircuitBreaker:
     @pytest.mark.fast
     @pytest.mark.unit
     @pytest.mark.prompt
+    @pytest.mark.fast
+    @pytest.mark.integration
     def test_circuit_breaker_initialization(self):
         """Test circuit breaker is properly initialized."""
         manager = PromptManager(enable_circuit_breaker=True)
@@ -434,6 +470,8 @@ class TestCircuitBreaker:
     @pytest.mark.fast
     @pytest.mark.unit
     @pytest.mark.prompt
+    @pytest.mark.fast
+    @pytest.mark.integration
     def test_circuit_breaker_disabled(self):
         """Test circuit breaker can be disabled."""
         manager = PromptManager(enable_circuit_breaker=False)
@@ -443,6 +481,8 @@ class TestCircuitBreaker:
     @pytest.mark.fast
     @pytest.mark.unit
     @pytest.mark.prompt
+    @pytest.mark.fast
+    @pytest.mark.integration
     def test_circuit_breaker_statistics(self):
         """Test circuit breaker statistics in cache statistics."""
         manager = PromptManager(enable_circuit_breaker=True)
@@ -463,6 +503,7 @@ class TestMemoryMonitoring:
     @pytest.mark.unit
     @pytest.mark.prompt
     @pytest.mark.medium
+    @pytest.mark.integration
     def test_memory_statistics_basic(self):
         """Test basic memory statistics collection."""
         manager = PromptManager()
@@ -478,6 +519,8 @@ class TestMemoryMonitoring:
     @pytest.mark.fast
     @pytest.mark.unit
     @pytest.mark.prompt
+    @pytest.mark.fast
+    @pytest.mark.integration
     def test_memory_statistics_process_info(self):
         """Test process memory information collection."""
         manager = PromptManager()
@@ -501,6 +544,8 @@ class TestHealthChecks:
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.integration
     async def test_health_check_healthy_system(self, temp_prompts_dir):
         """Test health check with healthy system."""
         manager = PromptManager(prompts_base_path=temp_prompts_dir)

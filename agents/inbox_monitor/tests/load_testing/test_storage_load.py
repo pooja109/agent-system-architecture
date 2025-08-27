@@ -88,11 +88,11 @@ class TestStorageLoadTesting:
         
         return records
     
-    @pytest.mark.load
-    @pytest.mark.scenario_tracking
     @pytest.mark.slow
-    @pytest.mark.performance
+    @pytest.mark.integration
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_high_volume_sequential_load(self):
         """Test sequential processing of high volume data."""
         
@@ -155,11 +155,11 @@ class TestStorageLoadTesting:
             "avg_batch_time": avg_batch_time
         }
     
-    @pytest.mark.load
-    @pytest.mark.scenario_tracking
     @pytest.mark.slow
-    @pytest.mark.performance
+    @pytest.mark.integration
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_high_concurrency_load(self):
         """Test high concurrency with many simultaneous operations."""
         
@@ -245,11 +245,11 @@ class TestStorageLoadTesting:
                 "error": str(e)
             }
     
-    @pytest.mark.load
-    @pytest.mark.scenario_tracking
     @pytest.mark.slow
-    @pytest.mark.performance
+    @pytest.mark.integration
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_burst_load_patterns(self):
         """Test handling of burst traffic patterns."""
         
@@ -356,11 +356,11 @@ class TestStorageLoadTesting:
             logger.error("Burst batch task failed", batch_id=batch_id, error=str(e))
             return {"batch_id": batch_id, "successful": 0, "failed": len(records)}
     
-    @pytest.mark.load
-    @pytest.mark.scenario_tracking
     @pytest.mark.slow
-    @pytest.mark.performance
+    @pytest.mark.integration
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_sustained_high_load_endurance(self):
         """Test sustained high load over extended period."""
         
@@ -463,11 +463,11 @@ class TestStorageLoadTesting:
             "success_degradation": success_degradation
         }
     
-    @pytest.mark.load
-    @pytest.mark.scenario_tracking
     @pytest.mark.slow
-    @pytest.mark.performance
+    @pytest.mark.edge_case
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_memory_pressure_under_load(self):
         """Test system behavior under memory pressure during load."""
         
@@ -566,7 +566,11 @@ class TestStorageLoadTesting:
 class TestExtremeLoadConditions:
     """Test system behavior under extreme load conditions."""
     
+    @pytest.mark.slow
+    @pytest.mark.edge_case
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_extreme_concurrency_stress(self):
         """Test with extreme concurrency levels."""
         

@@ -39,10 +39,11 @@ class TestEmailProcessor:
             processor._mock_scenario_processor = mock_scenario_instance
             return processor
     
+    @pytest.mark.fast
+    @pytest.mark.unit
     @pytest.mark.asyncio
     @pytest.mark.fast
     @pytest.mark.unit
-    @pytest.mark.smoke
     async def test_process_inbox_no_messages(self, processor, mock_graph_client):
         """Test processing inbox with no messages."""
         mock_graph_client.get_inbox_messages.return_value = []
@@ -51,10 +52,11 @@ class TestEmailProcessor:
         assert results["processed_count"] == 0
         assert results["failed_count"] == 0
         assert len(results["errors"]) == 0
-    @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.integration
-    @pytest.mark.email
+    @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_process_inbox_with_messages(
         self, processor, mock_graph_client, mock_graph_message, mock_folder
     ):
@@ -99,10 +101,11 @@ class TestEmailProcessor:
         assert len(results["processing_results"]) == 1
         # Note: retry_operation may not be called if scenario processing fails
         # The main test is that inbox processing completes successfully
-    @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.edge_case
-    @pytest.mark.email
+    @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     async def test_process_inbox_folder_creation_failure(
         self, processor, mock_graph_client, mock_graph_message
     ):
@@ -113,10 +116,11 @@ class TestEmailProcessor:
         results = await processor.process_inbox()
         assert results["success"] is False
         assert "Failed to create/get processed folder" in results["errors"][0]
-    @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.integration
-    @pytest.mark.email
+    @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_process_single_email_success(
         self, processor, mock_graph_client, mock_graph_message
     ):
@@ -148,10 +152,11 @@ class TestEmailProcessor:
         assert result.destination_folder == "Processed_01_2024"
         assert result.storage_location is not None
         assert result.error is None
+    @pytest.mark.fast
+    @pytest.mark.unit
     @pytest.mark.asyncio
     @pytest.mark.fast
-    @pytest.mark.integration
-    @pytest.mark.email
+    @pytest.mark.unit
     async def test_process_single_email_dry_run(
         self, processor, mock_graph_client, mock_graph_message
     ):
@@ -180,10 +185,11 @@ class TestEmailProcessor:
         assert result.destination_folder is None  # Not moved in dry-run
         # Verify email was NOT moved
         mock_graph_client.move_message.assert_not_called()
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     @pytest.mark.asyncio
     @pytest.mark.fast
     @pytest.mark.edge_case
-    @pytest.mark.email
     async def test_process_single_email_failure(
         self, processor, mock_graph_client, mock_graph_message
     ):
@@ -196,6 +202,8 @@ class TestEmailProcessor:
         assert "Conversion failed" in result.error
         assert result.destination_folder is None
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     @pytest.mark.fast
     @pytest.mark.unit
     async def test_store_email_file(self, processor, mock_email_model):
@@ -212,6 +220,8 @@ class TestEmailProcessor:
     @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_store_email_api(self, processor, mock_email_model):
         """Test storing email via API."""
         processor.settings.output.storage_type = "api"
@@ -231,9 +241,11 @@ class TestEmailProcessor:
             mock_client_class.return_value = mock_client
             location = await processor._store_email_api(mock_email_model)
         assert location == "api-email-id"
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     @pytest.mark.asyncio
     @pytest.mark.fast
-    @pytest.mark.integration
+    @pytest.mark.edge_case
     async def test_store_email_api_error(self, processor, mock_email_model):
         """Test API storage error handling."""
         processor.settings.output.storage_type = "api"
@@ -254,16 +266,18 @@ class TestEmailProcessor:
                 await processor._store_email_api(mock_email_model)
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_get_processed_folder_name(self, processor):
         """Test generating processed folder name."""
         with patch("services.email_processor.datetime") as mock_datetime:
             mock_datetime.now.return_value.strftime.side_effect = ["01", "2024"]
             folder_name = processor._get_processed_folder_name()
         assert folder_name == "Processed_01_2024"
-    @pytest.mark.asyncio
     @pytest.mark.fast
     @pytest.mark.integration
-    @pytest.mark.azure
+    @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_ensure_processed_folder_exists(self, processor, mock_graph_client, mock_folder):
         """Test ensuring folder exists when it already exists."""
         mock_graph_client.get_folder_by_name.return_value = mock_folder
@@ -272,11 +286,11 @@ class TestEmailProcessor:
         assert folder["id"] == "test-folder-id-123"
         # Should not create new folder
         mock_graph_client.create_folder.assert_not_called()
-    @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.integration
-    @pytest.mark.azure
-    @pytest.mark.retry
+    @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_ensure_processed_folder_create_new(
         self, processor, mock_graph_client, mock_folder
     ):
@@ -290,10 +304,11 @@ class TestEmailProcessor:
         assert folder["id"] == "test-folder-id-123"  # This should match mock_folder fixture
         # Should have called retry operation
         mock_retry.assert_called_once()
-    @pytest.mark.asyncio
     @pytest.mark.medium
-    @pytest.mark.integration
-    @pytest.mark.azure
+    @pytest.mark.edge_case
+    @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     async def test_ensure_processed_folder_create_failure(self, processor, mock_graph_client):
         """Test handling folder creation failure."""
         mock_graph_client.get_folder_by_name.return_value = None

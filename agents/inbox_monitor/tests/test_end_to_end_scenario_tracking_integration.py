@@ -97,6 +97,8 @@ class TestEndToEndScenarioTrackingIntegration:
         )
     
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_scenario_processor_to_tracking_integration(self, scenario_tracking_config):
         """Test the complete flow from ScenarioProcessor to tracking integration."""
         
@@ -149,6 +151,8 @@ class TestEndToEndScenarioTrackingIntegration:
         logger.info("✅ ScenarioProcessor to tracking integration test passed")
     
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_email_processor_to_tracking_integration(self, scenario_tracking_config):
         """Test the complete flow from EmailProcessor to tracking integration."""
         
@@ -218,6 +222,8 @@ class TestEndToEndScenarioTrackingIntegration:
         logger.info("✅ EmailProcessor to tracking integration test passed")
     
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_integration_service_data_transformation(self, scenario_tracking_config):
         """Test the data transformation process in the integration service."""
         
@@ -271,6 +277,8 @@ class TestEndToEndScenarioTrackingIntegration:
         await integration_service.close()
     
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_error_handling_isolation(self, scenario_tracking_config):
         """Test that tracking failures don't affect scenario processing."""
         
@@ -308,6 +316,8 @@ class TestEndToEndScenarioTrackingIntegration:
         logger.info("✅ Error handling isolation test passed")
     
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_circuit_breaker_protection(self, scenario_tracking_config):
         """Test that circuit breaker protects against cascading failures."""
         
@@ -363,6 +373,8 @@ class TestEndToEndScenarioTrackingIntegration:
         await integration_service.close()
     
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_batch_processing_efficiency(self, scenario_tracking_config):
         """Test batch processing functionality and efficiency."""
         
@@ -424,6 +436,8 @@ class TestEndToEndScenarioTrackingIntegration:
         await integration_service.close()
     
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.integration
     async def test_performance_monitoring_integration(self, scenario_tracking_config):
         """Test performance monitoring and metrics collection."""
         
@@ -478,6 +492,8 @@ class TestEndToEndScenarioTrackingIntegration:
         await integration_service.close()
     
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_health_check_integration(self, scenario_tracking_config):
         """Test health check functionality across the integration."""
         
@@ -510,6 +526,8 @@ class TestEndToEndScenarioTrackingIntegration:
 
 
 @pytest.mark.asyncio
+@pytest.mark.medium
+@pytest.mark.integration
 async def test_complete_end_to_end_flow():
     """
     Complete end-to-end test simulating the full flow:
