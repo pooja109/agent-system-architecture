@@ -382,7 +382,35 @@ class DatabricksConnectionPool:
             initialization_time = time.time() - start_time
             
             if created_connections == 0:
-                raise ConnectionPoolInitializationError("Failed to create any initial connections")
+                error_details = [
+                    "❌ CONNECTION POOL INITIALIZATION FAILED",
+                    "",
+                    "🔍 Failed to create any initial Databricks connections",
+                    f"📊 Attempted: {self.config.min_connections} connections, Created: 0",
+                    "",
+                    "🚨 MOST LIKELY CAUSE: Databricks SDK not properly installed in container",
+                    "",
+                    "🔧 CONTAINER DEBUG COMMANDS:",
+                    "",
+                    "# 1. Check SDK installation",
+                    "docker exec <container_name> pip list | grep databricks-sdk",
+                    "docker exec <container_name> pip show databricks-sdk",
+                    "",
+                    "# 2. Test SDK imports",
+                    "docker exec <container_name> python -c \"from databricks.sdk.service.sql import StatementState; print('SDK imports OK')\"",
+                    "",
+                    "# 3. Install SDK if missing",
+                    "docker exec <container_name> pip install 'databricks-sdk>=0.28.0'",
+                    "",
+                    "# 4. Test basic connection",
+                    "docker exec <container_name> python -c \"from databricks.sdk import WorkspaceClient; client = WorkspaceClient(); print('Connection OK')\"",
+                    "",
+                    "# 5. Check container environment",
+                    "docker exec <container_name> env | grep -E '(AZURE_|DATABRICKS_)'",
+                    "",
+                    "💡 If SDK is installed but still failing, check network connectivity and authentication"
+                ]
+                raise ConnectionPoolInitializationError("\n".join(error_details))
             
             with self._lock:
                 self._is_initialized = True

@@ -28,6 +28,8 @@ class TestCLIIntegrationIsolated:
     @pytest.mark.fast
     @pytest.mark.integration
     @pytest.mark.ci_safe
+    @pytest.mark.slow
+    @pytest.mark.integration
     def test_cli_help_command_isolated(self, isolated_filesystem, performance_monitor, isolated_config):
         """Test CLI help command with complete isolation."""
         with performance_monitor.monitor():
@@ -58,6 +60,7 @@ class TestCLIIntegrationIsolated:
     
     @pytest.mark.fast
     @pytest.mark.integration
+    @pytest.mark.slow
     def test_cli_list_modes_isolated(self, isolated_filesystem, performance_monitor):
         """Test CLI list modes with isolation."""
         with performance_monitor.monitor():
@@ -88,6 +91,7 @@ class TestCLIIntegrationIsolated:
     
     @pytest.mark.fast
     @pytest.mark.integration
+    @pytest.mark.slow
     def test_cli_dry_run_isolated(self, temp_config_dir, isolated_config, performance_monitor):
         """Test CLI dry run with isolated configuration."""
         with performance_monitor.monitor():
@@ -115,6 +119,10 @@ class TestCLIIntegrationIsolated:
         metrics = performance_monitor.metrics
         assert metrics.execution_time < 20.0
     
+    @pytest.mark.integration
+    @pytest.mark.medium
+    @pytest.mark.cli
+    @pytest.mark.slow
     @pytest.mark.integration
     def test_cli_status_command_with_mocks(self, isolated_mocks, temp_config_dir, async_resource_manager):
         """Test CLI status command with isolated mocks and async management."""
@@ -158,6 +166,8 @@ class TestCLIIntegrationIsolated:
             assert "INTERNALERROR" not in result.stderr
     
     @pytest.mark.asyncio
+    @pytest.mark.integration
+    @pytest.mark.slow
     @pytest.mark.integration
     async def test_cli_async_operations_isolated(
         self, 
@@ -204,6 +214,10 @@ class TestCLIIntegrationIsolated:
     
     @pytest.mark.integration
     @pytest.mark.skip(reason="Complex file isolation not supported in test environment")
+    @pytest.mark.medium
+    @pytest.mark.cli
+    @pytest.mark.slow
+    @pytest.mark.integration
     def test_cli_config_isolation(self, project_structure, isolated_global_state, no_singleton_conflicts):
         """Test CLI configuration isolation between tests."""
         # Use project structure for realistic CLI testing
@@ -247,6 +261,7 @@ class TestCLIIntegrationIsolated:
     
     @pytest.mark.fast
     @pytest.mark.integration
+    @pytest.mark.slow
     def test_cli_subprocess_isolation(self, isolated_filesystem, temp_log_dir):
         """Test that CLI subprocess operations don't interfere with each other."""
         
@@ -285,6 +300,11 @@ class TestCLIIntegrationIsolated:
             assert "Address already in use" not in result.stderr
     
     @pytest.mark.performance
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.cli
+    @pytest.mark.slow
+    @pytest.mark.integration
     def test_cli_performance_isolation(self, performance_monitor, isolated_filesystem):
         """Test CLI performance with isolation overhead."""
         with performance_monitor.monitor():
@@ -316,6 +336,7 @@ class TestCLIIsolationValidation:
     
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.slow
     def test_cli_parallel_execution(self, isolated_filesystem):
         """Test CLI operations can run in parallel without conflicts."""
         import concurrent.futures
@@ -349,6 +370,7 @@ class TestCLIIsolationValidation:
     
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.slow
     def test_cli_isolation_cleanup(self, isolated_filesystem, performance_monitor):
         """Test that CLI operations clean up properly."""
         initial_files = set(Path.cwd().rglob('*.tmp'))
@@ -388,6 +410,7 @@ class TestCLIResourceIntensive:
     @pytest.mark.skip(reason="Resource-intensive CLI test - Phase 3 recovery")
     @pytest.mark.slow
     @pytest.mark.integration
+    @pytest.mark.slow
     def test_cli_full_test_execution(self):
         """Full CLI test execution - requires Phase 3 resource management."""
         # This would run actual test execution through CLI
@@ -397,6 +420,7 @@ class TestCLIResourceIntensive:
     @pytest.mark.skip(reason="Complex CLI orchestration - Phase 3 recovery")
     @pytest.mark.slow
     @pytest.mark.integration
+    @pytest.mark.slow
     def test_cli_complex_workflow(self):
         """Complex CLI workflow testing - requires Phase 3 resource management."""
         # This would test complex CLI scenarios with multiple service interactions
@@ -411,6 +435,10 @@ class TestCLIPhase2Recovery:
     @pytest.mark.performance
     @pytest.mark.integration
     @pytest.mark.skip(reason="Performance validation requires stable environment - disabled for general testing")
+    @pytest.mark.medium
+    @pytest.mark.cli
+    @pytest.mark.slow
+    @pytest.mark.integration
     def test_cli_phase2_performance_targets(self, performance_monitor, isolated_filesystem):
         """Validate CLI Phase 2 recovery meets all performance targets."""
         

@@ -37,6 +37,8 @@ class TestGraphAPIClient:
     @pytest.mark.fast
     @pytest.mark.integration
     @pytest.mark.azure
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_initialize_cleanup(self, graph_client):
         """Test client initialization and cleanup."""
         await graph_client.initialize()
@@ -48,6 +50,8 @@ class TestGraphAPIClient:
     @pytest.mark.fast
     @pytest.mark.integration
     @pytest.mark.azure
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_context_manager(self, graph_client):
         """Test using client as async context manager."""
         async with graph_client as client:
@@ -59,6 +63,8 @@ class TestGraphAPIClient:
     @pytest.mark.azure
     @pytest.mark.integration
     @pytest.mark.email
+    @pytest.mark.medium
+    @pytest.mark.unit
     def test_get_access_token_cached(self, graph_client):
         """Test getting cached access token."""
         # Set up cache
@@ -78,6 +84,8 @@ class TestGraphAPIClient:
     @pytest.mark.azure
     @pytest.mark.integration
     @pytest.mark.email
+    @pytest.mark.medium
+    @pytest.mark.unit
     def test_get_access_token_new(self, graph_client):
         """Test acquiring new access token."""
         graph_client._token_cache = None
@@ -92,6 +100,7 @@ class TestGraphAPIClient:
     @pytest.mark.edge_case
     @pytest.mark.fast
     @pytest.mark.integration
+    @pytest.mark.medium
     def test_get_access_token_error(self, graph_client):
         """Test error handling when acquiring token fails."""
         graph_client.msal_app.acquire_token_for_client.return_value = {
@@ -104,6 +113,8 @@ class TestGraphAPIClient:
     @pytest.mark.medium
     @pytest.mark.integration
     @pytest.mark.azure
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_make_request_success(self, graph_client, mock_httpx_client):
         """Test successful API request."""
         graph_client._client = mock_httpx_client
@@ -122,6 +133,8 @@ class TestGraphAPIClient:
     @pytest.mark.fast
     @pytest.mark.edge_case
     @pytest.mark.azure
+    @pytest.mark.medium
+    @pytest.mark.edge_case
     async def test_make_request_error(self, graph_client, mock_httpx_client):
         """Test API request error handling."""
         graph_client._client = mock_httpx_client
@@ -137,6 +150,8 @@ class TestGraphAPIClient:
     @pytest.mark.integration
     @pytest.mark.azure
     @pytest.mark.email
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_get_inbox_messages(self, graph_client, mock_httpx_client, mock_graph_message):
         """Test getting inbox messages."""
         graph_client._client = mock_httpx_client
@@ -157,6 +172,8 @@ class TestGraphAPIClient:
     @pytest.mark.medium
     @pytest.mark.integration
     @pytest.mark.azure
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_create_folder_success(self, graph_client, mock_httpx_client, mock_folder):
         """Test creating a new folder."""
         graph_client._client = mock_httpx_client
@@ -173,6 +190,8 @@ class TestGraphAPIClient:
     @pytest.mark.medium
     @pytest.mark.edge_case
     @pytest.mark.azure
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_create_folder_already_exists(self, graph_client, mock_httpx_client, mock_folder):
         """Test creating folder that already exists."""
         graph_client._client = mock_httpx_client
@@ -193,6 +212,8 @@ class TestGraphAPIClient:
     @pytest.mark.integration
     @pytest.mark.azure
     @pytest.mark.email
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_move_message(self, graph_client, mock_httpx_client):
         """Test moving a message to another folder."""
         graph_client._client = mock_httpx_client
@@ -214,6 +235,8 @@ class TestGraphAPIClient:
     @pytest.mark.azure
     @pytest.mark.integration
     @pytest.mark.email
+    @pytest.mark.medium
+    @pytest.mark.unit
     def test_parse_email_address(self, graph_client):
         """Test parsing email address from Graph API format."""
         address_data = {"emailAddress": {"address": "test@example.com", "name": "Test User"}}
@@ -223,6 +246,7 @@ class TestGraphAPIClient:
     @pytest.mark.edge_case
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_parse_email_address_no_name(self, graph_client):
         """Test parsing email address without name."""
         address_data = {"emailAddress": {"address": "test@example.com"}}
@@ -235,6 +259,8 @@ class TestGraphAPIClient:
     @pytest.mark.azure
     @pytest.mark.integration
     @pytest.mark.email
+    @pytest.mark.medium
+    @pytest.mark.unit
     def test_parse_importance(self, graph_client):
         """Test parsing importance levels."""
         assert graph_client._parse_importance("low") == EmailImportance.LOW
@@ -248,6 +274,8 @@ class TestGraphAPIClient:
     @pytest.mark.azure
     @pytest.mark.integration
     @pytest.mark.email
+    @pytest.mark.medium
+    @pytest.mark.unit
     def test_convert_to_email_model(self, graph_client, mock_graph_message):
         """Test converting Graph API message to Email model."""
         email = graph_client.convert_to_email_model(

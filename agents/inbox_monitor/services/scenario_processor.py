@@ -86,6 +86,7 @@ class ScenarioResult:
     ai_reasoning_detailed: Optional[str] = None
     scenario_decision_factors: Optional[List[str]] = None
     classification_confidence: Optional[float] = None
+    assignment_id: Optional[str] = None
     expert_id: Optional[str] = None
     expert_email: Optional[str] = None
     assignment_method: Optional[str] = None
@@ -129,6 +130,7 @@ class ScenarioProcessor:
                 await self.salesforce_client.__aenter__()
                 await self.round_robin_service.__aenter__()
                 await self.contact_lookup_service.__aenter__()
+                await self.graph_client.initialize()
                 
                 self._services_connected = True
                 self.logger.debug("Scenario processor initialized with Key Vault credentials")
@@ -153,10 +155,14 @@ class ScenarioProcessor:
                     ("salesforce_client", self.salesforce_client),
                     ("round_robin_service", self.round_robin_service),
                     ("contact_lookup_service", self.contact_lookup_service),
+                    ("graph_client", self.graph_client),
                 ]:
                     if client:
                         try:
-                            await client.__aexit__(exc_type, exc_val, exc_tb)
+                            if client_name == "graph_client":
+                                await client.cleanup()
+                            else:
+                                await client.__aexit__(exc_type, exc_val, exc_tb)
                         except Exception as e:
                             cleanup_errors.append(f"{client_name}: {e!s}")
                             self.logger.warning(f"Error closing {client_name}", extra={"error_message": str(e)})
@@ -191,6 +197,10 @@ class ScenarioProcessor:
         
         # Initialize email forwarding manager
         self.email_forwarding_manager = EmailForwardingManager()
+        
+        # Initialize Graph API client for conversation fetching
+        from services.graph_api_client import GraphAPIClient
+        self.graph_client = GraphAPIClient(settings.graph_api)
         
         # Initialize content formatter
         content_config = ContentFormattingConfig(
@@ -860,27 +870,69 @@ class ScenarioProcessor:
                 contact_lookup = await lookup_service.lookup_contact_by_email(lookup_email)
 
                 if not contact_lookup.found:
-                    # Contact not found - cannot assign expert for invalid contact
+                    # Contact not found - forward positive response to Victoria Grant for manual handling
                     self.logger.warning(
-                        "Contact not found in lookup table",
+                        "Contact not found in lookup table - forwarding positive response to Victoria Grant",
                         extra={
                             "email": lookup_email,
                             "original_email": email.sender.email,
-                            "table": "snowflake_ml_dev.mlops.i2a_lowtouch_sls_cnct_lvl_t",
+                            "table": "mld01_ml_de.features.i2a_lowtouch_sls_cnct_lvl_hist_t",
                         }
                     )
                     agent_actions_log.append(
                         f"Contact not found in Databricks for {lookup_email}"
                     )
-                    return ScenarioResult(
-                        scenario_type=ScenarioType.SCENARIO_5,
-                        success=False,
-                        agent_actions_log=agent_actions_log,
-                        expert_assigned=None,
-                        case_created=None,
-                        emails_sent=None,
-                        error_message=f"Contact {lookup_email} not found in lookup table - cannot assign expert",
+                    
+                    # Forward the positive response to Victoria Grant with context
+                    victoria_email = self.settings.scenarios.victoria_grant_email
+                    forwarding_success = await self._forward_email_to_recipient(
+                        original_email=email,
+                        recipient_email=victoria_email,
+                        recipient_name="Victoria Grant",
+                        reason=f"POSITIVE RESPONSE from unknown customer: {email.sender.email} is not in our contact lookup table but has expressed positive interest. This requires manual follow-up to capture the opportunity.",
                     )
+                    
+                    if forwarding_success:
+                        agent_actions_log.append(f"Forwarded positive response from unknown customer to Victoria Grant: {victoria_email}")
+                        self.logger.info(
+                            "Scenario 5 - positive response from unknown customer forwarded to Victoria Grant",
+                            extra={
+                                "customer_email": email.sender.email,
+                                "lookup_email": lookup_email,
+                                "forwarded_to": victoria_email,
+                                "reason": "positive_response_unknown_customer"
+                            }
+                        )
+                        return ScenarioResult(
+                            scenario_type=ScenarioType.SCENARIO_5,
+                            success=True,
+                            agent_actions_log=agent_actions_log,
+                            expert_assigned=None,
+                            case_created=None,
+                            emails_sent=[victoria_email],
+                            forwarding_success=True,
+                            forwarding_reason="positive_response_unknown_customer",
+                        )
+                    else:
+                        agent_actions_log.append(f"Failed to forward positive response from unknown customer to Victoria Grant: {victoria_email}")
+                        self.logger.error(
+                            "Scenario 5 failed - could not forward positive response from unknown customer",
+                            extra={
+                                "customer_email": email.sender.email,
+                                "victoria_email": victoria_email
+                            }
+                        )
+                        return ScenarioResult(
+                            scenario_type=ScenarioType.SCENARIO_5,
+                            success=False,
+                            agent_actions_log=agent_actions_log,
+                            expert_assigned=None,
+                            case_created=None,
+                            emails_sent=None,
+                            error_message=f"Contact {lookup_email} not found in lookup table and failed to forward to Victoria Grant - positive response lost",
+                            forwarding_success=False,
+                            forwarding_reason="positive_response_unknown_customer_forward_failed",
+                        )
 
                 # Contact found - extract account and contact IDs
                 account_id = contact_lookup.sf_account_id or ""
@@ -899,7 +951,7 @@ class ScenarioProcessor:
                 error_msg = "No available experts for assignment"
                 self.logger.error("Expert assignment failed", extra={"customer_email": lookup_email})
                 raise Exception(error_msg)
-            agent_actions_log.append(f"Assigned expert via round-robin: {expert.expert_name}")
+            agent_actions_log.append(f"Assigned expert via round-robin: {expert.expert_name} (Assignment ID: {expert.assignment_id})")
 
             # Step 4: Create Salesforce case assigned to the expert (original approach with enhanced fields)
             from services.salesforce_client import CaseCreateRequest
@@ -1021,6 +1073,7 @@ class ScenarioProcessor:
                 expert_assigned=expert.expert_name,
                 expert_id=expert.expert_id,
                 expert_email=expert.expert_email,
+                assignment_id=expert.assignment_id,
                 case_created=case_id,
                 account_id=account_id,
                 contact_id=contact_id,
@@ -1527,7 +1580,7 @@ class ScenarioProcessor:
     async def _forward_email_to_recipient(
         self, original_email: Email, recipient_email: str, recipient_name: str, reason: str
     ) -> bool:
-        """Forward an email to a specific recipient using external templates.
+        """Forward an email to a specific recipient using external templates with full conversation thread.
 
         Args:
             original_email: The original email to forward
@@ -1542,13 +1595,61 @@ class ScenarioProcessor:
             Exception: If email forwarding fails
         """
         try:
+            # Fetch the full conversation thread if available
+            full_conversation = ""
+            if original_email.conversation_id:
+                try:
+                    self.logger.info(
+                        "Fetching full conversation thread for forwarding",
+                        conversation_id=original_email.conversation_id,
+                        current_email_id=original_email.id
+                    )
+                    
+                    # Get all messages in the conversation
+                    conversation_messages = await self.graph_client.get_conversation_messages(
+                        original_email.conversation_id
+                    )
+                    
+                    if conversation_messages:
+                        # Combine messages into a single thread (excluding current message)
+                        full_conversation = self.graph_client.combine_conversation_thread(
+                            conversation_messages,
+                            current_message_id=original_email.id
+                        )
+                        
+                        self.logger.info(
+                            "Retrieved full conversation thread",
+                            conversation_id=original_email.conversation_id,
+                            message_count=len(conversation_messages),
+                            thread_length=len(full_conversation)
+                        )
+                    else:
+                        self.logger.warning(
+                            "No conversation messages found",
+                            conversation_id=original_email.conversation_id
+                        )
+                except Exception as e:
+                    self.logger.warning(
+                        "Failed to fetch conversation thread, using single message",
+                        conversation_id=original_email.conversation_id,
+                        error=str(e)
+                    )
+                    # Continue with single message if conversation fetch fails
+            
+            # Create enhanced email object with full conversation
+            if full_conversation:
+                # Create a copy of the email with the full conversation as the body
+                enhanced_email = original_email.model_copy(deep=True)
+                enhanced_email.email_body = f"{enhanced_email.email_body}\n\n{full_conversation}"
+            else:
+                enhanced_email = original_email
             # Determine scenario type from reason for scenario-specific templates
             scenario_type = self._determine_scenario_type_from_reason(reason)
             
-            # Generate email content using external templates
+            # Generate email content using external templates with enhanced email
             try:
                 email_content = await self.email_forwarding_manager.generate_forwarding_email_content(
-                    original_email=original_email,
+                    original_email=enhanced_email,
                     recipient_email=recipient_email,
                     recipient_name=recipient_name,
                     scenario_type=scenario_type,
@@ -1579,17 +1680,19 @@ class ScenarioProcessor:
                     }
                 )
                 
-                # Fallback to original inline generation
-                forward_subject = f"FWD: {original_email.subject}"
+                # Fallback to original inline generation (using enhanced email with full conversation)
+                forward_subject = f"FWD: {enhanced_email.subject}"
+                # Use email_body field which now contains the full conversation chain
+                body_content = enhanced_email.email_body if hasattr(enhanced_email, 'email_body') else enhanced_email.body.content if enhanced_email.body else ""
                 email_content = f"""{reason}
 
 Original Email Details:
-From: {original_email.sender.email} ({original_email.sender.name})
-Sent: {original_email.received_datetime.strftime('%Y-%m-%d %H:%M:%S UTC')}
-Subject: {original_email.subject}
+From: {enhanced_email.sender.email} ({enhanced_email.sender.name})
+Sent: {enhanced_email.received_datetime.strftime('%Y-%m-%d %H:%M:%S UTC')}
+Subject: {enhanced_email.subject}
 
 --- Original Message ---
-{original_email.body.content}"""
+{body_content}"""
 
             # Get the path to the email agent directory
             current_dir = os.path.dirname(os.path.abspath(__file__))  # /inbox_monitor/services/

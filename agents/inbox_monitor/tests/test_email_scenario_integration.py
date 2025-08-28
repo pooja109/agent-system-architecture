@@ -93,6 +93,7 @@ class TestEmailScenarioTrackingIntegration:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_to_scenario_tracking_data_basic(self, sample_email, sample_processing_result):
         """Test basic scenario tracking data extraction."""
         tracking_data = sample_email.to_scenario_tracking_data(sample_processing_result)
@@ -118,6 +119,7 @@ class TestEmailScenarioTrackingIntegration:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_to_scenario_tracking_data_with_scenario_result(self, sample_email, sample_processing_result, mock_scenario_result):
         """Test scenario tracking data with scenario result included."""
         tracking_data = sample_email.to_scenario_tracking_data(
@@ -136,6 +138,7 @@ class TestEmailScenarioTrackingIntegration:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_to_scenario_tracking_data_with_intent_result(self, sample_email, sample_processing_result, mock_intent_result):
         """Test scenario tracking data with AI intent result included."""
         tracking_data = sample_email.to_scenario_tracking_data(
@@ -153,6 +156,7 @@ class TestEmailScenarioTrackingIntegration:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_to_scenario_tracking_data_with_additional_fields(self, sample_email, sample_processing_result):
         """Test scenario tracking data with additional custom fields."""
         additional_fields = {
@@ -173,6 +177,7 @@ class TestEmailScenarioTrackingIntegration:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_to_scenario_tracking_data_complete(self, sample_email, sample_processing_result, mock_scenario_result, mock_intent_result):
         """Test complete scenario tracking data extraction with all parameters."""
         additional_fields = {
@@ -202,6 +207,7 @@ class TestEmailScenarioTrackingIntegration:
     
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.medium
     def test_create_scenario_processing_record_success(self, sample_email, sample_processing_result):
         """Test successful creation of ScenarioProcessingRecord."""
         # Test the method directly - it should work if imports are available
@@ -220,6 +226,7 @@ class TestEmailScenarioTrackingIntegration:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_create_scenario_processing_record_import_error(self, sample_email, sample_processing_result):
         """Test handling of import errors when creating scenario processing record."""
         # Simulate import failure
@@ -229,6 +236,7 @@ class TestEmailScenarioTrackingIntegration:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_recipient_extraction_edge_cases(self, sample_email, sample_processing_result):
         """Test recipient extraction with various edge cases."""
         # Test with empty recipients
@@ -247,6 +255,7 @@ class TestEmailScenarioTrackingIntegration:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_missing_optional_fields(self, sample_email, sample_processing_result):
         """Test handling of missing optional fields."""
         # Remove optional fields
@@ -267,6 +276,7 @@ class TestEmailScenarioTrackingIntegration:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_processing_result_edge_cases(self, sample_email):
         """Test with various ProcessingResult configurations."""
         # Test with failed processing result
@@ -292,6 +302,7 @@ class TestEmailScenarioTrackingIntegration:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_enum_value_extraction(self, sample_email, sample_processing_result):
         """Test that enum values are properly extracted."""
         # Test with different importance levels
@@ -305,6 +316,7 @@ class TestEmailScenarioTrackingIntegration:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_data_types_consistency(self, sample_email, sample_processing_result, mock_scenario_result, mock_intent_result):
         """Test that data types are consistent with ScenarioProcessingRecord expectations."""
         tracking_data = sample_email.to_scenario_tracking_data(

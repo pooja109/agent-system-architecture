@@ -29,6 +29,7 @@ class TestRichFormatting:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_format_system_status_summary(self, rich_formatter):
         """Test system status formatting in summary mode."""
         status_data = {
@@ -42,6 +43,7 @@ class TestRichFormatting:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_format_system_status_detailed(self, rich_formatter):
         """Test system status formatting in detailed mode."""
         status_data = {
@@ -64,6 +66,7 @@ class TestRichFormatting:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_format_inbox_results(self, rich_formatter):
         """Test inbox results formatting."""
         details = [
@@ -81,6 +84,7 @@ class TestRichFormatting:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_format_error_details(self, rich_formatter):
         """Test error details formatting."""
         test_error = ValueError("Test error message")
@@ -95,6 +99,7 @@ class TestRichFormatting:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_format_json_output(self, rich_formatter):
         """Test JSON output formatting."""
         test_data = {
@@ -114,6 +119,7 @@ class TestRichFormatting:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_format_operation_summary(self, rich_formatter):
         """Test operation summary formatting."""
         operations = [
@@ -136,6 +142,7 @@ class TestRichFormatting:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_show_welcome_message(self, rich_formatter):
         """Test welcome message display."""
         # Should not raise exception
@@ -158,6 +165,7 @@ class TestThemeManager:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_theme_initialization(self, theme_manager):
         """Test theme manager initialization."""
         assert theme_manager.console is not None
@@ -166,6 +174,7 @@ class TestThemeManager:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_set_theme(self, theme_manager):
         """Test setting different themes."""
         # Test setting each available theme
@@ -182,6 +191,7 @@ class TestThemeManager:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_get_available_themes(self, theme_manager):
         """Test getting available themes."""
         themes = theme_manager.get_available_themes()
@@ -195,6 +205,7 @@ class TestThemeManager:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_auto_detect_theme(self, theme_manager):
         """Test auto theme detection."""
         detected_theme = theme_manager.auto_detect_theme()
@@ -204,6 +215,7 @@ class TestThemeManager:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_accessibility_adjustments_no_color(self, theme_manager):
         """Test accessibility adjustments with NO_COLOR environment."""
         with patch.dict(os.environ, {'NO_COLOR': '1'}):
@@ -216,6 +228,7 @@ class TestThemeManager:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_accessibility_adjustments_high_contrast(self, theme_manager):
         """Test accessibility adjustments with high contrast."""
         with patch.dict(os.environ, {'HIGH_CONTRAST': '1'}):

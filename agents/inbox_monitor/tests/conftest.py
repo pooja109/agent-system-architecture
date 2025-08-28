@@ -16,6 +16,85 @@ from typing import Dict, List, Set
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
+from tests.fixtures.async_helpers import (
+    AsyncTestHelper, 
+    AsyncMockManager, 
+    async_test_helper, 
+    async_mock_manager,
+    mock_async_from_processing_results
+)
+
+# Import Phase 6 security and load testing fixtures
+from tests.fixtures.security_mocks import (
+    SecurityTestDataFactory,
+    SecurityComplianceValidator,
+    security_data_factory,
+    security_validator, 
+    mock_pydantic_model
+)
+from tests.fixtures.load_testing_framework import (
+    LoadTestExecutor,
+    MemoryLoadTester,
+    AsyncLoadTester,
+    load_test_executor,
+    memory_load_tester,
+    async_load_tester
+)
+
+# Configure pytest-asyncio properly
+pytest_plugins = ['pytest_asyncio']
+
+@pytest.fixture(scope="session")
+def event_loop_policy():
+    """Set up event loop policy for the entire test session."""
+    return asyncio.DefaultEventLoopPolicy()
+
+@pytest.fixture(scope="function")
+async def async_database_mock():
+    """
+    Async fixture providing database mock for scenario tracking tests.
+    
+    This handles the async database operations that scenario tracking tests expect.
+    """
+    class AsyncDatabaseMock:
+        async def get_scenario_record(self, scenario_id: str):
+            await asyncio.sleep(0.01)  # Simulate async I/O
+            return {
+                "scenario_id": scenario_id,
+                "status": "active",
+                "created_at": "2024-01-15T10:30:00Z"
+            }
+        
+        async def save_scenario_record(self, record_data: dict):
+            await asyncio.sleep(0.01)  # Simulate async I/O
+            return {"saved": True, "record_id": f"rec-{record_data['scenario_id']}"}
+        
+        async def update_scenario_status(self, scenario_id: str, status: str):
+            await asyncio.sleep(0.01)  # Simulate async I/O
+            return {"updated": True, "scenario_id": scenario_id, "status": status}
+    
+    return AsyncDatabaseMock()
+
+@pytest.fixture(scope="function")
+async def async_scenario_processor_mock():
+    """
+    Async fixture providing scenario processor mock with proper async patterns.
+    """
+    class AsyncScenarioProcessorMock:
+        async def process_scenario(self, email_data: dict, scenario_type: int):
+            await asyncio.sleep(0.01)  # Simulate processing
+            return {
+                "scenario_id": f"scenario-{scenario_type}-{email_data['id']}",
+                "classification": "positive_response",
+                "confidence": 0.95,
+                "processing_time": 0.01
+            }
+        
+        async def validate_scenario_data(self, scenario_data: dict):
+            await asyncio.sleep(0.01)  # Simulate validation
+            return {"valid": True, "errors": []}
+    
+    return AsyncScenarioProcessorMock()
 
 # Fix Python path globally for all tests - must be at the very beginning
 project_root = Path(__file__).parent.parent.absolute()
@@ -705,23 +784,186 @@ def test_retry_config():
 
 @pytest.fixture(autouse=True)  
 def validate_test_markers(request):
-    """Auto-validate test markers during collection - PHASE X STRICT ENFORCEMENT ENABLED."""
+    """Auto-validate test markers during collection - PHASE 3 STRICT ENFORCEMENT ENABLED."""
     import os
     
     # Skip validation during test collection phase to avoid noise
     if hasattr(request.node, 'function'):
         errors = validate_marker_consistency(request.node)
         if errors:
-            # PHASE X COMPLIANCE: Strict enforcement disabled by default for now
-            strict_mode = os.environ.get('PYTEST_STRICT_MARKERS', 'false').lower() == 'true'
+            # PHASE 3 COMPLIANCE: Enable strict enforcement for 100% compliance
+            strict_mode = os.environ.get('PYTEST_STRICT_MARKERS', 'true').lower() == 'true'
             
             if strict_mode:
                 # STRICT MODE ENABLED: Fail tests with invalid markers
-                pytest.fail(f"❌ PHASE X COMPLIANCE FAILURE: {errors[0]}")
+                pytest.fail(f"❌ PHASE 3 COMPLIANCE FAILURE: {errors[0]}")
             else:
                 # LEGACY MODE: Just warn about marker issues
                 for error in errors:
                     print(f"MARKER WARNING: {error}")
+
+
+def pytest_collection_modifyitems(config, items):
+    """
+    Pytest hook to validate marker compliance across ALL collected tests.
+    
+    This implements 100% marker coverage validation as required by Phase 3.
+    """
+    import os
+    
+    # Check if we should enforce strict marker compliance
+    strict_enforcement = os.environ.get('PYTEST_STRICT_MARKERS', 'true').lower() == 'true'
+    
+    validation_errors = []
+    marker_statistics = {
+        'total_tests': len(items),
+        'missing_performance': 0,
+        'missing_functional': 0,
+        'invalid_markers': 0,
+        'valid_tests': 0
+    }
+    
+    for item in items:
+        errors = validate_marker_consistency(item)
+        
+        if errors:
+            validation_errors.extend(errors)
+            
+            # Update statistics
+            for error in errors:
+                if 'missing required performance marker' in error:
+                    marker_statistics['missing_performance'] += 1
+                elif 'missing required functional marker' in error:
+                    marker_statistics['missing_functional'] += 1
+                elif 'conflicting' in error or 'logical conflict' in error:
+                    marker_statistics['invalid_markers'] += 1
+        else:
+            marker_statistics['valid_tests'] += 1
+    
+    # Report marker compliance statistics
+    total = marker_statistics['total_tests']
+    valid = marker_statistics['valid_tests']
+    coverage_percent = (valid / total * 100) if total > 0 else 0
+    
+    print(f"\n📊 PHASE 3 MARKER COMPLIANCE REPORT:")
+    print(f"Total tests collected: {total}")
+    print(f"Valid marker coverage: {valid}/{total} ({coverage_percent:.1f}%)")
+    
+    if marker_statistics['missing_performance'] > 0:
+        print(f"❌ Missing performance markers: {marker_statistics['missing_performance']}")
+    
+    if marker_statistics['missing_functional'] > 0:
+        print(f"❌ Missing functional markers: {marker_statistics['missing_functional']}")
+    
+    if marker_statistics['invalid_markers'] > 0:
+        print(f"⚠️ Invalid marker combinations: {marker_statistics['invalid_markers']}")
+    
+    if coverage_percent == 100.0:
+        print("🎉 100% MARKER COMPLIANCE ACHIEVED!")
+    else:
+        print(f"⚠️ {100 - coverage_percent:.1f}% of tests need marker compliance fixes")
+    
+    # If strict enforcement is enabled and there are errors, fail the collection
+    if strict_enforcement and validation_errors:
+        error_summary = f"\n❌ PHASE 3 STRICT COMPLIANCE FAILURE: {len(validation_errors)} marker validation errors found"
+        error_details = "\n".join(validation_errors[:10])  # Show first 10 errors
+        if len(validation_errors) > 10:
+            error_details += f"\n... and {len(validation_errors) - 10} more errors"
+        
+        pytest.exit(f"{error_summary}\n\nFirst errors:\n{error_details}\n\nSet PYTEST_STRICT_MARKERS=false to run tests with warnings only.", 1)
+    
+    # Update items with performance tracking (timeout markers removed due to dependency issues)
+    for item in items:
+        # Add performance category tracking
+        markers = get_test_markers(item)
+        
+        # Track performance expectations for runtime validation
+        if 'fast' in markers:
+            item.add_marker(pytest.mark.expected_duration("fast"))
+        elif 'medium' in markers:
+            item.add_marker(pytest.mark.expected_duration("medium"))
+        elif 'slow' in markers:
+            item.add_marker(pytest.mark.expected_duration("slow"))
+
+
+def pytest_runtest_setup(item):
+    """
+    Pytest hook to perform additional validation before each test runs.
+    """
+    # Validate that performance marker matches expected execution characteristics
+    markers = get_test_markers(item)
+    
+    # Fast tests should not have certain patterns that indicate slow operations
+    if 'fast' in markers:
+        test_name = item.name.lower()
+        
+        # Check for patterns that suggest the test might not be fast
+        slow_patterns = ['database', 'external', 'api', 'network', 'timeout', 'retry', 'load']
+        if any(pattern in test_name for pattern in slow_patterns):
+            # This is a warning, not a failure - the marker might be intentionally overridden
+            print(f"⚠️ Fast test '{item.nodeid}' contains patterns suggesting slow operations: {test_name}")
+    
+    # Validate unit test isolation
+    if 'unit' in markers and 'integration' in markers:
+        pytest.fail(f"Test {item.nodeid} cannot be both unit and integration test")
+    
+    # Validate logical marker combinations
+    if 'unit' in markers:
+        # Unit tests should not depend on external services
+        external_markers = {'azure', 'salesforce', 'databricks', 'real_database'}
+        external_found = markers.intersection(external_markers)
+        if external_found:
+            print(f"⚠️ Unit test '{item.nodeid}' has external service markers: {external_found}")
+
+
+def validate_marker_requirements() -> Dict[str, any]:
+    """
+    Standalone function to validate marker requirements for 100% compliance.
+    
+    Returns:
+        Dictionary with validation results and compliance statistics
+    """
+    import subprocess
+    from pathlib import Path
+    
+    test_dir = Path("tests/")
+    if not test_dir.exists():
+        return {"error": "Tests directory not found"}
+    
+    # Count all test functions
+    result = subprocess.run(['grep', '-r', 'def test_', 'tests/'], 
+                          capture_output=True, text=True)
+    
+    all_tests = []
+    for line in result.stdout.split('\n'):
+        if 'def test_' in line and line.strip():
+            all_tests.append(line)
+    
+    total_functions = len(all_tests)
+    
+    # Count tests with markers
+    performance_markers = 0
+    functional_markers = 0
+    
+    for marker_type in ['fast', 'medium', 'slow']:
+        marker_result = subprocess.run(['grep', '-r', f'@pytest.mark.{marker_type}', 'tests/'],
+                                     capture_output=True, text=True)
+        performance_markers += len([l for l in marker_result.stdout.split('\n') if l.strip()])
+    
+    for marker_type in ['unit', 'integration', 'edge_case']:
+        marker_result = subprocess.run(['grep', '-r', f'@pytest.mark.{marker_type}', 'tests/'],
+                                     capture_output=True, text=True)
+        functional_markers += len([l for l in marker_result.stdout.split('\n') if l.strip()])
+    
+    return {
+        'total_functions': total_functions,
+        'performance_marked': performance_markers,
+        'functional_marked': functional_markers,
+        'performance_coverage': (performance_markers / total_functions * 100) if total_functions > 0 else 0,
+        'functional_coverage': (functional_markers / total_functions * 100) if total_functions > 0 else 0,
+        'compliance_achieved': (performance_markers >= total_functions and 
+                               functional_markers >= total_functions)
+    }
 
 @pytest.fixture(autouse=True)
 def time_tests(request):
@@ -741,6 +983,69 @@ def time_tests(request):
 
 # Removed custom event_loop fixture to avoid conflict with pytest-asyncio
 # pytest-asyncio provides its own event_loop fixture
+
+# Configure pytest-asyncio properly
+pytest_plugins = ['pytest_asyncio']
+
+# NOTE: Removed custom event_loop_policy fixture to prevent conflicts with pytest-asyncio
+# pytest-asyncio manages event loop policy automatically and using custom event loop
+# fixtures can cause DeprecationWarning and resource leak issues
+
+@pytest.fixture(scope="function")
+async def async_database_mock(async_mock_manager: AsyncMockManager):
+    """
+    Async fixture providing database mock for scenario tracking tests using AsyncMockManager.
+    
+    This demonstrates Level 3 async service integration mocking patterns.
+    """
+    class AsyncDatabaseMock:
+        def __init__(self, mock_manager: AsyncMockManager):
+            self.mock_manager = mock_manager
+            
+            # Create async mocks for database operations
+            self.get_scenario_record = mock_manager.create_async_mock(
+                return_value={
+                    "scenario_id": "mock_scenario_123",
+                    "status": "active",
+                    "created_at": "2024-01-15T10:30:00Z"
+                }
+            )
+            
+            self.save_scenario_record = mock_manager.create_async_mock(
+                return_value={"saved": True, "record_id": "rec-mock_scenario_123"}
+            )
+            
+            self.update_scenario_status = mock_manager.create_async_mock(
+                return_value={"updated": True, "scenario_id": "mock_scenario_123", "status": "updated"}
+            )
+            
+            # Create hybrid mock for operations that might be called sync or async
+            self.validate_record_data = mock_manager.create_hybrid_mock(
+                async_return={"valid": True, "errors": []}
+            )
+    
+    return AsyncDatabaseMock(async_mock_manager)
+
+@pytest.fixture(scope="function")
+async def async_scenario_processor_mock():
+    """
+    Async fixture providing scenario processor mock with proper async patterns.
+    """
+    class AsyncScenarioProcessorMock:
+        async def process_scenario(self, email_data: dict, scenario_type: int):
+            await asyncio.sleep(0.01)  # Simulate processing
+            return {
+                "scenario_id": f"scenario-{scenario_type}-{email_data['id']}",
+                "classification": "positive_response",
+                "confidence": 0.95,
+                "processing_time": 0.01
+            }
+        
+        async def validate_scenario_data(self, scenario_data: dict):
+            await asyncio.sleep(0.01)  # Simulate validation
+            return {"valid": True, "errors": []}
+    
+    return AsyncScenarioProcessorMock()
 
 @pytest.fixture(autouse=True)
 def manage_logger_factory():
@@ -801,6 +1106,175 @@ try:
     from tests.fixtures.connection_management import *
     # System monitoring fixtures
     from tests.fixtures.system_monitoring import *
+    # ResponseHandler mock fixtures
+    from tests.fixtures.response_handler_mock import MockResponseHandler, mock_full_response_handler
+    # Import resolution helpers
+    from tests.fixtures.import_helpers import ensure_project_imports, safe_import_service, safe_import_model
+    # Logging isolation for ResponseHandler tests
+    from tests.fixtures.logging_isolation import isolated_logging, mock_response_handler_factory
+    # Async test helpers
+    from tests.fixtures.async_helpers import (
+        AsyncTestHelper, 
+        AsyncMockManager, 
+        async_test_helper, 
+        async_mock_manager,
+        async_scenario_processing_record,
+        await_all_coroutines
+    )
 except ImportError:
     # Fixture modules not available, continue without them
     pass
+
+# ResponseHandler-specific fixtures
+@pytest.fixture
+def mock_simplified_response_handler(mock_settings, mock_scenario_processor):
+    """
+    Fixture providing actual simplified ResponseHandler for source-compatible tests.
+    
+    Use this for tests that should work with the current simplified implementation.
+    """
+    from services.response_handler import ResponseHandler
+    return ResponseHandler(
+        settings=mock_settings,
+        scenario_processor=mock_scenario_processor
+    )
+
+@pytest.fixture  
+def response_handler_call_tracker():
+    """
+    Utility fixture for tracking ResponseHandler method calls during testing.
+    """
+    calls = []
+    def track_call(method_name, *args, **kwargs):
+        calls.append((method_name, args, kwargs))
+    
+    return {
+        'calls': calls,
+        'track': track_call,
+        'get_calls': lambda: calls.copy(),
+        'clear_calls': lambda: calls.clear()
+    }
+
+@pytest.fixture
+def mock_scenario_processor():
+    """Create mock ScenarioProcessor for testing."""
+    from services.scenario_processor import ScenarioProcessor
+    processor = Mock(spec=ScenarioProcessor)
+    processor.process_scenario = AsyncMock()
+    return processor
+
+# Configuration testing fixtures from Phase 4
+try:
+    from tests.fixtures.config_mocks import (
+        config_mocker, 
+        environment_mocker, 
+        cli_helpers,
+        temp_config_file,
+        mock_cli_environment,
+        mock_development_environment,
+        mock_production_environment,
+        mock_kubernetes_environment,
+        mock_testing_environment
+    )
+except ImportError:
+    # Configuration mocking not available, continue without
+    pass
+
+# Phase 5: Performance monitoring and resource management integration
+try:
+    from tests.utils.performance_monitor import (
+        TestPerformanceMonitor,
+        TimeoutManager,
+        performance_monitor,
+        test_performance_monitor,
+        monitor_test_performance,
+        test_timeout
+    )
+    from tests.utils.resource_manager import (
+        ResourceManager,
+        AsyncResourceManager,
+        OptimizedMockManager,
+        resource_manager,
+        async_resource_manager,
+        mock_manager,
+        auto_resource_cleanup,
+        managed_resources,
+        async_resources,
+        optimized_mocks
+    )
+    
+    # Import performance monitoring fixtures
+    performance_monitoring_available = True
+    
+except ImportError:
+    # Performance monitoring not available
+    performance_monitoring_available = False
+
+
+@pytest.fixture(autouse=True, scope="session")
+def performance_monitoring_session_setup():
+    """Set up performance monitoring for the entire test session."""
+    if not performance_monitoring_available:
+        yield
+        return
+    
+    # Generate performance report at end of session
+    yield
+    
+    # Generate and save performance report
+    try:
+        report = performance_monitor.get_performance_report()
+        
+        # Save performance report to file
+        import json
+        from datetime import datetime
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        report_file = Path(f"performance_report_{timestamp}.json")
+        
+        with report_file.open('w') as f:
+            json.dump(report, f, indent=2, default=str)
+        
+        # Print summary to console
+        print(f"\n📊 PHASE 5 PERFORMANCE REPORT SUMMARY:")
+        print(f"Total execution time: {report['total_execution_time']:.2f}s")
+        print(f"Memory growth: {report['memory_growth']}MB")
+        print(f"Tests executed: {report['tests_executed']}")
+        
+        if report['slow_tests']:
+            print(f"Slow tests (>5s): {len(report['slow_tests'])}")
+            for test_name, duration in report['slow_tests'][:3]:
+                print(f"  - {test_name}: {duration:.2f}s")
+        
+        if report['recommendations']:
+            print("Recommendations:")
+            for rec in report['recommendations']:
+                print(f"  - {rec}")
+        
+        print(f"Full report saved to: {report_file}")
+        
+    except Exception as e:
+        print(f"Warning: Could not generate performance report: {e}")
+
+
+@pytest.fixture(autouse=True)
+def enhanced_performance_tracking(request):
+    """Enhanced performance tracking with timeout management."""
+    if not performance_monitoring_available:
+        yield
+        return
+    
+    test_name = f"{request.cls.__name__ if request.cls else 'module'}::{request.function.__name__}"
+    markers = list(request.node.iter_markers())
+    
+    # Apply timeout if not marked with no_timeout
+    marker_names = [m.name for m in markers]
+    if 'no_timeout' not in marker_names:
+        timeout = TimeoutManager.get_timeout_for_markers(markers)
+        
+        with TimeoutManager.timeout_context(timeout, test_name):
+            with performance_monitor.monitor_test_execution(test_name):
+                yield
+    else:
+        with performance_monitor.monitor_test_execution(test_name):
+            yield

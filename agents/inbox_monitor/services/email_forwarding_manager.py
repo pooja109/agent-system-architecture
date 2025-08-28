@@ -65,7 +65,7 @@ class EmailForwardingManager:
         self._error_count = 0
         
         # Security settings
-        self._max_email_body_length = 50000  # Increased from 10000 for better content retention
+        self._max_email_body_length = 200000  # Increased from 50000 to preserve full email chains
         self._max_subject_length = 200
         self._allowed_file_extensions = ['.py']
         
@@ -117,7 +117,7 @@ class EmailForwardingManager:
                 "sender_name": original_email.sender.name or original_email.sender.email,
                 "sent_datetime": original_email.received_datetime.strftime('%Y-%m-%d %H:%M:%S UTC'),
                 "original_subject": original_email.subject or "No Subject",
-                "original_body": self._sanitize_email_body(original_email.body.content if original_email.body else "")
+                "original_body": self._sanitize_email_body(original_email.email_body if hasattr(original_email, 'email_body') else original_email.body.content if original_email.body else "")
             }
             
             # Render email content

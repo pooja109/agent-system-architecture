@@ -25,7 +25,7 @@ Data Privacy Compliance:
 - Secure deletion procedures should be implemented for data cleanup
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 from uuid import UUID, uuid4
@@ -222,6 +222,7 @@ class ScenarioProcessingRecord(BaseModel):
     agent_actions_log: List[str] = Field(default_factory=list)
     
     # Expert assignment (Scenario 5) - PII: Contains expert names and contact info
+    assignment_id: Optional[str] = Field(None, description="Foreign key to expert_lead_assignments table")
     expert_assigned: Optional[str] = Field(None, description="Expert name (PII)")
     expert_id: Optional[str] = Field(None, description="Expert system ID")
     expert_email: Optional[str] = Field(None, description="Expert email address (PII)")
@@ -278,7 +279,7 @@ class ScenarioProcessingRecord(BaseModel):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     created_by: str = Field(default="inbox_monitor")
     data_version: int = Field(default=1)
-    processing_date: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0), description="Date partition field for the table")
+    processing_date: Optional[date] = Field(default_factory=lambda: datetime.now(timezone.utc).date(), description="Date partition field for the table")
     
     # Note: Advanced Analytics Fields were removed as they don't exist in the actual database table
 
@@ -447,9 +448,11 @@ class ScenarioProcessingRecord(BaseModel):
         
         # Convert boolean fields for Databricks compatibility
         
-        # Convert datetime objects to ISO strings and handle type conversions
+        # Convert datetime and date objects to ISO strings and handle type conversions
         for field_name, field_value in data.items():
             if isinstance(field_value, datetime):
+                data[field_name] = field_value.isoformat()
+            elif isinstance(field_value, date):
                 data[field_name] = field_value.isoformat()
             elif isinstance(field_value, bool):
                 # Convert Python boolean to integer for Databricks compatibility

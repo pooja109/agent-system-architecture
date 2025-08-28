@@ -31,6 +31,8 @@ class TestImportFallbackPaths:
     @pytest.mark.fast
     @pytest.mark.unit
     @pytest.mark.ci_safe
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     def test_psutil_not_available_fallback(self):
         """Test behavior when psutil is not available."""
         with patch.dict('sys.modules', {'psutil': None}):
@@ -53,6 +55,8 @@ class TestImportFallbackPaths:
     @pytest.mark.fast
     @pytest.mark.unit
     @pytest.mark.ci_safe
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     def test_jsonschema_not_available_fallback(self):
         """Test schema validation fallback when jsonschema not available."""
         # Test the case where jsonschema is not available
@@ -80,6 +84,8 @@ class TestImportFallbackPaths:
     @pytest.mark.fast
     @pytest.mark.unit
     @pytest.mark.ci_safe
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     def test_jsonschema_validation_with_missing_fields(self):
         """Test jsonschema fallback validation with missing required fields."""
         manager = PromptManager()
@@ -106,6 +112,8 @@ class TestCircuitBreakerEdgeCases:
     @pytest.mark.fast
     @pytest.mark.unit
     @pytest.mark.ci_safe
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     def test_circuit_breaker_half_open_return_true(self):
         """Test that circuit breaker returns True in HALF_OPEN state."""
         breaker = CircuitBreaker(failure_threshold=2, recovery_timeout=1)
@@ -119,6 +127,8 @@ class TestCircuitBreakerEdgeCases:
     @pytest.mark.fast
     @pytest.mark.unit
     @pytest.mark.ci_safe
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     def test_circuit_breaker_success_in_closed_state(self):
         """Test record_success in CLOSED state resets failure count."""
         breaker = CircuitBreaker()
@@ -136,6 +146,7 @@ class TestCircuitBreakerEdgeCases:
     @pytest.mark.unit
     @pytest.mark.ci_safe
     @pytest.mark.edge_case
+    @pytest.mark.fast
     def test_memory_error_during_psutil_access(self):
         """Test handling of memory errors when accessing process memory."""
         manager = PromptManager()
@@ -155,6 +166,8 @@ class TestHealthCheckEdgeCases:
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     async def test_health_check_directory_not_directory(self):
         """Test health check when prompts path exists but is not a directory."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -173,6 +186,8 @@ class TestHealthCheckEdgeCases:
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     async def test_health_check_directory_access_error(self):
         """Test health check when directory access raises exception."""
         manager = PromptManager()
@@ -187,6 +202,8 @@ class TestHealthCheckEdgeCases:
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     async def test_health_check_validation_exception(self):
         """Test health check when validate_all_prompts raises exception."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -200,6 +217,8 @@ class TestHealthCheckEdgeCases:
     @pytest.mark.edge_case
     @pytest.mark.prompt
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     async def test_health_check_with_failed_prompts(self):
         """Test health check with some failed prompt validations."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -240,6 +259,8 @@ class TestSchemaValidationEdgeCases:
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     async def test_validate_schema_no_schema_file(self):
         """Test schema validation when schema file doesn't exist."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -254,6 +275,8 @@ class TestSchemaValidationEdgeCases:
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     async def test_validate_schema_json_load_error(self):
         """Test schema validation with malformed JSON schema file."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -271,6 +294,8 @@ class TestSchemaValidationEdgeCases:
     @pytest.mark.edge_case
     @pytest.mark.prompt
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     async def test_validate_schema_jsonschema_validation_error(self):
         """Test jsonschema ValidationError handling."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -300,6 +325,8 @@ class TestTemplateLoadingEdgeCases:
     @pytest.mark.edge_case
     @pytest.mark.prompt
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     async def test_load_template_missing_template_field(self):
         """Test loading template without 'template' field."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -323,6 +350,8 @@ class TestCacheEdgeCases:
     @pytest.mark.fast
     @pytest.mark.unit
     @pytest.mark.prompt
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     def test_specific_cache_clearing_no_matching_keys(self):
         """Test clearing cache for prompt with no cached items."""
         manager = PromptManager()
@@ -336,6 +365,8 @@ class TestCacheEdgeCases:
     @pytest.mark.fast
     @pytest.mark.unit
     @pytest.mark.ci_safe
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     def test_file_modification_tracking_file_deleted(self):
         """Test file modification tracking when file is deleted."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -359,6 +390,7 @@ class TestMemoryEdgeCases:
     @pytest.mark.medium
     @pytest.mark.unit
 
+    @pytest.mark.fast
     def test_memory_statistics_with_large_cache(self):
         """Test memory statistics calculation with substantial cache data."""
         manager = PromptManager()
@@ -379,6 +411,8 @@ class TestValidationAllPromptsEdgeCases:
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     async def test_validate_all_prompts_permission_error(self):
         """Test validate_all_prompts with directory permission error."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -391,6 +425,8 @@ class TestValidationAllPromptsEdgeCases:
     @pytest.mark.edge_case
     @pytest.mark.prompt
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     async def test_validate_all_prompts_with_invalid_directory_names(self):
         """Test validation skipping directories with invalid names."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -439,6 +475,8 @@ class TestCircuitBreakerIntegrationEdgeCases:
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     async def test_circuit_breaker_rejection_not_recorded_as_failure(self):
         """Test that circuit breaker rejections don't count as failures."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -462,6 +500,8 @@ class TestUtilityFunctions:
     @pytest.mark.integration
     @pytest.mark.medium
     @pytest.mark.prompt
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     def test_safe_yaml_load_memory_error(self):
         """Test _safe_yaml_load with memory error."""
         manager = PromptManager()
@@ -482,6 +522,7 @@ class TestUtilityFunctions:
     @pytest.mark.unit
     @pytest.mark.ci_safe
     @pytest.mark.edge_case
+    @pytest.mark.fast
     def test_safe_yaml_load_unicode_decode_error(self):
         """Test _safe_yaml_load with unicode decode error."""
         manager = PromptManager()

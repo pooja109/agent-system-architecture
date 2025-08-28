@@ -40,6 +40,9 @@ class TestInboxMonitorIsolation:
         os.environ.update(self.original_env)
         os.chdir(self.original_cwd)
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.medium
     def test_all_required_files_exist(self):
         """Test that all required files from Phase 2 checklist exist."""
         required_files = [
@@ -60,6 +63,9 @@ class TestInboxMonitorIsolation:
         
         assert not missing_files, f"Missing required files: {missing_files}"
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.medium
     def test_python_dotenv_in_requirements(self):
         """Test that python-dotenv is properly specified in requirements.txt."""
         requirements_file = self.service_root / "requirements.txt"
@@ -68,6 +74,9 @@ class TestInboxMonitorIsolation:
         
         assert 'python-dotenv' in content, "python-dotenv not found in requirements.txt"
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.medium
     def test_main_py_environment_loading(self):
         """Test that main.py has proper environment loading implementation."""
         main_file = self.service_root / "main.py"
@@ -84,6 +93,9 @@ class TestInboxMonitorIsolation:
         for element in required_elements:
             assert element in content, f"Missing element in main.py: {element}"
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.medium
     def test_init_py_service_metadata(self):
         """Test that __init__.py has all required service metadata."""
         init_file = self.service_root / "__init__.py"
@@ -104,6 +116,9 @@ class TestInboxMonitorIsolation:
         for metadata in required_metadata:
             assert metadata in content, f"Missing metadata in __init__.py: {metadata}"
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.medium
     def test_service_runs_in_complete_isolation(self):
         """Test that service can run in completely isolated directory."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -129,6 +144,9 @@ class TestInboxMonitorIsolation:
             assert result.returncode == 0, f"Service failed in isolation: {result.stderr}"
             assert 'Inbox Monitor' in result.stdout, "Help output not found"
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.medium
     def test_backward_compatibility(self):
         """Test that service can be imported from parent directory context."""
         # Test from repository root
@@ -146,6 +164,11 @@ class TestInboxMonitorIsolation:
         assert result.returncode == 0, f"Backward compatibility broken: {result.stderr}"
         assert "✅" in result.stdout, "Import test failed"
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.scenario_tracking
+    @pytest.mark.medium
+    @pytest.mark.integration
     def test_environment_loading_scenarios(self):
         """Test various environment loading scenarios."""
         # Test 1: With REQUIRE_ENV_FILE set
@@ -182,6 +205,9 @@ class TestInboxMonitorIsolation:
             if env_file.exists():
                 env_file.unlink()
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.medium
     def test_runner_scripts_functionality(self):
         """Test that both runner scripts work correctly."""
         # Test Python runner
@@ -202,6 +228,9 @@ class TestInboxMonitorIsolation:
         )
         assert result.returncode == 0, f"Shell runner failed: {result.stderr}"
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.medium
     def test_no_external_parent_dependencies(self):
         """Test that there are no imports to parent directories outside service."""
         def check_file_imports(file_path: Path) -> List[str]:
@@ -232,6 +261,9 @@ class TestInboxMonitorIsolation:
         
         assert not all_issues, f"External dependency issues found: {all_issues}"
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.medium
     def test_path_resolution_correctness(self):
         """Test that path resolution works correctly."""
         # Import main to trigger environment loading
@@ -246,6 +278,9 @@ class TestInboxMonitorIsolation:
         expected_prompts = str(Path(service_root) / 'prompts')
         assert prompts_path == expected_prompts, f"Path mismatch: {prompts_path} vs {expected_prompts}"
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.medium
     def test_container_environment_detection(self):
         """Test that container environment is detected correctly."""
         # Test Kubernetes detection
@@ -269,6 +304,9 @@ print("✅ Container environment handled")
         assert result.returncode == 0, f"Container detection failed: {result.stderr}"
         assert "✅" in result.stdout, "Container environment not handled properly"
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.medium
     def test_concurrent_environment_loading(self):
         """Test thread safety of environment loading."""
         def load_env_worker(results: List[bool], index: int):
@@ -304,12 +342,20 @@ print("✅ Container environment handled")
         # Check results
         assert all(results), f"Concurrent environment loading failed: {results}"
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.security
+    @pytest.mark.medium
+    @pytest.mark.integration
     def test_service_executable_permissions(self):
         """Test that runner scripts have proper executable permissions."""
         run_sh = self.service_root / 'run.sh'
         assert run_sh.exists(), "run.sh does not exist"
         assert os.access(run_sh, os.X_OK), "run.sh is not executable"
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.medium
     def test_gitignore_completeness(self):
         """Test that .gitignore includes all necessary patterns."""
         gitignore_file = self.service_root / '.gitignore'
@@ -330,6 +376,9 @@ print("✅ Container environment handled")
         for pattern in required_patterns:
             assert pattern in content, f"Missing gitignore pattern: {pattern}"
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.medium
     def test_documentation_completeness(self):
         """Test that README_ISOLATED.md has all required sections."""
         readme_file = self.service_root / 'README_ISOLATED.md'
@@ -348,6 +397,9 @@ print("✅ Container environment handled")
         for section in required_sections:
             assert section in content, f"Missing documentation section: {section}"
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.slow
     def test_performance_baseline(self):
         """Test that service meets performance requirements."""
         import time
@@ -382,6 +434,9 @@ print("✅ Container environment handled")
 class TestIsolationEdgeCases:
     """Test edge cases and error conditions for isolation."""
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.medium
     def test_missing_dotenv_graceful_handling(self):
         """Test that service handles missing python-dotenv gracefully."""
         # This would be tested in an environment without python-dotenv
@@ -394,6 +449,9 @@ class TestIsolationEdgeCases:
         assert 'from dotenv import load_dotenv' in content
         assert 'def load_environment(' in content
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.medium
     def test_corrupted_env_file_handling(self):
         """Test handling of corrupted .env files."""
         service_root = Path(__file__).parent.parent.parent
@@ -417,6 +475,9 @@ class TestIsolationEdgeCases:
             if env_file.exists():
                 env_file.unlink()
     
+    @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.medium
     def test_readonly_environment_handling(self):
         """Test behavior in read-only environments."""
         # Test that service works without write permissions to service directory

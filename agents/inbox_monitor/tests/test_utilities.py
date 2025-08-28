@@ -757,12 +757,14 @@ def mock_graph_client():
 @pytest.mark.integration
 @pytest.fixture
 @pytest.mark.medium
+@pytest.mark.unit
 def test_file_system():
     """Provide MockFileSystem instance."""
     return MockFileSystem()
 @pytest.mark.integration
 @pytest.fixture
 @pytest.mark.medium
+@pytest.mark.unit
 def test_assertions():
     """Provide MockAssertions instance."""
     return MockAssertions()
@@ -774,6 +776,8 @@ def data_manager():
 @pytest.mark.unit
 @pytest.mark.email
 @pytest.fixture
+@pytest.mark.fast
+@pytest.mark.unit
 async def test_environment():
     """Provide temporary test environment."""
     async with temporary_test_environment() as env:
@@ -818,6 +822,7 @@ class TestTestDataFactory:
     """Test the TestDataFactory class."""
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_create_graph_message_defaults(self):
         """Test creating graph message with defaults."""
         factory = TestDataFactory()
@@ -831,6 +836,7 @@ class TestTestDataFactory:
     @pytest.mark.email
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_create_email_address_defaults(self):
         """Test creating email address with defaults."""
         factory = TestDataFactory()
@@ -839,6 +845,7 @@ class TestTestDataFactory:
         assert address.name is not None
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_create_batch_of_messages(self):
         """Test creating batch of messages."""
         factory = TestDataFactory()
@@ -852,6 +859,7 @@ class TestTestDataFactory:
         
         @pytest.mark.fast
         @pytest.mark.unit
+        @pytest.mark.medium
         def test_client_initialization(self):
             """Test mock client initialization."""
             client = MockGraphAPIClient()
@@ -862,6 +870,8 @@ class TestTestDataFactory:
         
         @pytest.mark.fast
         @pytest.mark.integration
+        @pytest.mark.fast
+        @pytest.mark.unit
         async def test_get_inbox_messages(self):
             """Test getting inbox messages."""
             client = MockGraphAPIClient()
@@ -874,6 +884,8 @@ class TestTestDataFactory:
     
         @pytest.mark.fast
         @pytest.mark.integration  
+        @pytest.mark.fast
+        @pytest.mark.edge_case
         async def test_failure_modes(self):
             """Test client failure simulation."""
             client = MockGraphAPIClient()
@@ -889,6 +901,7 @@ class TestMockFileSystem:
     """Test the MockFileSystem class."""
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_file_operations(self):
         """Test basic file operations."""
         fs = MockFileSystem()
@@ -905,6 +918,7 @@ class TestMockFileSystem:
     @pytest.mark.fast
     @pytest.mark.edge_case
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_file_not_found_errors(self):
         """Test file system error conditions."""
         fs = MockFileSystem()
@@ -920,6 +934,7 @@ class TestMockAssertions:
     @pytest.mark.fast
     @pytest.mark.email
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_email_model_validation(self, mock_email_model):
         """Test email model validation."""
         assertions = MockAssertions()
@@ -928,6 +943,7 @@ class TestMockAssertions:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_processing_result_validation(self):
         """Test processing result validation."""
         assertions = MockAssertions()
@@ -955,6 +971,7 @@ class TestMockDataManager:
 
     @pytest.mark.fast
     @pytest.mark.integration
+    @pytest.mark.fast
     def test_scenario_management(self):
         """Test adding and retrieving scenarios."""
         manager = MockDataManager()
@@ -970,6 +987,8 @@ class TestMockDataManager:
     @pytest.mark.fast
     @pytest.mark.integration
     @pytest.mark.email
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_email_scenarios_creation(self):
         """Test creating email scenarios."""
         manager = MockDataManager()
@@ -987,6 +1006,8 @@ class TestTemporaryEnvironment:
     
     @pytest.mark.fast
     @pytest.mark.integration
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_environment_creation(self):
         """Test creating temporary test environment."""
         async with temporary_test_environment() as env:

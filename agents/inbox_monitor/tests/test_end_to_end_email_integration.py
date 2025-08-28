@@ -72,6 +72,8 @@ class TestEndToEndEmailIntegration:
     @pytest.mark.asyncio
     @pytest.mark.slow
     @pytest.mark.e2e
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_email_processing_with_tracking_integration(
         self, sample_email, tracking_config
     ):
@@ -149,6 +151,8 @@ class TestEndToEndEmailIntegration:
     @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_email_processing_with_tracking_failure_isolation(
         self, sample_email, tracking_config
     ):
@@ -203,6 +207,8 @@ class TestEndToEndEmailIntegration:
     @pytest.mark.asyncio
     @pytest.mark.slow
     @pytest.mark.e2e
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_batch_processing_integration(self, sample_email, tracking_config):
         """Test batch processing integration with multiple emails."""
         
@@ -263,6 +269,8 @@ class TestEndToEndEmailIntegration:
     @pytest.mark.asyncio
     @pytest.mark.slow
     @pytest.mark.performance
+    @pytest.mark.slow
+    @pytest.mark.integration
     async def test_performance_impact_measurement(self, sample_email, tracking_config):
         """Test and measure performance impact of tracking integration."""
         
@@ -354,6 +362,8 @@ class TestEndToEndEmailIntegration:
     @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_integration_health_and_monitoring(self, tracking_config):
         """Test integration health checks and monitoring capabilities."""
         
@@ -396,6 +406,8 @@ class TestPhase3ComplianceValidation:
     @pytest.mark.asyncio
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_phase3_requirements_summary(self):
         """Validate all Phase 3 requirements are met."""
         

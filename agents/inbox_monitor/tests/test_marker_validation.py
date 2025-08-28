@@ -50,6 +50,8 @@ class TestMarkerValidation:
     @pytest.mark.azure
     @pytest.mark.salesforce
     @pytest.mark.databricks
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_no_marker_conflicts(self):
         """Validate no conflicting markers exist across all test files."""
         conflicts = self._find_marker_conflicts()
@@ -61,6 +63,8 @@ class TestMarkerValidation:
     @pytest.mark.azure
     @pytest.mark.salesforce
     @pytest.mark.databricks
+    @pytest.mark.slow
+    @pytest.mark.unit
     def test_all_tests_have_performance_markers(self):
         """Ensure all tests have exactly one performance marker."""
         missing_performance = self._find_tests_missing_performance_markers()
@@ -72,6 +76,8 @@ class TestMarkerValidation:
     @pytest.mark.azure
     @pytest.mark.salesforce
     @pytest.mark.databricks
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_functional_marker_consistency(self):
         """Ensure tests don't have conflicting functional markers."""
         functional_conflicts = self._find_functional_marker_conflicts()
@@ -84,6 +90,8 @@ class TestMarkerValidation:
     @pytest.mark.azure
     @pytest.mark.salesforce
     @pytest.mark.databricks
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_retry_tests_not_marked_fast(self):
         """Ensure retry tests are not marked as fast (they involve delays)."""
         retry_fast_conflicts = self._find_retry_fast_conflicts()
@@ -95,6 +103,8 @@ class TestMarkerValidation:
     @pytest.mark.azure
     @pytest.mark.salesforce
     @pytest.mark.databricks
+    @pytest.mark.medium
+    @pytest.mark.integration
     def test_unit_tests_no_service_dependencies(self):
         """Ensure unit tests don't have service dependency markers."""
         unit_service_conflicts = self._find_unit_service_conflicts()
@@ -106,6 +116,8 @@ class TestMarkerValidation:
     @pytest.mark.azure
     @pytest.mark.salesforce
     @pytest.mark.databricks
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_marker_classification_system(self):
         """Test the marker classification system itself."""
         classifier = MarkerClassifier()
@@ -135,6 +147,8 @@ class TestMarkerValidation:
     @pytest.mark.azure
     @pytest.mark.salesforce
     @pytest.mark.databricks
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_comprehensive_test_file_analysis(self):
         """Comprehensive analysis of all test files."""
         analysis_results = self._analyze_all_test_files()
@@ -413,6 +427,8 @@ class TestMarkerClassificationSystem:
     @pytest.mark.azure
     @pytest.mark.salesforce
     @pytest.mark.databricks
+    @pytest.mark.slow
+    @pytest.mark.unit
     def test_performance_classification(self):
         """Test performance marker classification logic."""
         classifier = MarkerClassifier()
@@ -437,6 +453,8 @@ class TestMarkerClassificationSystem:
     @pytest.mark.azure
     @pytest.mark.salesforce
     @pytest.mark.databricks
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_functional_classification(self):
         """Test functional marker classification logic."""
         classifier = MarkerClassifier()
@@ -467,6 +485,8 @@ class TestMarkerClassificationSystem:
     @pytest.mark.azure
     @pytest.mark.salesforce
     @pytest.mark.databricks
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_marker_validation_logic(self):
         """Test marker validation logic."""
         validator = MarkerValidator()

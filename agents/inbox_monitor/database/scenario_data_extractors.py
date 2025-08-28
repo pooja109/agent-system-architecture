@@ -84,6 +84,132 @@ class EmailDataExtractor:
             return value
         except Exception:
             return default
+    
+    @classmethod
+    def extract_original_sent_datetime(cls, email_data: Any) -> Optional[datetime]:
+        """
+        Extract the original sent timestamp from email.
+        For forwarded/replied emails, attempts to extract from email body.
+        Falls back to Date header or sent_datetime field.
+        """
+        try:
+            # Check if this is a forward or reply
+            subject = cls.safe_getattr(email_data, "subject", "")
+            is_forward_or_reply = False
+            if subject:
+                subject_lower = subject.lower()
+                # Check for common forward/reply indicators
+                forward_reply_indicators = ['re:', 'fw:', 'fwd:', '[ext]:re:', 'aw:', 're[', 'fw[']
+                is_forward_or_reply = any(indicator in subject_lower for indicator in forward_reply_indicators)
+            
+            logger.debug("Checking for original sent datetime",
+                        is_forward_or_reply=is_forward_or_reply,
+                        subject_preview=subject[:50] if subject else None)
+            
+            # If it's a forward/reply, try to extract from email body
+            if is_forward_or_reply:
+                body = cls.safe_getattr(email_data, "body", None)
+                if body:
+                    body_content = getattr(body, 'content', str(body)) if body else ""
+                    
+                    if body_content:
+                        logger.debug("Attempting to extract original date from email body")
+                        
+                        # Extract original date directly from body content using regex
+                        try:
+                            import re
+                            
+                            # Debug: Check if we have "Sent:" in the body at all
+                            if "Sent:" in body_content or "sent:" in body_content.lower():
+                                logger.debug("Found 'Sent:' in email body, attempting extraction")
+                                # Find context around "Sent:" for debugging
+                                sent_index = body_content.lower().find("sent:")
+                                if sent_index != -1:
+                                    context = body_content[max(0, sent_index-20):min(len(body_content), sent_index+100)]
+                                    logger.debug(f"Context around 'Sent:': ...{context}...")
+                            else:
+                                logger.debug("No 'Sent:' found in email body")
+                            
+                            # Common patterns for forwarded email headers - handle both plain text and HTML
+                            patterns = [
+                                # HTML: <b>Sent:</b> Monday, August 18, 2025 11:19 AM<br>
+                                r'<b>Sent:</b>\s*([^<]+?)(?:<br|<\/|$)',
+                                # Plain text: "Sent: Monday, August 18, 2025 11:19 AM"
+                                r'(?:^|\n)Sent:\s*([A-Za-z]+,\s+[A-Za-z]+\s+\d{1,2},\s+\d{4}\s+\d{1,2}:\d{2}\s*[AP]M)',
+                                # More flexible HTML version - capture date until next tag
+                                r'Sent:</b>\s*([^<]+)',
+                                # Even more flexible - capture anything that looks like a date after "Sent:"
+                                r'Sent:\s*([^<\n\r]{10,50})',
+                                # "Date: Mon, 18 Aug 2025 15:19:00 +0000"
+                                r'Date:\s*([^<\n\r]+?)(?:</div>|</td>|\n|\r|<br|$)',
+                                # "On Monday, August 18, 2025 at 11:19 AM"
+                                r'On\s+([A-Za-z]+,\s+[A-Za-z]+\s+\d{1,2},\s+\d{4}\s+(?:at\s+)?\d{1,2}:\d{2}\s*[AP]M)',
+                            ]
+                            
+                            # Find ALL matches to get the oldest/deepest date (the true original)
+                            all_dates = []
+                            for i, pattern in enumerate(patterns[:4]):  # Use first 4 patterns (HTML and plain text)
+                                matches = re.finditer(pattern, body_content, re.IGNORECASE | re.MULTILINE | re.DOTALL)
+                                for match in matches:
+                                    date_str = match.group(1).strip()
+                                    logger.debug(f"Found date string using pattern #{i+1}: '{date_str}'")
+                                    all_dates.append(date_str)
+                            
+                            # Use the LAST date found (deepest in the email chain = oldest/original)
+                            original_date_str = None
+                            if all_dates:
+                                original_date_str = all_dates[-1]  # Get the last (oldest) date
+                                logger.debug(f"Using the last/deepest date found (true original): '{original_date_str}'")
+                                logger.debug(f"Total dates found: {len(all_dates)}, dates: {all_dates}")
+                            
+                            if original_date_str:
+                                # Clean up the date string
+                                import html
+                                original_date_str = html.unescape(original_date_str).strip()
+                                
+                                # Parse using the ContentFormatter's method
+                                from utils.content_formatter import ContentFormatter
+                                formatter = ContentFormatter()
+                                original_date = formatter._parse_original_sent_date(original_date_str)
+                                
+                                if original_date:
+                                    logger.info("Successfully extracted original sent date from email body",
+                                               original_date=str(original_date),
+                                               date_string=original_date_str,
+                                               extraction_method="regex_body_parsing")
+                                    return original_date
+                                else:
+                                    logger.debug(f"Could not parse extracted date string: {original_date_str}")
+                            else:
+                                logger.debug("No date pattern found in email body")
+                                    
+                        except Exception as e:
+                            logger.debug(f"Failed to extract from email body using regex: {e}")
+            
+            # Fallback to Date header from internet message headers
+            if hasattr(email_data, 'internet_message_headers') and email_data.internet_message_headers:
+                date_header = email_data.internet_message_headers.get('Date')
+                if date_header:
+                    logger.debug("Using Date header as fallback",
+                                date_header_preview=date_header[:50] if date_header else None)
+                    from email.utils import parsedate_to_datetime
+                    return parsedate_to_datetime(date_header)
+            
+            # Fallback to sent_datetime field
+            if hasattr(email_data, 'sent_datetime') and email_data.sent_datetime:
+                logger.debug("Using Graph API sent_datetime as fallback")
+                return email_data.sent_datetime
+                
+            # Final fallback to received_datetime
+            if hasattr(email_data, 'received_datetime') and email_data.received_datetime:
+                logger.debug("Using received_datetime as final fallback")
+                return email_data.received_datetime
+                
+        except Exception as e:
+            logger.warning(f"Failed to extract original sent datetime: {e}")
+        
+        # Return received_datetime as last resort
+        return cls.safe_getattr(email_data, "received_datetime", datetime.now(timezone.utc))
 
     @classmethod
     def extract(cls, email_data: Any, processing_result: Any) -> Dict[str, Any]:
@@ -112,7 +238,7 @@ class EmailDataExtractor:
             "sender_name": sender_info.get('name'),  # FIXED: key was 'sender_name', should be 'name'
             "subject": cls.safe_getattr(email_data, "subject", None),
             "received_datetime": cls.safe_getattr(email_data, "received_datetime", datetime.now(timezone.utc)),
-            "sent_datetime": cls.safe_getattr(email_data, "sent_datetime", None),
+            "sent_datetime": cls.extract_original_sent_datetime(email_data),  # Now extracts from Date header
             "email_body": None,  # Will be populated from full body content below
             "has_attachments": cls.safe_getattr(email_data, "has_attachments", False),
             "attachment_count": cls.safe_getattr(email_data, "attachment_count", 0),
@@ -121,10 +247,6 @@ class EmailDataExtractor:
         # Extract recipients with improved logic
         recipients = cls._extract_recipients(email_data)
         email_fields["recipient_emails"] = recipients
-        
-        # Fill in missing datetime field
-        if not email_fields["sent_datetime"]:
-            email_fields["sent_datetime"] = email_fields["received_datetime"]
         
         # Always get full body content and clean HTML - ignore Microsoft's truncated email_body
         body = cls.safe_getattr(email_data, "body", "")
@@ -163,7 +285,8 @@ class EmailDataExtractor:
                     sender_email=email_fields["sender_email"][:50],
                     recipients_count=len(recipients),
                     has_subject=bool(email_fields["subject"]),
-                    has_graph_api_json=bool(email_payload))
+                    has_graph_api_json=bool(email_payload),
+                    email_body_length=len(email_fields["email_body"]) if email_fields["email_body"] else 0)
         
         return email_fields
 
@@ -254,6 +377,7 @@ class ScenarioDataExtractor:
                 "scenario_success": getattr(scenario_result, "success", False),
                 "agent_actions_log": getattr(scenario_result, "agent_actions_log", getattr(scenario_result, "agent_actions_log", [])),
                 "expert_assigned": getattr(scenario_result, "expert_assigned", None),
+                "assignment_id": getattr(scenario_result, "assignment_id", None),
                 "case_created": getattr(scenario_result, "case_created", None),
                 "emails_forwarded": getattr(scenario_result, "emails_sent", []),
                 "scenario_error_message": getattr(scenario_result, "error_message", None),

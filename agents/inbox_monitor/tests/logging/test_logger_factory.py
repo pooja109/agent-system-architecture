@@ -63,6 +63,7 @@ class TestLoggerFactory:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_singleton_pattern_isolated(self, isolated_logger, performance_monitor):
         """Test that LoggerFactory is a singleton within test scope."""
         with performance_monitor.monitor():
@@ -78,6 +79,7 @@ class TestLoggerFactory:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_initialization_isolated(self, basic_config, isolated_logger, logger_performance_monitor):
         """Test factory initialization with performance monitoring."""
         logger_performance_monitor.start_monitoring()
@@ -111,6 +113,7 @@ class TestLoggerFactory:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_double_initialization_error(self, basic_config, isolated_logger):
         """Test that double initialization raises an error."""
         factory = LoggerFactory()
@@ -121,6 +124,7 @@ class TestLoggerFactory:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_get_logger_before_initialization(self, isolated_logger):
         """Test getting logger before initialization raises error."""
         factory = LoggerFactory()
@@ -130,6 +134,7 @@ class TestLoggerFactory:
     
     @pytest.mark.fast
     @pytest.mark.unit  
+    @pytest.mark.fast
     def test_basic_logger_creation_isolated(self, basic_config, isolated_logger, enforce_logger_performance):
         """Test basic logger creation with isolation and performance limits."""
         factory = LoggerFactory()
@@ -149,6 +154,7 @@ class TestLoggerFactory:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.slow
     def test_logger_caching_performance(self, basic_config, isolated_logger, performance_monitor):
         """Test that loggers are cached and reused with performance validation."""
         factory = LoggerFactory()
@@ -175,6 +181,7 @@ class TestLoggerFactory:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_console_only_logger(self, basic_config):
         """Test console-only logger creation."""
         factory = LoggerFactory()
@@ -189,6 +196,7 @@ class TestLoggerFactory:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_structured_only_logger(self, basic_config):
         """Test structured-only logger creation."""
         factory = LoggerFactory()
@@ -203,6 +211,7 @@ class TestLoggerFactory:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_file_handler_setup(self, file_config):
         """Test file handler setup."""
         factory = LoggerFactory()
@@ -221,6 +230,7 @@ class TestLoggerFactory:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_third_party_logger_suppression(self, basic_config):
         """Test third-party logger suppression."""
         factory = LoggerFactory()
@@ -238,6 +248,7 @@ class TestLoggerFactory:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_third_party_suppression_disabled(self):
         """Test with third-party suppression disabled."""
         config = LoggingConfig(
@@ -257,6 +268,7 @@ class TestLoggerFactory:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_logger_level_setting(self, basic_config):
         """Test that logger levels are set correctly."""
         factory = LoggerFactory()
@@ -270,6 +282,7 @@ class TestLoggerFactory:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_console_disabled_configuration(self):
         """Test configuration with console handler disabled."""
         config = LoggingConfig(
@@ -289,6 +302,7 @@ class TestLoggerFactory:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_all_handlers_disabled(self):
         """Test configuration with all handlers disabled."""
         config = LoggingConfig(
@@ -308,6 +322,7 @@ class TestLoggerFactory:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_reconfiguration(self, basic_config):
         """Test factory reconfiguration."""
         factory = LoggerFactory()
@@ -336,6 +351,7 @@ class TestLoggerFactory:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_cleanup(self, basic_config):
         """Test factory cleanup."""
         factory = LoggerFactory()
@@ -359,6 +375,7 @@ class TestLoggerFactory:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_thread_safety(self, basic_config):
         """Test thread safety of logger factory."""
         factory = LoggerFactory()
@@ -399,6 +416,8 @@ class TestLoggerFactory:
     
     @pytest.mark.performance
     @pytest.mark.integration
+    @pytest.mark.slow
+    @pytest.mark.unit
     def test_logger_factory_performance_benchmarks(self, basic_config, isolated_logger, logger_performance_monitor):
         """Comprehensive performance benchmarks for logger factory - Phase 1 Recovery Target."""
         logger_performance_monitor.start_monitoring()
@@ -460,6 +479,7 @@ class TestLoggerFactory:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_concurrent_same_logger_creation(self, basic_config):
         """Test concurrent creation of the same logger name."""
         factory = LoggerFactory()
@@ -503,6 +523,7 @@ class TestLoggerFactory:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_reset_functionality(self, basic_config):
         """Test factory reset functionality."""
         # Create first instance

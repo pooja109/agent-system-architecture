@@ -18,6 +18,8 @@ class TestCLIPerformance:
     @pytest.mark.fast
     @pytest.mark.integration
     @pytest.mark.performance
+    @pytest.mark.slow
+    @pytest.mark.unit
     def test_cli_performance_fast_mode(self):
         """Verify fast mode completes within expected timeframe."""
         start_time = time.time()
@@ -33,6 +35,8 @@ class TestCLIPerformance:
     @pytest.mark.medium
     @pytest.mark.integration
     @pytest.mark.performance
+    @pytest.mark.slow
+    @pytest.mark.integration
     def test_cli_performance_integration_mode(self):
         """Verify integration mode completes within expected timeframe."""
         start_time = time.time()
@@ -48,6 +52,8 @@ class TestCLIPerformance:
     @pytest.mark.fast
     @pytest.mark.unit
     @pytest.mark.smoke
+    @pytest.mark.slow
+    @pytest.mark.unit
     def test_cli_dry_run_functionality(self):
         """Test dry run mode provides accurate test collection."""
         result = subprocess.run([
@@ -61,6 +67,8 @@ class TestCLIPerformance:
     @pytest.mark.fast
     @pytest.mark.unit
     @pytest.mark.smoke
+    @pytest.mark.slow
+    @pytest.mark.unit
     def test_cli_smoke_mode_performance(self):
         """Verify smoke mode completes within expected timeframe."""
         start_time = time.time()
@@ -75,6 +83,7 @@ class TestCLIPerformance:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.slow
     def test_cli_list_markers_performance(self):
         """Verify --list-markers command executes quickly."""
         start_time = time.time()

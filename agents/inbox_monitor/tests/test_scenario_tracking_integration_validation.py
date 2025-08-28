@@ -28,6 +28,8 @@ class TestScenarioTrackingIntegrationValidation:
     """Comprehensive scenario tracking integration validation tests."""
     
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_scenario_processor_metadata_capture_compliance(self):
         """Test ScenarioProcessor captures comprehensive metadata per Phase 3 requirements."""
         
@@ -126,6 +128,8 @@ class TestScenarioTrackingIntegrationValidation:
         assert 'test_mode' in result.processing_metadata
     
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_circuit_breaker_integration_compliance(self):
         """Test circuit breaker pattern is properly integrated per Phase 3 requirements."""
         
@@ -182,6 +186,8 @@ class TestScenarioTrackingIntegrationValidation:
         assert "Circuit breaker is OPEN" in result.error_message
     
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_email_processor_template_compliance(self):
         """Test EmailProcessor integration follows template requirements exactly."""
         
@@ -319,6 +325,8 @@ class TestScenarioTrackingIntegrationValidation:
             assert result.tracking_async_queued is True
     
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_data_transformation_compliance(self):
         """Test data transformation follows template requirements and handles all scenarios."""
         
@@ -427,6 +435,8 @@ class TestScenarioTrackingIntegrationValidation:
         assert tracking_record.monitor_version == "1.0.0-transform"
     
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.integration
     async def test_performance_validation_compliance(self):
         """Test performance validation meets <5% overhead requirement."""
         
@@ -494,6 +504,8 @@ class TestScenarioTrackingIntegrationValidation:
         assert result.metrics.tracking_max_ms > 0
     
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_integration_error_isolation_compliance(self):
         """Test that tracking failures are isolated from email processing per requirements."""
         
@@ -579,6 +591,8 @@ class TestScenarioTrackingIntegrationValidation:
             mock_integration.track_scenario_processing.assert_called_once()
     
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_configuration_integration_compliance(self):
         """Test configuration integration includes all required Phase 3 settings."""
         
@@ -616,6 +630,8 @@ class TestScenarioTrackingIntegrationValidation:
             assert env_settings.memory_usage_threshold_mb == 150
     
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_complete_scenario_tracking_integration_workflow(self):
         """Test complete scenario tracking workflow from email processing to tracking storage."""
         

@@ -24,6 +24,8 @@ class TestEmailProcessorErrorConditions:
     @pytest.mark.email
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     async def test_process_inbox_with_graph_api_failure(self, processor, mock_graph_client):
         """Test inbox processing when Graph API fails."""
         mock_graph_client.get_inbox_messages.side_effect = Exception("Graph API unavailable")
@@ -38,6 +40,8 @@ class TestEmailProcessorErrorConditions:
     @pytest.mark.email
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     async def test_process_inbox_with_authentication_failure(self, processor, mock_graph_client):
         """Test inbox processing with authentication failure."""
         mock_graph_client.get_inbox_messages.side_effect = Exception(
@@ -52,6 +56,8 @@ class TestEmailProcessorErrorConditions:
     @pytest.mark.email
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.edge_case
     async def test_process_inbox_with_network_timeout(self, processor, mock_graph_client):
         """Test inbox processing with network timeout."""
         mock_graph_client.get_inbox_messages.side_effect = asyncio.TimeoutError("Network timeout")
@@ -64,6 +70,8 @@ class TestEmailProcessorErrorConditions:
     @pytest.mark.email
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     async def test_process_inbox_with_rate_limiting(self, processor, mock_graph_client):
         """Test inbox processing with rate limiting."""
         mock_graph_client.get_inbox_messages.side_effect = Exception(
@@ -78,6 +86,8 @@ class TestEmailProcessorErrorConditions:
     @pytest.mark.email
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     async def test_process_inbox_with_folder_creation_permission_denied(
         self, processor, mock_graph_client, mock_graph_message
     ):
@@ -97,6 +107,8 @@ class TestEmailProcessorErrorConditions:
     @pytest.mark.azure
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     async def test_store_email_with_invalid_storage_type(self, processor, mock_email_model):
         """Test email storage with invalid storage type."""
         processor.settings.output.storage_type = "invalid-type"
@@ -109,6 +121,8 @@ class TestEmailProcessorErrorConditions:
     @pytest.mark.azure
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     async def test_store_email_file_with_invalid_path(self, processor, mock_email_model):
         """Test file storage with invalid path."""
         # Set output directory to an invalid path
@@ -122,6 +136,8 @@ class TestEmailProcessorErrorConditions:
     @pytest.mark.azure
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     async def test_store_email_api_without_endpoint(self, processor, mock_email_model):
         """Test API storage without endpoint configuration."""
         processor.settings.output.storage_type = "api"
@@ -135,6 +151,8 @@ class TestEmailProcessorErrorConditions:
     @pytest.mark.azure
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     async def test_store_email_api_with_server_error(self, processor, mock_email_model):
         """Test API storage with server error."""
         processor.settings.output.storage_type = "api"
@@ -162,6 +180,8 @@ class TestEmailProcessorErrorConditions:
     @pytest.mark.azure
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.edge_case
     async def test_store_email_api_with_connection_error(self, processor, mock_email_model):
         """Test API storage with connection error."""
         processor.settings.output.storage_type = "api"
@@ -179,6 +199,8 @@ class TestEmailProcessorErrorConditions:
     @pytest.mark.email
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     async def test_ensure_processed_folder_with_graph_api_error(self, processor, mock_graph_client):
         """Test folder creation with Graph API error."""
         mock_graph_client.get_folder_by_name.side_effect = Exception("Graph API error")
@@ -191,6 +213,8 @@ class TestEmailProcessorErrorConditions:
     @pytest.mark.email
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     async def test_process_single_email_with_json_serialization_error(
         self, processor, mock_graph_client, mock_graph_message
     ):
@@ -213,6 +237,8 @@ class TestEmailProcessorErrorConditions:
     @pytest.mark.edge_case
     @pytest.mark.email
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     async def test_process_single_email_with_unicode_error(
         self, processor, mock_graph_client, mock_graph_message
     ):

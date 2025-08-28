@@ -73,6 +73,8 @@ class TestRoundRobinService:
     @pytest.mark.fast
     @pytest.mark.unit
     @pytest.mark.smoke
+    @pytest.mark.medium
+    @pytest.mark.integration
     def test_init(self, databricks_settings):
         """Test service initialization."""
         service = RoundRobinService(databricks_settings=databricks_settings)
@@ -85,6 +87,8 @@ class TestRoundRobinService:
     @pytest.mark.email
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_connect_success(self, round_robin_service):
         """Test successful connection via connection pool."""
         # Mock the connection pool and test connection
@@ -101,6 +105,8 @@ class TestRoundRobinService:
     @pytest.mark.email
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_connect_failure(self, round_robin_service):
         """Test connection failure via connection pool."""
         # Mock connection pool failure
@@ -112,6 +118,8 @@ class TestRoundRobinService:
     @pytest.mark.email
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_context_manager(self, round_robin_service):
         """Test async context manager behavior."""
         # Mock the connection pool
@@ -128,6 +136,8 @@ class TestRoundRobinService:
     @pytest.mark.email
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_create_assignment_table_success(self, round_robin_service, mock_connection):
         """Test successful assignment table creation."""
         # Mock the connection pool and OAuth client
@@ -146,6 +156,8 @@ class TestRoundRobinService:
     @pytest.mark.email
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_create_assignment_table_failure(self, round_robin_service, mock_connection):
         """Test assignment table creation failure."""
         # Mock the connection pool and OAuth client
@@ -163,6 +175,8 @@ class TestRoundRobinService:
     @pytest.mark.email
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_get_active_experts_success(self, round_robin_service, mock_connection):
         """Test successful retrieval of active experts."""
         # Mock the connection pool and OAuth client with query results
@@ -201,6 +215,8 @@ class TestRoundRobinService:
     @pytest.mark.email
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_get_active_experts_failure(self, round_robin_service, mock_connection):
         """Test get active experts failure."""
         # Mock the connection pool and OAuth client with error
@@ -219,6 +235,8 @@ class TestRoundRobinService:
     @pytest.mark.email
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_assign_lead_to_expert_success(self, round_robin_service, mock_connection):
         """Test successful lead assignment to expert."""
         # Mock the connection pool and OAuth client
@@ -251,6 +269,8 @@ class TestRoundRobinService:
     @pytest.mark.email
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_assign_lead_to_expert_no_experts(self, round_robin_service, mock_connection):
         """Test lead assignment when no experts available."""
         # Mock the connection pool and OAuth client
@@ -272,6 +292,8 @@ class TestRoundRobinService:
     @pytest.mark.email
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_assign_lead_to_expert_failure(self, round_robin_service, mock_connection):
         """Test lead assignment failure."""
         # Mock the connection pool and OAuth client with error
@@ -290,6 +312,8 @@ class TestRoundRobinService:
     @pytest.mark.email
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_get_assignment_by_customer_found(self, round_robin_service, mock_connection):
         """Test retrieving assignment by customer email when found."""
         # Mock the connection pool and OAuth client
@@ -320,6 +344,8 @@ class TestRoundRobinService:
     @pytest.mark.email
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_get_assignment_by_customer_not_found(self, round_robin_service, mock_connection):
         """Test retrieving assignment by customer email when not found."""
         # Mock the connection pool and OAuth client
@@ -337,6 +363,8 @@ class TestRoundRobinService:
     @pytest.mark.email
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_get_assignment_by_customer_failure(self, round_robin_service, mock_connection):
         """Test get assignment by customer failure."""
         # Mock the connection pool and OAuth client with error
@@ -354,6 +382,8 @@ class TestRoundRobinService:
     @pytest.mark.email
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_update_assignment_status_success(self, round_robin_service, mock_connection):
         """Test successful assignment status update."""
         # Mock the connection pool and OAuth client
@@ -372,6 +402,8 @@ class TestRoundRobinService:
     @pytest.mark.email
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_update_assignment_status_not_found(self, round_robin_service, mock_connection):
         """Test assignment status update when assignment not found."""
         # Mock the connection pool and OAuth client
@@ -390,6 +422,8 @@ class TestRoundRobinService:
     @pytest.mark.email
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_update_assignment_status_failure(self, round_robin_service, mock_connection):
         """Test assignment status update failure."""
         # Mock the connection pool and OAuth client with error
@@ -407,6 +441,8 @@ class TestRoundRobinService:
     @pytest.mark.email
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_get_assignment_statistics_success(self, round_robin_service, mock_connection):
         """Test successful assignment statistics retrieval."""
         # Mock the connection pool and OAuth client
@@ -444,6 +480,8 @@ class TestRoundRobinService:
     @pytest.mark.integration
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_get_assignment_statistics_failure(self, round_robin_service, mock_connection):
         """Test assignment statistics retrieval failure."""
         # Mock the connection pool and OAuth client with error
@@ -461,6 +499,8 @@ class TestRoundRobinService:
     @pytest.mark.integration
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_test_connection_success(self, round_robin_service, mock_connection):
         """Test successful connection test."""
         # Mock the connection pool and OAuth client
@@ -475,6 +515,8 @@ class TestRoundRobinService:
     @pytest.mark.slow
     @pytest.mark.integration
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_test_connection_failure(self, round_robin_service, mock_connection):
         """Test connection test failure."""
         # Mock the connection pool with error
@@ -484,6 +526,7 @@ class TestRoundRobinService:
     @pytest.mark.email
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_expert_assignment_model(self):
         """Test expert assignment model."""
         assignment_data = {
@@ -506,6 +549,7 @@ class TestRoundRobinService:
     @pytest.mark.email
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_active_expert_model(self):
         """Test active expert model."""
         expert_data = {
@@ -525,6 +569,7 @@ class TestRoundRobinService:
     @pytest.mark.email
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_active_expert_model_defaults(self):
         """Test active expert model with default values."""
         expert_data = {

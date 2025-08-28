@@ -29,6 +29,8 @@ class TestProductionConfiguration:
     @pytest.mark.production
     @pytest.mark.scenario_tracking
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_environment_variables_configuration(self):
         """Test that all required environment variables are configured."""
         
@@ -86,6 +88,8 @@ class TestProductionConfiguration:
     @pytest.mark.production
     @pytest.mark.scenario_tracking
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_configuration_model_validation(self):
         """Test configuration model validation and defaults."""
         
@@ -122,6 +126,8 @@ class TestProductionConfiguration:
     @pytest.mark.production
     @pytest.mark.scenario_tracking
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_database_connection_configuration(self):
         """Test database connection configuration validation."""
         
@@ -161,6 +167,8 @@ class TestProductionSecurity:
     @pytest.mark.security
     @pytest.mark.scenario_tracking
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_no_hardcoded_secrets(self):
         """Test that no secrets are hardcoded in source files."""
         
@@ -215,6 +223,8 @@ class TestProductionSecurity:
     @pytest.mark.security
     @pytest.mark.scenario_tracking
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_secure_connection_requirements(self):
         """Test that connections use secure protocols."""
         
@@ -251,6 +261,8 @@ class TestProductionSecurity:
     @pytest.mark.security
     @pytest.mark.scenario_tracking
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_data_privacy_compliance(self):
         """Test data privacy and PII handling compliance."""
         
@@ -291,6 +303,8 @@ class TestProductionPerformance:
     @pytest.mark.scenario_tracking
     @pytest.mark.performance
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_connection_pool_performance(self):
         """Test connection pool performance under production conditions."""
         
@@ -333,6 +347,8 @@ class TestProductionPerformance:
     @pytest.mark.scenario_tracking
     @pytest.mark.performance
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_memory_efficiency_production(self):
         """Test memory efficiency under production-like load."""
         
@@ -410,6 +426,8 @@ class TestProductionMonitoring:
     @pytest.mark.scenario_tracking
     @pytest.mark.monitoring
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_health_check_completeness(self):
         """Test that health checks provide comprehensive status information."""
         
@@ -452,6 +470,8 @@ class TestProductionMonitoring:
     @pytest.mark.scenario_tracking
     @pytest.mark.monitoring
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_metrics_collection(self):
         """Test that performance metrics are properly collected."""
         
@@ -497,6 +517,8 @@ class TestProductionMonitoring:
     @pytest.mark.scenario_tracking
     @pytest.mark.monitoring
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     async def test_error_reporting(self):
         """Test that errors are properly reported and tracked."""
         
@@ -547,6 +569,8 @@ class TestProductionDataIntegrity:
     @pytest.mark.scenario_tracking
     @pytest.mark.database
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_data_consistency_validation(self):
         """Test data consistency validation mechanisms."""
         
@@ -593,6 +617,8 @@ class TestProductionDataIntegrity:
     @pytest.mark.scenario_tracking
     @pytest.mark.database
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_schema_compatibility(self):
         """Test schema compatibility for database operations."""
         

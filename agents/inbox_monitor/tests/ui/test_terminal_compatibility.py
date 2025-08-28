@@ -30,6 +30,7 @@ class TestTerminalCompatibility:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_terminal_capabilities_initialization(self, terminal_caps):
         """Test terminal capabilities initialization."""
         assert terminal_caps.capabilities is not None
@@ -41,6 +42,7 @@ class TestTerminalCompatibility:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_unicode_support_detection_utf8(self, terminal_caps):
         """Test Unicode support detection with UTF-8."""
         with patch('sys.stdout') as mock_stdout:
@@ -52,6 +54,7 @@ class TestTerminalCompatibility:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_unicode_support_detection_ascii(self, terminal_caps):
         """Test Unicode support detection with ASCII."""
         with patch('sys.stdout') as mock_stdout, \
@@ -64,6 +67,7 @@ class TestTerminalCompatibility:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_unicode_support_from_environment(self, terminal_caps):
         """Test Unicode support from environment variables."""
         with patch('sys.stdout') as mock_stdout, \
@@ -76,6 +80,7 @@ class TestTerminalCompatibility:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_emoji_support_depends_on_unicode(self, terminal_caps):
         """Test emoji support depends on unicode support."""
         if terminal_caps.capabilities['unicode_support']:
@@ -87,6 +92,7 @@ class TestTerminalCompatibility:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_emoji_support_friendly_terminal(self, terminal_caps):
         """Test emoji support detection in emoji-friendly terminals."""
         with patch.dict(os.environ, {'TERM_PROGRAM': 'vscode'}):
@@ -99,6 +105,7 @@ class TestTerminalCompatibility:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_terminal_type_detection_vscode(self, terminal_caps):
         """Test terminal type detection for VS Code."""
         with patch.dict(os.environ, {'TERM_PROGRAM': 'vscode'}):
@@ -109,6 +116,7 @@ class TestTerminalCompatibility:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_terminal_type_detection_windows_terminal(self, terminal_caps):
         """Test terminal type detection for Windows Terminal."""
         with patch.dict(os.environ, {'WT_SESSION': 'some-session-id'}):
@@ -119,6 +127,7 @@ class TestTerminalCompatibility:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_terminal_type_detection_fallback(self, terminal_caps):
         """Test terminal type detection fallback."""
         with patch.dict(os.environ, {}, clear=True):
@@ -129,6 +138,7 @@ class TestTerminalCompatibility:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_accessibility_mode_no_color(self, terminal_caps):
         """Test accessibility mode detection with NO_COLOR."""
         with patch.dict(os.environ, {'NO_COLOR': '1'}):
@@ -139,6 +149,7 @@ class TestTerminalCompatibility:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_accessibility_mode_high_contrast(self, terminal_caps):
         """Test accessibility mode detection with HIGH_CONTRAST."""
         with patch.dict(os.environ, {'HIGH_CONTRAST': '1'}):
@@ -149,6 +160,7 @@ class TestTerminalCompatibility:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_accessibility_mode_screen_reader(self, terminal_caps):
         """Test accessibility mode detection with SCREEN_READER."""
         with patch.dict(os.environ, {'SCREEN_READER': '1'}):
@@ -159,6 +171,7 @@ class TestTerminalCompatibility:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_ci_environment_detection_ci(self, terminal_caps):
         """Test CI environment detection with CI variable."""
         with patch.dict(os.environ, {'CI': 'true'}):
@@ -169,6 +182,7 @@ class TestTerminalCompatibility:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_ci_environment_detection_github_actions(self, terminal_caps):
         """Test CI environment detection for GitHub Actions."""
         with patch.dict(os.environ, {'GITHUB_ACTIONS': 'true'}):
@@ -179,6 +193,7 @@ class TestTerminalCompatibility:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_ci_environment_detection_gitlab_ci(self, terminal_caps):
         """Test CI environment detection for GitLab CI."""
         with patch.dict(os.environ, {'GITLAB_CI': 'true'}):
@@ -189,6 +204,7 @@ class TestTerminalCompatibility:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_should_use_progress_indicators(self, terminal_caps):
         """Test progress indicator usage decision."""
         should_use = terminal_caps.should_use_progress_indicators()
@@ -200,6 +216,7 @@ class TestTerminalCompatibility:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_should_use_colors_no_color_env(self, terminal_caps):
         """Test color usage with NO_COLOR environment."""
         with patch.dict(os.environ, {'NO_COLOR': '1'}):
@@ -208,6 +225,7 @@ class TestTerminalCompatibility:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_should_use_colors_monochrome_env(self, terminal_caps):
         """Test color usage with MONOCHROME environment."""
         with patch.dict(os.environ, {'MONOCHROME': '1'}):
@@ -216,6 +234,7 @@ class TestTerminalCompatibility:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_should_use_colors_normal(self, terminal_caps):
         """Test color usage in normal conditions."""
         with patch.dict(os.environ, {}, clear=True):
@@ -225,6 +244,7 @@ class TestTerminalCompatibility:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_get_optimal_width_normal(self, terminal_caps):
         """Test optimal width calculation for normal terminal."""
         optimal_width = terminal_caps.get_optimal_width()
@@ -234,6 +254,7 @@ class TestTerminalCompatibility:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_get_optimal_width_narrow_terminal(self, terminal_caps):
         """Test optimal width calculation for narrow terminal."""
         with patch.object(terminal_caps, 'capabilities', {'width': 30}):
@@ -242,6 +263,7 @@ class TestTerminalCompatibility:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_get_optimal_width_wide_terminal(self, terminal_caps):
         """Test optimal width calculation for wide terminal."""
         with patch.object(terminal_caps, 'capabilities', {'width': 200}):
@@ -250,6 +272,7 @@ class TestTerminalCompatibility:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_get_capability_summary(self, terminal_caps):
         """Test getting capability summary."""
         summary = terminal_caps.get_capability_summary()
@@ -262,6 +285,7 @@ class TestTerminalCompatibility:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_cache_functionality(self):
         """Test terminal capability caching."""
         # Clear cache first
@@ -280,6 +304,7 @@ class TestTerminalCompatibility:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_accessibility_manager_initialization(self, accessibility_manager):
         """Test accessibility manager initialization."""
         assert accessibility_manager.console is not None
@@ -288,6 +313,7 @@ class TestTerminalCompatibility:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_accessibility_settings(self, accessibility_manager):
         """Test accessibility settings detection."""
         settings = accessibility_manager.get_accessibility_settings()
@@ -301,6 +327,7 @@ class TestTerminalCompatibility:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_screen_reader_format_detection(self, accessibility_manager):
         """Test screen reader format detection."""
         should_use_sr = accessibility_manager.should_use_screen_reader_format()
@@ -308,6 +335,7 @@ class TestTerminalCompatibility:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_accessibility_text_formatting(self, accessibility_manager):
         """Test accessibility text formatting."""
         test_text = "✅ Success: Operation completed 📊"
@@ -321,6 +349,7 @@ class TestTerminalCompatibility:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_safe_characters(self, accessibility_manager):
         """Test safe character alternatives."""
         safe_chars = accessibility_manager.get_safe_characters()
@@ -334,6 +363,7 @@ class TestTerminalCompatibility:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_color_alternatives(self, accessibility_manager):
         """Test color alternatives for accessibility."""
         color_alts = accessibility_manager.get_color_alternatives()

@@ -8,6 +8,9 @@ from datetime import datetime, timezone
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
+# Import async test helpers
+from tests.fixtures.async_helpers import AsyncTestHelper
+
 from database.scenario_tracking_models import (
     ScenarioProcessingRecord,
     ScenarioType,
@@ -52,6 +55,11 @@ class TestScenarioProcessingRecord:
             "ai_confidence": 0.95
         }
     
+    @pytest.mark.slow
+    @pytest.mark.unit
+    @pytest.mark.scenario_tracking
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_minimal_record_creation(self, minimal_record_data):
         """Test creation of record with minimal required fields."""
         record = ScenarioProcessingRecord(**minimal_record_data)
@@ -60,6 +68,11 @@ class TestScenarioProcessingRecord:
         assert record.scenario_type == ScenarioType.UNKNOWN  # Default value
         assert record.test_mode is False  # Default value
     
+    @pytest.mark.slow
+    @pytest.mark.unit
+    @pytest.mark.scenario_tracking
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_complete_record_creation(self, complete_record_data):
         """Test creation of record with all fields populated."""
         record = ScenarioProcessingRecord(**complete_record_data)
@@ -67,6 +80,11 @@ class TestScenarioProcessingRecord:
         assert record.ai_confidence == 0.95
         assert record.scenario_type == ScenarioType.SCENARIO_5
     
+    @pytest.mark.slow
+    @pytest.mark.unit
+    @pytest.mark.scenario_tracking
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_subject_line_truncation(self, minimal_record_data):
         """Test that overly long subject lines are truncated."""
         long_subject = "A" * 600  # Exceeds 500 character limit
@@ -76,6 +94,12 @@ class TestScenarioProcessingRecord:
         assert len(record.subject) == 503  # 500 + "..."
         assert record.subject.endswith("...")
     
+    @pytest.mark.slow
+    @pytest.mark.unit
+    @pytest.mark.email
+    @pytest.mark.scenario_tracking
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_email_validation(self, minimal_record_data):
         """Test email address validation in recipient list."""
         minimal_record_data["recipient_emails"] = [
@@ -90,6 +114,11 @@ class TestScenarioProcessingRecord:
         assert "valid@example.com" in record.recipient_emails
         assert "another@valid.com" in record.recipient_emails
     
+    @pytest.mark.slow
+    @pytest.mark.unit
+    @pytest.mark.scenario_tracking
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_scenario_consistency_validation(self, minimal_record_data):
         """Test scenario-specific field validation."""
         # Test Scenario 5 requires expert fields
@@ -104,6 +133,11 @@ class TestScenarioProcessingRecord:
             assert record.scenario_type == ScenarioType.SCENARIO_5
             # Verify warning was logged for missing expert email
     
+    @pytest.mark.slow
+    @pytest.mark.unit
+    @pytest.mark.scenario_tracking
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_databricks_dict_conversion(self, complete_record_data):
         """Test conversion to Databricks-compatible dictionary."""
         record = ScenarioProcessingRecord(**complete_record_data)
@@ -120,6 +154,12 @@ class TestScenarioProcessingRecord:
         # Check map handling  
         assert isinstance(databricks_dict["external_operations_status"], dict)
     
+    @pytest.mark.slow
+    @pytest.mark.unit
+    @pytest.mark.email
+    @pytest.mark.scenario_tracking
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_factory_method_from_processing_results(self):
         """Test factory method for creating records from existing objects."""
         # Mock objects simulating real processing results
@@ -144,10 +184,13 @@ class TestScenarioProcessingRecord:
         scenario_result_mock.agent_actions_log = ["assigned_expert", "created_case"]
         scenario_result_mock.expert_assigned = "Jane Expert"
         
-        record = ScenarioProcessingRecord.from_processing_results(
-            email_data=email_mock,
-            processing_result=processing_result_mock,
-            scenario_result=scenario_result_mock
+        # FIX: Run the async method synchronously in tests
+        record = AsyncTestHelper.run_sync(
+            ScenarioProcessingRecord.from_processing_results(
+                email_data=email_mock,
+                processing_result=processing_result_mock,
+                scenario_result=scenario_result_mock
+            )
         )
         
         # Factory method should create a valid record even if source data is incomplete
@@ -168,6 +211,11 @@ class TestScenarioProcessingRecord:
             assert record.process_success is False
             assert record.process_error is not None
     
+    @pytest.mark.slow
+    @pytest.mark.unit
+    @pytest.mark.scenario_tracking
+    @pytest.mark.slow
+    @pytest.mark.unit
     def test_performance_score_calculation(self, minimal_record_data):
         """Test performance score calculation logic."""
         # Test high performance scenario
@@ -193,6 +241,11 @@ class TestScenarioProcessingRecord:
         score = record.calculate_performance_score()
         assert score < 50  # Should be heavily penalized
     
+    @pytest.mark.slow
+    @pytest.mark.unit
+    @pytest.mark.scenario_tracking
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_customer_key_standardization(self, minimal_record_data):
         """Test customer key generation for grouping."""
         minimal_record_data["sender_email"] = "  TEST@Example.COM  "
@@ -201,6 +254,11 @@ class TestScenarioProcessingRecord:
         customer_key = record.get_customer_key()
         assert customer_key == "test@example.com"  # Normalized
     
+    @pytest.mark.slow
+    @pytest.mark.unit
+    @pytest.mark.scenario_tracking
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_actionable_scenario_detection(self, minimal_record_data):
         """Test detection of actionable scenarios."""
         # Non-actionable scenario
@@ -218,6 +276,11 @@ class TestScenarioProcessingRecord:
         record = ScenarioProcessingRecord(**minimal_record_data)
         assert record.is_scenario_actionable()
 
+    @pytest.mark.slow
+    @pytest.mark.edge_case
+    @pytest.mark.scenario_tracking
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     def test_validation_with_invalid_data(self):
         """Test model validation with invalid data."""
         # Test negative processing time
@@ -242,6 +305,11 @@ class TestScenarioProcessingRecord:
                 ai_confidence=1.5  # Invalid value > 1.0
             )
     
+    @pytest.mark.slow
+    @pytest.mark.unit
+    @pytest.mark.scenario_tracking
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_enum_serialization(self, minimal_record_data):
         """Test that enums are properly serialized."""
         minimal_record_data.update({
@@ -261,6 +329,11 @@ class TestScenarioProcessingRecord:
 class TestScenarioTrackingConfiguration:
     """Test configuration validation and defaults."""
     
+    @pytest.mark.slow
+    @pytest.mark.unit
+    @pytest.mark.scenario_tracking
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_default_configuration(self):
         """Test default configuration values."""
         config = ScenarioTrackingConfiguration()
@@ -270,6 +343,11 @@ class TestScenarioTrackingConfiguration:
         assert config.async_insert is True
         assert config.data_retention_days == 365
     
+    @pytest.mark.slow
+    @pytest.mark.unit
+    @pytest.mark.scenario_tracking
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_configuration_validation(self):
         """Test configuration field validation."""
         # Test invalid batch size
@@ -286,6 +364,11 @@ class TestScenarioTrackingConfiguration:
         with pytest.raises(ValueError):
             ScenarioTrackingConfiguration(retry_attempts=20)
     
+    @pytest.mark.slow
+    @pytest.mark.unit
+    @pytest.mark.scenario_tracking
+    @pytest.mark.slow
+    @pytest.mark.unit
     def test_performance_thresholds(self):
         """Test performance monitoring configuration."""
         config = ScenarioTrackingConfiguration(
@@ -296,6 +379,11 @@ class TestScenarioTrackingConfiguration:
         assert config.slow_query_threshold_ms == 10000
         assert config.health_check_interval_seconds == 600
     
+    @pytest.mark.slow
+    @pytest.mark.unit
+    @pytest.mark.scenario_tracking
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_data_retention_settings(self):
         """Test data retention configuration."""
         config = ScenarioTrackingConfiguration(
@@ -312,6 +400,11 @@ class TestScenarioTrackingConfiguration:
 class TestDatabaseUpdateRecord:
     """Test database update record functionality."""
     
+    @pytest.mark.slow
+    @pytest.mark.unit
+    @pytest.mark.scenario_tracking
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_basic_record_creation(self):
         """Test basic database update record creation."""
         record = DatabaseUpdateRecord(
@@ -327,6 +420,11 @@ class TestDatabaseUpdateRecord:
         assert record.new_value == "completed"
         assert isinstance(record.update_timestamp, datetime)
     
+    @pytest.mark.slow
+    @pytest.mark.unit
+    @pytest.mark.scenario_tracking
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_record_without_old_value(self):
         """Test record creation without old value (new field)."""
         record = DatabaseUpdateRecord(
@@ -344,18 +442,33 @@ class TestDatabaseUpdateRecord:
 class TestEnums:
     """Test enum definitions and values."""
     
+    @pytest.mark.slow
+    @pytest.mark.unit
+    @pytest.mark.scenario_tracking
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_scenario_type_enum(self):
         """Test ScenarioType enum values."""
         assert ScenarioType.SCENARIO_5.value == "scenario_5"
         assert ScenarioType.SCENARIO_6.value == "scenario_6"
         assert ScenarioType.UNKNOWN.value == "unknown"
     
+    @pytest.mark.slow
+    @pytest.mark.unit
+    @pytest.mark.scenario_tracking
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_ai_intent_enum(self):
         """Test AIIntent enum values."""
         assert AIIntent.POSITIVE.value == "POSITIVE"
         assert AIIntent.NEGATIVE.value == "NEGATIVE"
         assert AIIntent.UNKNOWN.value == "UNKNOWN"
     
+    @pytest.mark.slow
+    @pytest.mark.unit
+    @pytest.mark.scenario_tracking
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_test_mode_type_enum(self):
         """Test TestModeType enum values."""
         assert TestModeType.DISABLED.value == "disabled"
@@ -366,6 +479,11 @@ class TestEnums:
 class TestErrorHandling:
     """Test error handling and edge cases."""
     
+    @pytest.mark.slow
+    @pytest.mark.edge_case
+    @pytest.mark.scenario_tracking
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     def test_factory_method_error_handling(self):
         """Test factory method handles errors gracefully."""
         # Mock objects with missing attributes
@@ -376,15 +494,24 @@ class TestErrorHandling:
         processing_result_mock.process_id = str(uuid4())
         
         # Should create minimal valid record on error
-        record = ScenarioProcessingRecord.from_processing_results(
-            email_data=email_mock,
-            processing_result=processing_result_mock
+        # FIX: Run the async method synchronously in tests
+        record = AsyncTestHelper.run_sync(
+            ScenarioProcessingRecord.from_processing_results(
+                email_data=email_mock,
+                processing_result=processing_result_mock
+            )
         )
         
         assert record.process_success is False
         assert "error" in record.email_id
         assert record.process_error is not None
     
+    @pytest.mark.slow
+    @pytest.mark.edge_case
+    @pytest.mark.email
+    @pytest.mark.scenario_tracking
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     def test_invalid_email_addresses(self):
         """Test handling of invalid email addresses."""
         record_data = {
@@ -407,6 +534,11 @@ class TestErrorHandling:
             valid_emails = [email for email in record.recipient_emails if email]
             assert len(valid_emails) <= 2  # Only valid emails should remain
     
+    @pytest.mark.slow
+    @pytest.mark.unit
+    @pytest.mark.scenario_tracking
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_serialization_with_none_values(self):
         """Test serialization handles None values properly."""
         record_data = {

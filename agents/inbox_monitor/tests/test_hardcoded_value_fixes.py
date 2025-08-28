@@ -17,6 +17,7 @@ from utils.data_extraction_helpers import (
     extract_customer_name,
     get_expert_assignment_method
 )
+from tests.fixtures.async_helpers import AsyncTestHelper
 
 
 class TestSenderInfoExtraction:
@@ -24,6 +25,7 @@ class TestSenderInfoExtraction:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_extract_from_email_address_object(self):
         """Test extraction from EmailAddress object with name."""
         # Create mock email data
@@ -41,6 +43,7 @@ class TestSenderInfoExtraction:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_extract_from_email_object_with_email_attr(self):
         """Test extraction from email object with direct email attribute."""
         # Use a simple object instead of Mock to avoid Mock detection
@@ -63,6 +66,7 @@ class TestSenderInfoExtraction:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_extract_from_email_without_name(self):
         """Test extraction when only email address available."""
         email_data = Mock()
@@ -79,6 +83,7 @@ class TestSenderInfoExtraction:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_extract_from_dictionary_format(self):
         """Test extraction from dictionary sender format."""
         email_data = Mock()
@@ -95,6 +100,7 @@ class TestSenderInfoExtraction:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_extract_from_dictionary_with_email_key(self):
         """Test extraction from dictionary with 'email' key instead of 'email_address'."""
         email_data = Mock()
@@ -111,6 +117,7 @@ class TestSenderInfoExtraction:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_extract_from_from_email_fallback(self):
         """Test fallback to from_email attribute."""
         email_data = Mock()
@@ -125,6 +132,7 @@ class TestSenderInfoExtraction:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_fallback_to_unknown_sender(self):
         """Test fallback when no sender data available."""
         email_data = None
@@ -137,6 +145,7 @@ class TestSenderInfoExtraction:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_error_handling_in_extraction(self):
         """Test error handling during extraction."""
         class ErrorSender:
@@ -170,6 +179,7 @@ class TestEnvironmentDetection:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_detect_production_environment(self, monkeypatch):
         """Test production environment detection."""
         monkeypatch.setenv('ENVIRONMENT', 'production')
@@ -180,6 +190,7 @@ class TestEnvironmentDetection:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_detect_production_with_prod_keyword(self, monkeypatch):
         """Test production detection with 'prod' keyword."""
         monkeypatch.setenv('ENV', 'prod')
@@ -190,6 +201,7 @@ class TestEnvironmentDetection:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_detect_test_environment(self, monkeypatch):
         """Test test environment detection."""
         monkeypatch.setenv('ENV', 'test')
@@ -200,6 +212,7 @@ class TestEnvironmentDetection:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_detect_staging_as_test(self, monkeypatch):
         """Test staging mapped to test environment."""
         monkeypatch.setenv('DEPLOYMENT_ENV', 'staging')
@@ -210,6 +223,7 @@ class TestEnvironmentDetection:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_detect_development_environment(self, monkeypatch):
         """Test development environment detection."""
         monkeypatch.setenv('AZURE_ENV', 'development')
@@ -220,6 +234,7 @@ class TestEnvironmentDetection:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_priority_order_of_env_vars(self, monkeypatch):
         """Test that ENVIRONMENT takes priority over other vars."""
         monkeypatch.setenv('NODE_ENV', 'production')
@@ -232,6 +247,7 @@ class TestEnvironmentDetection:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_fallback_to_development(self, monkeypatch):
         """Test fallback to development when no env vars set."""
         # No environment variables set
@@ -243,6 +259,7 @@ class TestEnvironmentDetection:
     @patch('socket.gethostname')
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_hostname_detection(self, mock_hostname, monkeypatch):
         """Test hostname-based environment detection."""
         mock_hostname.return_value = 'prod-server-01'
@@ -257,6 +274,8 @@ class TestAssignmentReasoningExtraction:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
+    @pytest.mark.fast
     def test_extract_from_expert_assignment(self):
         """Test extraction from expert assignment reason."""
         scenario_result = Mock()
@@ -270,6 +289,7 @@ class TestAssignmentReasoningExtraction:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_construct_from_assignment_method(self):
         """Test construction when only method and expert available."""
         scenario_result = Mock()
@@ -286,6 +306,7 @@ class TestAssignmentReasoningExtraction:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_extract_from_assignment_method_directly(self):
         """Test extraction from direct assignment method."""
         class MockScenarioResult:
@@ -303,6 +324,7 @@ class TestAssignmentReasoningExtraction:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_fallback_to_scenario_type(self):
         """Test fallback to scenario type when no assignment info."""
         class MockScenarioResult:
@@ -320,6 +342,9 @@ class TestAssignmentReasoningExtraction:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
+    @pytest.mark.fast
+    @pytest.mark.fast
     def test_ultimate_fallback(self):
         """Test ultimate fallback when minimal data available."""
         class MockScenarioResult:
@@ -336,6 +361,7 @@ class TestAssignmentReasoningExtraction:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_no_scenario_result(self):
         """Test handling when no scenario result provided."""
         result = extract_assignment_reasoning(None)
@@ -348,6 +374,7 @@ class TestDataValidation:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_clean_sender_name(self):
         """Test sender name cleaning removes artifacts."""
         data = {'sender_name': '  John Smith (External)  '}
@@ -358,6 +385,7 @@ class TestDataValidation:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_clean_sender_name_with_brackets(self):
         """Test removal of bracket artifacts."""
         data = {'sender_name': 'Jane Doe [Contractor]'}
@@ -368,6 +396,7 @@ class TestDataValidation:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_truncate_long_names(self):
         """Test truncation of extremely long names."""
         long_name = "A" * 150
@@ -380,6 +409,7 @@ class TestDataValidation:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_clean_customer_name(self):
         """Test customer name cleaning."""
         data = {'customer_name': '  (Corporate Account) ACME Inc  '}
@@ -390,6 +420,7 @@ class TestDataValidation:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_validate_environment(self):
         """Test environment validation."""
         data = {'environment': 'invalid_env'}
@@ -400,6 +431,7 @@ class TestDataValidation:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_validate_valid_environment(self):
         """Test that valid environments pass through."""
         data = {'environment': 'production'}
@@ -410,6 +442,7 @@ class TestDataValidation:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_truncate_long_assignment_reasoning(self):
         """Test truncation of long assignment reasoning."""
         long_reasoning = "A" * 600
@@ -426,6 +459,7 @@ class TestCustomerNameExtraction:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_extract_from_sender_info(self):
         """Test extraction using sender info."""
         email_data = Mock()
@@ -440,6 +474,8 @@ class TestCustomerNameExtraction:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
+    @pytest.mark.fast
     def test_extract_from_processing_result(self):
         """Test extraction from processing result."""
         email_data = Mock()
@@ -453,6 +489,7 @@ class TestCustomerNameExtraction:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_fallback_to_email_local_part(self):
         """Test fallback to email local part formatting."""
         email_data = Mock()
@@ -479,6 +516,7 @@ class TestExpertAssignmentMethod:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_extract_from_scenario_result(self):
         """Test extraction from scenario result."""
         scenario_result = Mock()
@@ -516,6 +554,7 @@ class TestExpertAssignmentMethod:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_scenario_specific_default(self):
         """Test scenario-specific default methods."""
         scenario_result = Mock()
@@ -585,6 +624,7 @@ class TestIntegratedScenarioRecordCreation:
     
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.fast
     def test_enhanced_record_creation_no_hardcoded_values(self):
         """Test that enhanced record creation eliminates hardcoded values."""
         email_data = self.create_mock_email_data("Real Customer", "customer@realcompany.com")
@@ -592,11 +632,11 @@ class TestIntegratedScenarioRecordCreation:
         scenario_result = self.create_mock_scenario_result("scenario_5")
         
         with patch('database.scenario_tracking_models.detect_environment', return_value='production'):
-            record = ScenarioProcessingRecord.from_processing_results(
+            record = AsyncTestHelper.run_sync(ScenarioProcessingRecord.from_processing_results(
                 email_data=email_data,
                 processing_result=processing_result,
                 scenario_result=scenario_result
-            )
+            ))
         
         # Verify no hardcoded values
         assert record.sender_name != "Customer"  # Should be "Real Customer"
@@ -611,15 +651,16 @@ class TestIntegratedScenarioRecordCreation:
     @patch.dict(os.environ, {'ENVIRONMENT': 'test'})
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_environment_detection_integration(self):
         """Test environment detection integration in record creation."""
         email_data = self.create_mock_email_data()
         processing_result = self.create_mock_processing_result()
         
-        record = ScenarioProcessingRecord.from_processing_results(
+        record = AsyncTestHelper.run_sync(ScenarioProcessingRecord.from_processing_results(
             email_data=email_data,
             processing_result=processing_result
-        )
+        ))
         
         # Should detect 'test' environment from environment variable
         assert "test" in record.environment
@@ -627,6 +668,7 @@ class TestIntegratedScenarioRecordCreation:
     
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.fast
     def test_error_handling_preserves_functionality(self):
         """Test that error handling doesn't break record creation."""
         # Create problematic email data that might cause extraction errors
@@ -642,16 +684,17 @@ class TestIntegratedScenarioRecordCreation:
         processing_result = self.create_mock_processing_result()
         
         # Should still create record without crashing
-        record = ScenarioProcessingRecord.from_processing_results(
+        record = AsyncTestHelper.run_sync(ScenarioProcessingRecord.from_processing_results(
             email_data=email_data,
             processing_result=processing_result
-        )
+        ))
         
         assert record.process_id == "proc-123"
         assert record.process_success is True
     
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.fast
     def test_case_subject_uses_extracted_customer_name(self):
         """Test that case subject uses extracted customer name, not hardcoded 'Customer'."""
         email_data = self.create_mock_email_data("Acme Corporation", "contact@acme.com")
@@ -660,11 +703,11 @@ class TestIntegratedScenarioRecordCreation:
         # Simulate case creation
         scenario_result.case_created = "SF-20240101120000"
         
-        record = ScenarioProcessingRecord.from_processing_results(
+        record = AsyncTestHelper.run_sync(ScenarioProcessingRecord.from_processing_results(
             email_data=email_data,
             processing_result=processing_result,
             scenario_result=scenario_result
-        )
+        ))
         
         # Case subject should use extracted customer name
         if record.case_subject:

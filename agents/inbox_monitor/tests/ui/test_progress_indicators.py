@@ -23,6 +23,7 @@ class TestProgressIndicators:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_create_and_complete_operation(self, progress_manager):
         """Test basic operation lifecycle."""
         # Create operation
@@ -48,6 +49,7 @@ class TestProgressIndicators:
     
     @pytest.mark.fast
     @pytest.mark.integration
+    @pytest.mark.fast
     def test_progress_display_context(self, progress_manager):
         """Test progress display context manager."""
         with progress_manager.start_progress_display("Test Operations"):
@@ -70,6 +72,7 @@ class TestProgressIndicators:
     
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.fast
     def test_concurrent_operations(self, progress_manager):
         """Test multiple concurrent operations."""
         with progress_manager.start_progress_display("Concurrent Test"):
@@ -94,6 +97,7 @@ class TestProgressIndicators:
     
     @pytest.mark.fast
     @pytest.mark.edge_case
+    @pytest.mark.fast
     def test_operation_failure(self, progress_manager):
         """Test operation failure handling."""
         operation_id = progress_manager.create_operation(
@@ -114,6 +118,7 @@ class TestProgressIndicators:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_disabled_progress_manager(self, mock_console):
         """Test progress manager when disabled."""
         disabled_manager = ProgressManager(mock_console, enabled=False)
@@ -134,6 +139,7 @@ class TestProgressIndicators:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_cleanup_completed_operations(self, progress_manager):
         """Test cleanup of old completed operations."""
         # Create and complete some operations
@@ -158,6 +164,7 @@ class TestProgressIndicators:
 
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.slow
     def test_performance_metrics(self, progress_manager):
         """Test performance metrics functionality."""
         # Create some operations

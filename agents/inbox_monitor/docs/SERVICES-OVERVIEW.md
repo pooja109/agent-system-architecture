@@ -357,7 +357,7 @@ Provides Salesforce contact and account information lookup from Databricks data 
 - Connection pooling for performance
 - Comprehensive error handling and fallback logic
 
-**Lookup Table**: `snowflake_ml_dev.mlops.i2a_lowtouch_sls_cnct_lvl_t`
+**Lookup Table**: `mld01_ml_de.features.i2a_lowtouch_sls_cnct_lvl_hist_t`
 
 **Dependencies**: Databricks Connection Pool, OAuth Client, test mode settings
 

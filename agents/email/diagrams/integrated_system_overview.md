@@ -82,7 +82,7 @@ graph TB
 graph LR
     subgraph "Databricks Data Layer"
         A[email_communication_pipeline<br/>Campaign Tracking]
-        B[snowflake_ml_dev.mlops.i2a_lowtouch_sls_cnct_lvl_t<br/>Customer Lookup]
+        B[mld01_ml_de.features.i2a_lowtouch_sls_cnct_lvl_hist_t<br/>Customer Lookup]
         C[expert_lead_assignments<br/>Round-Robin Management]
         D[active_rep_pool_v<br/>Available Experts]
     end

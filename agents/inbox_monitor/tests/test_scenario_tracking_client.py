@@ -118,6 +118,8 @@ class TestScenarioTrackingClient:
     @pytest.mark.asyncio
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_client_initialization(self, scenario_tracking_config):
         """Test client initialization with configuration."""
         client = ScenarioTrackingClient(config=scenario_tracking_config)
@@ -131,6 +133,8 @@ class TestScenarioTrackingClient:
     @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_table_initialization_success(self, scenario_tracking_config, mock_connection_pool):
         """Test successful table initialization."""
         client = ScenarioTrackingClient(config=scenario_tracking_config)
@@ -156,6 +160,8 @@ class TestScenarioTrackingClient:
     @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.medium
+    @pytest.mark.edge_case
     async def test_table_initialization_failure(self, scenario_tracking_config, mock_connection_pool):
         """Test table initialization failure."""
         client = ScenarioTrackingClient(config=scenario_tracking_config)
@@ -181,6 +187,8 @@ class TestScenarioTrackingClient:
     @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_store_single_record_sync_success(self, scenario_tracking_config, sample_scenario_record, mock_connection_pool):
         """Test successful single record storage."""
         client = ScenarioTrackingClient(config=scenario_tracking_config)
@@ -195,6 +203,8 @@ class TestScenarioTrackingClient:
     @pytest.mark.asyncio
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
+    @pytest.mark.edge_case
     async def test_store_single_record_validation_error(self, scenario_tracking_config, mock_connection_pool):
         """Test single record storage with validation error."""
         client = ScenarioTrackingClient(config=scenario_tracking_config)
@@ -209,6 +219,8 @@ class TestScenarioTrackingClient:
     @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_batch_process_success(self, scenario_tracking_config, mock_connection_pool):
         """Test successful batch processing."""
         client = ScenarioTrackingClient(config=scenario_tracking_config)
@@ -237,6 +249,8 @@ class TestScenarioTrackingClient:
     @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.medium
+    @pytest.mark.edge_case
     async def test_batch_processing_validation_errors(self, scenario_tracking_config, sample_scenario_record, mock_connection_pool):
         """Test batch processing with validation errors."""
         client = ScenarioTrackingClient(config=scenario_tracking_config)
@@ -255,6 +269,8 @@ class TestScenarioTrackingClient:
     @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.medium
+    @pytest.mark.edge_case
     async def test_batch_processing_high_failure_rate(self, scenario_tracking_config, mock_connection_pool):
         """Test batch processing with high failure rate raises exception."""
         client = ScenarioTrackingClient(config=scenario_tracking_config)
@@ -286,6 +302,8 @@ class TestScenarioTrackingClient:
     @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_circuit_breaker_functionality(self, scenario_tracking_config, mock_connection_pool):
         """Test circuit breaker opens after repeated failures."""
         client = ScenarioTrackingClient(config=scenario_tracking_config)
@@ -313,6 +331,8 @@ class TestScenarioTrackingClient:
     @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_get_scenario_analytics(self, scenario_tracking_config, mock_connection_pool):
         """Test scenario analytics retrieval."""
         client = ScenarioTrackingClient(config=scenario_tracking_config)
@@ -346,6 +366,8 @@ class TestScenarioTrackingClient:
     @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_get_scenario_analytics_with_pagination(self, scenario_tracking_config, mock_connection_pool):
         """Test scenario analytics with pagination parameters."""
         client = ScenarioTrackingClient(config=scenario_tracking_config)
@@ -366,6 +388,8 @@ class TestScenarioTrackingClient:
     @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_get_customer_interaction_history(self, scenario_tracking_config, mock_connection_pool):
         """Test customer interaction history retrieval."""
         client = ScenarioTrackingClient(config=scenario_tracking_config)
@@ -400,6 +424,8 @@ class TestScenarioTrackingClient:
     @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_get_expert_workload_stats(self, scenario_tracking_config, mock_connection_pool):
         """Test expert workload statistics retrieval."""
         client = ScenarioTrackingClient(config=scenario_tracking_config)
@@ -433,6 +459,8 @@ class TestScenarioTrackingClient:
     @pytest.mark.asyncio
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_health_check_healthy(self, scenario_tracking_config, mock_connection_pool):
         """Test health check when service is healthy."""
         client = ScenarioTrackingClient(config=scenario_tracking_config)
@@ -459,6 +487,8 @@ class TestScenarioTrackingClient:
     @pytest.mark.asyncio
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_health_check_unhealthy(self, scenario_tracking_config, mock_connection_pool):
         """Test health check when service is unhealthy."""
         client = ScenarioTrackingClient(config=scenario_tracking_config)
@@ -477,6 +507,8 @@ class TestScenarioTrackingClient:
     @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.performance
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_async_batch_processing(self, mock_connection_pool):
         """Test async batch processing functionality."""
         config = ScenarioTrackingConfiguration(
@@ -516,6 +548,8 @@ class TestScenarioTrackingClient:
     @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.performance
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_performance_metrics_collection(self, scenario_tracking_config, sample_scenario_record, mock_connection_pool):
         """Test performance metrics collection during operations."""
         client = ScenarioTrackingClient(config=scenario_tracking_config)
@@ -535,6 +569,8 @@ class TestScenarioTrackingClient:
     @pytest.mark.asyncio
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
+    @pytest.mark.edge_case
     async def test_query_execution_error_handling(self, scenario_tracking_config, mock_connection_pool):
         """Test query execution error handling."""
         client = ScenarioTrackingClient(config=scenario_tracking_config)
@@ -551,6 +587,8 @@ class TestScenarioTrackingClient:
     @pytest.mark.asyncio
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_service_cleanup(self, mock_connection_pool):
         """Test service cleanup and resource management."""
         config = ScenarioTrackingConfiguration(async_insert=True)
@@ -576,6 +614,7 @@ class TestScenarioTrackingExceptions:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_scenario_tracking_exception_base(self):
         """Test base exception class."""
         exc = ScenarioTrackingException(
@@ -595,6 +634,7 @@ class TestScenarioTrackingExceptions:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_data_validation_error(self):
         """Test data validation error."""
         field_errors = {"email": "Invalid format", "date": "Future date"}
@@ -609,6 +649,7 @@ class TestScenarioTrackingExceptions:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_batch_process_error(self):
         """Test batch processing error."""
         exc = BatchProcessingError(
@@ -636,6 +677,8 @@ class TestScenarioTrackingPerformance:
     @pytest.mark.asyncio
     @pytest.mark.slow
     @pytest.mark.performance
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_batch_insert_performance(self, scenario_tracking_config, mock_connection_pool):
         """Test batch insert performance with large datasets."""
         client = ScenarioTrackingClient(config=scenario_tracking_config)
@@ -670,6 +713,8 @@ class TestScenarioTrackingPerformance:
     @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_concurrent_operations(self, scenario_tracking_config, mock_connection_pool):
         """Test concurrent scenario tracking operations."""
         client = ScenarioTrackingClient(config=scenario_tracking_config)

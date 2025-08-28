@@ -22,6 +22,7 @@ class TestEnhancedCLI:
     
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.fast
     def test_cli_initialization(self):
         """Test CLI initialization with advanced components."""
         cli = TestRunnerCLI()
@@ -37,6 +38,7 @@ class TestEnhancedCLI:
     
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.fast
     def test_profile_argument_parsing(self):
         """Test profile argument parsing."""
         cli = TestRunnerCLI()
@@ -55,6 +57,7 @@ class TestEnhancedCLI:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_generate_report_argument_parsing(self):
         """Test generate report argument parsing."""
         cli = TestRunnerCLI()
@@ -67,6 +70,7 @@ class TestEnhancedCLI:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_export_formats_argument_parsing(self):
         """Test export formats argument parsing."""
         cli = TestRunnerCLI()
@@ -79,6 +83,7 @@ class TestEnhancedCLI:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_analyze_argument_parsing(self):
         """Test analyze argument parsing."""
         cli = TestRunnerCLI()
@@ -91,6 +96,7 @@ class TestEnhancedCLI:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_ci_mode_argument_parsing(self):
         """Test CI mode argument parsing."""
         cli = TestRunnerCLI()
@@ -103,6 +109,7 @@ class TestEnhancedCLI:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_monitoring_argument_parsing(self):
         """Test monitoring argument parsing."""
         cli = TestRunnerCLI()
@@ -115,6 +122,7 @@ class TestEnhancedCLI:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_plugins_argument_parsing(self):
         """Test plugins argument parsing."""
         cli = TestRunnerCLI()
@@ -127,6 +135,7 @@ class TestEnhancedCLI:
     
     @pytest.mark.slow
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_list_profiles_information_option(self):
         """Test --list-profiles information option."""
         cli = TestRunnerCLI()
@@ -152,6 +161,7 @@ class TestEnhancedCLI:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_list_plugins_information_option(self):
         """Test --list-plugins information option."""
         cli = TestRunnerCLI()
@@ -182,6 +192,7 @@ class TestEnhancedCLI:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_supported_formats_information_option(self):
         """Test --supported-formats information option."""
         cli = TestRunnerCLI()
@@ -197,6 +208,7 @@ class TestEnhancedCLI:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_trends_analysis_information_option(self):
         """Test --trends analysis option."""
         cli = TestRunnerCLI()
@@ -231,6 +243,7 @@ class TestEnhancedCLI:
     @pytest.mark.ci_safe
     @pytest.mark.edge_case
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_invalid_profile_error(self):
         """Test error handling for invalid profile."""
         cli = TestRunnerCLI()
@@ -246,6 +259,7 @@ class TestEnhancedCLI:
     @patch('scripts.test_runner.TestExecutor.execute_tests')
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.medium
     def test_monitoring_integration(self, mock_executor):
         """Test monitoring integration in test execution."""
         cli = TestRunnerCLI()
@@ -290,6 +304,7 @@ class TestEnhancedCLI:
     @patch('scripts.test_runner.TestRunnerCLI._handle_results')
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_plugin_enablement(self, mock_handle, mock_execute):
         """Test plugin enablement during execution."""
         cli = TestRunnerCLI()
@@ -318,6 +333,7 @@ class TestEnhancedCLI:
     @patch('scripts.test_runner.TestRunnerCLI._handle_results')
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.medium
     def test_analysis_and_reporting_integration(self, mock_handle, mock_generate, mock_analyze, mock_execute):
         """Test analysis and reporting integration."""
         cli = TestRunnerCLI()
@@ -341,6 +357,7 @@ class TestEnhancedCLI:
     
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.fast
     def test_ci_mode_environment_setup(self):
         """Test CI mode environment variable setup."""
         cli = TestRunnerCLI()
@@ -368,6 +385,7 @@ class TestEnhancedCLI:
     
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.fast
     def test_argument_validation_with_advanced_options(self):
         """Test argument validation with advanced options."""
         cli = TestRunnerCLI()
@@ -394,6 +412,8 @@ class TestEnhancedCLI:
     @pytest.mark.fast
     @pytest.mark.unit
     @pytest.mark.ci_safe
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_help_includes_advanced_options(self):
         """Test that help output includes advanced options."""
         cli = TestRunnerCLI()
@@ -418,6 +438,7 @@ class TestEnhancedCLI:
     
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.fast
     def test_profile_overrides_execution_mode(self):
         """Test that profile can provide execution mode when none specified."""
         cli = TestRunnerCLI()
@@ -437,6 +458,7 @@ class TestEnhancedCLI:
     
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.fast
     def test_explicit_mode_overrides_profile(self):
         """Test that explicit execution mode overrides profile mode."""
         cli = TestRunnerCLI()
@@ -461,6 +483,7 @@ class TestAdvancedCLIFeatures:
     
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.fast
     def test_analyze_result_processing(self):
         """Test analysis result processing."""
         cli = TestRunnerCLI()
@@ -493,6 +516,7 @@ class TestAdvancedCLIFeatures:
     
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.fast
     def test_report_generation(self):
         """Test report generation functionality."""
         cli = TestRunnerCLI()
@@ -532,6 +556,7 @@ class TestAdvancedCLIFeatures:
     
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.medium
     def test_ci_mode_integration(self):
         """Test CI mode integration features."""
         cli = TestRunnerCLI()
@@ -558,6 +583,7 @@ class TestAdvancedCLIFeatures:
     
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.fast
     def test_error_handling_in_advanced_features(self):
         """Test error handling in advanced features."""
         cli = TestRunnerCLI()
@@ -580,6 +606,8 @@ class TestAdvancedCLIFeatures:
     @pytest.mark.fast
     @pytest.mark.unit
     @pytest.mark.ci_safe
+    @pytest.mark.fast
+    @pytest.mark.unit
     def test_trends_analysis_no_data(self):
         """Test trends analysis when no data is available."""
         cli = TestRunnerCLI()
@@ -601,6 +629,7 @@ class TestAdvancedCLIFeatures:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_plugin_failure_handling(self):
         """Test handling of plugin failures."""
         cli = TestRunnerCLI()

@@ -136,6 +136,8 @@ Analyze the overall context, tone, and meaning to determine the sender's true in
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_system_instructions_loading(self, temp_prompts_dir):
         """Test that system instructions are loaded correctly from external files."""
         # Mock the Azure AI Foundry client dependencies
@@ -164,6 +166,8 @@ Analyze the overall context, tone, and meaning to determine the sender's true in
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_classification_template_rendering(self, temp_prompts_dir):
         """Test that classification templates are rendered correctly."""
         # Mock the Azure AI Foundry client dependencies
@@ -199,6 +203,8 @@ Analyze the overall context, tone, and meaning to determine the sender's true in
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_fallback_behavior_missing_prompts(self, temp_prompts_dir):
         """Test fallback behavior when external prompts are missing."""
         # Create empty prompts directory
@@ -229,6 +235,8 @@ Analyze the overall context, tone, and meaning to determine the sender's true in
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_performance_with_external_prompts(self, temp_prompts_dir):
         """Test performance characteristics with external prompt loading."""
         mock_settings = MagicMock()
@@ -256,6 +264,8 @@ Analyze the overall context, tone, and meaning to determine the sender's true in
     @pytest.mark.azure
     @pytest.mark.prompt
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_template_variable_validation(self, temp_prompts_dir):
         """Test template variable validation and error handling."""
         client = AzureAIFoundryClient(MagicMock(), MagicMock())
@@ -274,6 +284,7 @@ Analyze the overall context, tone, and meaning to determine the sender's true in
     @pytest.mark.integration
     @pytest.mark.prompt
     @pytest.mark.slow
+    @pytest.mark.unit
     def test_template_renderer_variable_processing(self):
         """Test template renderer variable processing and validation."""
         renderer = TemplateRenderer()
@@ -325,6 +336,8 @@ Analyze the overall context, tone, and meaning to determine the sender's true in
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_circuit_breaker_integration(self, temp_prompts_dir):
         """Test that circuit breaker works with external prompt loading."""
         mock_settings = MagicMock()
@@ -349,6 +362,7 @@ class TestTemplateRenderingEdgeCases:
     @pytest.mark.fast
     @pytest.mark.prompt
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_template_with_special_characters(self):
         """Test template rendering with special characters and Unicode."""
         renderer = TemplateRenderer()
@@ -381,6 +395,7 @@ class TestTemplateRenderingEdgeCases:
     @pytest.mark.fast
     @pytest.mark.prompt
     @pytest.mark.unit
+    @pytest.mark.fast
     def test_template_validation_comprehensive(self):
         """Test comprehensive template validation."""
         renderer = TemplateRenderer()
@@ -420,6 +435,8 @@ class TestTemplateRenderingEdgeCases:
     @pytest.mark.fast
     @pytest.mark.unit
     @pytest.mark.prompt
+    @pytest.mark.slow
+    @pytest.mark.unit
     def test_performance_statistics(self):
         """Test template rendering performance statistics."""
         renderer = TemplateRenderer()
@@ -455,6 +472,8 @@ class TestBackwardCompatibility:
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.unit
     async def test_existing_api_compatibility(self):
         """Test that existing API calls continue to work unchanged."""
         mock_settings = MagicMock()
@@ -475,6 +494,8 @@ class TestBackwardCompatibility:
     @pytest.mark.azure
     @pytest.mark.prompt
     @pytest.mark.asyncio
+    @pytest.mark.fast
+    @pytest.mark.edge_case
     async def test_error_handling_unchanged(self):
         """Test that error handling behavior remains consistent."""
         mock_settings = MagicMock()
@@ -496,6 +517,8 @@ class TestPerformanceRegression:
     @pytest.mark.prompt
     @pytest.mark.ci_safe
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_prompt_loading_performance(self):
         """Test that prompt loading doesn't significantly impact performance."""
         import time
@@ -515,6 +538,8 @@ class TestPerformanceRegression:
     @pytest.mark.azure
     @pytest.mark.prompt
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.unit
     async def test_template_rendering_performance(self):
         """Test that template rendering is performant."""
         import time

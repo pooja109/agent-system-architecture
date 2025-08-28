@@ -46,7 +46,7 @@ class ContactLookupService(PooledServiceBase, DatabaseLoggerMixin):
         self.test_mode_settings = test_mode_settings
         
         # Table path for contact lookup
-        self._lookup_table = "snowflake_ml_dev.mlops.i2a_lowtouch_sls_cnct_lvl_t"
+        self._lookup_table = "mld01_ml_de.features.i2a_lowtouch_sls_cnct_lvl_hist_t"
 
     # Connection management handled by base class and global pool
 

@@ -204,7 +204,31 @@ class ContentFormatter:
                     if email_match:
                         original_content.sender_email = email_match.group().strip()
                 
-                original_content.sent_date = sent_info
+                # Find ALL "Sent:" dates in the email body to get the oldest/original one
+                all_sent_dates = []
+                
+                # Pattern to find all "Sent:" dates in the email
+                sent_patterns = [
+                    r'<b>Sent:</b>\s*([^<]+)<',
+                    r'Sent:\s*([^<\r\n]+)',
+                ]
+                
+                for pattern in sent_patterns:
+                    matches = re.finditer(pattern, html_content, re.IGNORECASE | re.MULTILINE)
+                    for match in matches:
+                        date_str = match.group(1).strip()
+                        if date_str and date_str not in all_sent_dates:
+                            all_sent_dates.append(date_str)
+                            self.logger.debug(f"Found Sent date in email: '{date_str}'")
+                
+                # Use the LAST date found (deepest in the email chain = oldest/original)
+                if all_sent_dates:
+                    # The last one should be the original
+                    original_content.sent_date = all_sent_dates[-1]
+                    self.logger.info(f"Using oldest/original Sent date from {len(all_sent_dates)} found: '{original_content.sent_date}'")
+                else:
+                    # Fallback to the one we initially found
+                    original_content.sent_date = sent_info
                 original_content.subject = subject_info
                 original_content.found = True
                 original_content.extraction_method = "from_header_pattern"
@@ -270,8 +294,29 @@ class ContentFormatter:
                                 if email_match:
                                     original_content.sender_email = email_match.group().strip()
                         
-                        # Extract Sent date if available
-                        if sent_match:
+                        # Find ALL "Sent:" dates to get the oldest/original one
+                        all_sent_dates = []
+                        
+                        # Pattern to find all "Sent:" dates in the email
+                        sent_patterns = [
+                            r'<b>Sent:</b>\s*([^<]+)<',
+                            r'Sent:\s*([^<\r\n]+)',
+                        ]
+                        
+                        for pattern in sent_patterns:
+                            matches = re.finditer(pattern, html_content, re.IGNORECASE | re.MULTILINE)
+                            for match in matches:
+                                date_str = match.group(1).strip()
+                                if date_str and date_str not in all_sent_dates:
+                                    all_sent_dates.append(date_str)
+                                    self.logger.debug(f"Found Sent date in email: '{date_str}'")
+                        
+                        # Use the LAST date found (deepest in the email chain = oldest/original)
+                        if all_sent_dates:
+                            original_content.sent_date = all_sent_dates[-1]
+                            self.logger.info(f"Using oldest/original Sent date from {len(all_sent_dates)} found: '{original_content.sent_date}'")
+                        elif sent_match:
+                            # Fallback to the one we initially found
                             original_content.sent_date = sent_match.group(1).strip()
                         
                         # Extract the body content

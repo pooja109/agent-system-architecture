@@ -82,6 +82,11 @@ def mock_tracking_settings():
 
 
 @pytest.fixture
+@pytest.mark.medium
+@pytest.mark.integration
+@pytest.mark.email
+@pytest.mark.medium
+@pytest.mark.integration
 def test_email():
     """Create a test email for processing."""
     from models.email import Email, EmailAddress, EmailRecipients, EmailBody, ProcessingMetadata
@@ -115,6 +120,11 @@ def test_email():
 
 
 @pytest.fixture
+@pytest.mark.medium
+@pytest.mark.integration
+@pytest.mark.email
+@pytest.mark.medium
+@pytest.mark.integration
 def test_message_dict(test_email):
     """Convert test email to message dict format."""
     return {
@@ -223,6 +233,8 @@ class TestEmailProcessorIntegration:
     @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_scenario_tracking_integration_enabled(
         self, email_processor, test_email, test_message_dict
     ):
@@ -271,6 +283,8 @@ class TestEmailProcessorIntegration:
     @pytest.mark.asyncio
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_scenario_tracking_integration_disabled(
         self, email_processor, test_email, test_message_dict
     ):
@@ -299,6 +313,8 @@ class TestEmailProcessorIntegration:
         assert result.tracking_async_queued is False
     
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     @pytest.mark.medium
     @pytest.mark.integration
     async def test_tracking_failure_does_not_affect_email_processing(
@@ -332,6 +348,8 @@ class TestEmailProcessorIntegration:
             assert "Tracking service unavailable" in result.tracking_error
     
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     @pytest.mark.medium
     @pytest.mark.integration
     async def test_enhanced_processing_result_construction(
@@ -393,6 +411,8 @@ class TestEmailProcessorIntegration:
     @pytest.mark.asyncio
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_correlation_id_management(
         self, email_processor, test_email, test_message_dict
     ):
@@ -432,6 +452,8 @@ class TestEmailProcessorIntegration:
     
     @pytest.mark.asyncio
     @pytest.mark.medium
+    @pytest.mark.integration
+    @pytest.mark.slow
     @pytest.mark.integration
     async def test_performance_context_inclusion(
         self, email_processor, test_email, test_message_dict
@@ -474,6 +496,8 @@ class TestEmailProcessorIntegration:
             assert captured_context['memory_usage_mb'] == 45.7
     
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     @pytest.mark.medium
     @pytest.mark.integration
     async def test_comprehensive_metadata_capture(
@@ -528,6 +552,8 @@ class TestEmailProcessorIntegration:
     @pytest.mark.asyncio 
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_timing_integration(self, email_processor, test_email, test_message_dict):
         """Test that tracking timing is properly measured and recorded."""
         
@@ -561,6 +587,8 @@ class TestEmailProcessorIntegration:
             assert result.tracking_time_ms < 100.0  # Reasonable upper bound
     
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     @pytest.mark.medium
     @pytest.mark.integration
     async def test_error_handling_isolation(
@@ -612,6 +640,8 @@ class TestEmailProcessorIntegrationEdgeCases:
     @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.unit
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_integration_with_malformed_scenario_result(
         self, mock_app_settings, mock_tracking_settings
     ):
@@ -666,6 +696,8 @@ class TestEmailProcessorIntegrationEdgeCases:
             mock_integration.track_scenario_processing.assert_called_once()
     
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.integration
     @pytest.mark.slow
     @pytest.mark.integration
     async def test_integration_timeout_handling(

@@ -104,6 +104,8 @@ class TestScenarioTrackingIntegration:
     @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_successful_tracking_integration(
         self, integration_service, mock_email_data, 
         mock_processing_result, mock_scenario_result
@@ -132,6 +134,8 @@ class TestScenarioTrackingIntegration:
     @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_tracking_with_storage_failure(
         self, integration_service, mock_email_data, mock_processing_result
     ):
@@ -153,6 +157,8 @@ class TestScenarioTrackingIntegration:
     @pytest.mark.asyncio
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_tracking_disabled_by_configuration(self, mock_email_data, mock_processing_result):
         """Test tracking behavior when disabled by configuration."""
         
@@ -172,6 +178,8 @@ class TestScenarioTrackingIntegration:
             await service.close()
     
     @pytest.mark.asyncio
+    @pytest.mark.slow
+    @pytest.mark.integration
     @pytest.mark.slow
     @pytest.mark.integration
     async def test_tracking_timeout_handling(
@@ -198,6 +206,8 @@ class TestScenarioTrackingIntegration:
     @pytest.mark.asyncio
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_data_transformation_with_missing_fields(
         self, integration_service, mock_processing_result
     ):
@@ -231,6 +241,8 @@ class TestScenarioTrackingIntegration:
     @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.integration
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_integration_health_check(self, integration_service):
         """Test integration health check functionality."""
         
@@ -247,6 +259,8 @@ class TestScenarioTrackingIntegration:
                 assert "tracking_client" in health
     
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     @pytest.mark.medium
     @pytest.mark.integration
     async def test_comprehensive_data_capture(
@@ -336,6 +350,7 @@ class TestScenarioDataTransformer:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_create_tracking_record_basic(self, transformer, sample_email_data, sample_processing_result):
         """Test basic tracking record creation."""
         
@@ -355,6 +370,7 @@ class TestScenarioDataTransformer:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_create_tracking_record_with_scenario_data(
         self, transformer, sample_email_data, sample_processing_result
     ):
@@ -382,6 +398,7 @@ class TestScenarioDataTransformer:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_create_tracking_record_with_ai_data(
         self, transformer, sample_email_data, sample_processing_result
     ):
@@ -408,6 +425,7 @@ class TestScenarioDataTransformer:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_fallback_record_creation(self, transformer):
         """Test fallback record creation when transformation fails."""
         
@@ -429,6 +447,7 @@ class TestScenarioDataTransformer:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_safe_data_extraction(self, transformer):
         """Test safe data extraction with various input formats."""
         
@@ -473,6 +492,8 @@ class TestEmailProcessorIntegration:
     @pytest.mark.asyncio
     @pytest.mark.slow
     @pytest.mark.e2e
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_email_processor_tracking_integration(self):
         """Test that EmailProcessor can call tracking integration."""
         
@@ -491,6 +512,8 @@ class TestEmailProcessorIntegration:
         assert processor_settings.integrate_after_scenario_processing is not None
     
     @pytest.mark.asyncio
+    @pytest.mark.medium
+    @pytest.mark.integration
     @pytest.mark.medium
     @pytest.mark.integration
     async def test_tracking_does_not_affect_email_process_success(self):
@@ -515,6 +538,8 @@ class TestPerformanceImpact:
     @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.performance
+    @pytest.mark.slow
+    @pytest.mark.integration
     async def test_tracking_performance_overhead(self):
         """Measure performance overhead of tracking integration."""
         
@@ -561,6 +586,8 @@ class TestPerformanceImpact:
     @pytest.mark.asyncio
     @pytest.mark.medium
     @pytest.mark.performance
+    @pytest.mark.slow
+    @pytest.mark.integration
     async def test_async_tracking_performance(self):
         """Test performance characteristics of async tracking."""
         
@@ -604,6 +631,7 @@ class TestConfigurationIntegration:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_integration_settings_from_environment(self):
         """Test integration settings creation from environment variables."""
         
@@ -636,6 +664,7 @@ class TestConfigurationIntegration:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.medium
     def test_configuration_validation(self):
         """Test configuration validation rules."""
         
@@ -656,6 +685,7 @@ class TestConfigurationIntegration:
     
     @pytest.mark.fast
     @pytest.mark.unit
+    @pytest.mark.slow
     def test_performance_thresholds_by_environment(self):
         """Test performance threshold adjustment by environment."""
         

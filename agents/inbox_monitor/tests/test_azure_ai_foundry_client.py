@@ -46,6 +46,8 @@ class TestAzureAIFoundryClient:
     @pytest.mark.fast
     @pytest.mark.integration
     @pytest.mark.smoke
+    @pytest.mark.medium
+    @pytest.mark.unit
     def test_init(self, azure_ai_settings, mock_ai_foundry_credentials):
         """Test client initialization."""
         client = AzureAIFoundryClient(azure_ai_settings, mock_ai_foundry_credentials)
@@ -58,6 +60,8 @@ class TestAzureAIFoundryClient:
     @pytest.mark.fast
     @pytest.mark.integration
     @pytest.mark.prompt
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_create_intent_classification_prompt(self, azure_ai_client):
         """Test prompt creation for intent classification."""
         subject = "Test Subject"
@@ -74,6 +78,7 @@ class TestAzureAIFoundryClient:
         assert len(prompt) > 100  # Should be a substantial prompt
     @pytest.mark.fast
     @pytest.mark.integration
+    @pytest.mark.medium
     def test_parse_classification_response_positive(self, azure_ai_client):
         """Test parsing positive intent classification response."""
         response_content = json.dumps({
@@ -90,6 +95,7 @@ class TestAzureAIFoundryClient:
         assert result.detected_phrases == ["interested", "learning more"]
     @pytest.mark.fast
     @pytest.mark.integration
+    @pytest.mark.medium
     def test_parse_classification_response_negative(self, azure_ai_client):
         """Test parsing negative intent classification response."""
         response_content = json.dumps({
@@ -105,6 +111,7 @@ class TestAzureAIFoundryClient:
         assert result.detected_phrases == ["not interested", "stop messaging"]
     @pytest.mark.fast
     @pytest.mark.integration
+    @pytest.mark.medium
     def test_parse_classification_response_service_inquiry(self, azure_ai_client):
         """Test parsing service inquiry intent classification response."""
         response_content = json.dumps({
@@ -118,6 +125,7 @@ class TestAzureAIFoundryClient:
         assert result.confidence == 0.85
     @pytest.mark.fast
     @pytest.mark.integration
+    @pytest.mark.medium
     def test_parse_classification_response_out_of_office(self, azure_ai_client):
         """Test parsing out of office intent classification response."""
         response_content = json.dumps({
@@ -131,6 +139,7 @@ class TestAzureAIFoundryClient:
         assert result.confidence == 0.98
     @pytest.mark.fast
     @pytest.mark.integration
+    @pytest.mark.medium
     def test_parse_classification_response_email_invalid(self, azure_ai_client):
         """Test parsing email invalid intent classification response."""
         response_content = json.dumps({
@@ -144,6 +153,7 @@ class TestAzureAIFoundryClient:
         assert result.confidence == 0.99
     @pytest.mark.fast
     @pytest.mark.integration
+    @pytest.mark.medium
     def test_parse_classification_response_no_longer_works(self, azure_ai_client):
         """Test parsing no longer works intent classification response."""
         response_content = json.dumps({
@@ -157,6 +167,7 @@ class TestAzureAIFoundryClient:
         assert result.confidence == 0.92
     @pytest.mark.fast
     @pytest.mark.integration
+    @pytest.mark.medium
     def test_parse_classification_response_unknown_intent(self, azure_ai_client):
         """Test parsing unknown intent classification response."""
         response_content = json.dumps({
@@ -176,6 +187,7 @@ class TestAzureAIFoundryClient:
     @pytest.mark.azure
     @pytest.mark.email
     @pytest.mark.edge_case
+    @pytest.mark.medium
     def test_parse_classification_response_invalid_json(self, azure_ai_client):
         """Test parsing invalid JSON response."""
         response_content = "This is not valid JSON"
@@ -189,6 +201,8 @@ class TestAzureAIFoundryClient:
     @pytest.mark.integration
     @pytest.mark.azure
     @pytest.mark.email
+    @pytest.mark.medium
+    @pytest.mark.unit
     def test_parse_classification_response_confidence_bounds(self, azure_ai_client):
         """Test confidence score bounds handling."""
         # Test confidence > 1.0
@@ -213,6 +227,8 @@ class TestAzureAIFoundryClient:
     @pytest.mark.medium
     @pytest.mark.integration
     @pytest.mark.azure
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_make_api_call_success(self, azure_ai_client):
         """Test successful API call."""
         # Mock the agent response instead of session
@@ -236,6 +252,8 @@ class TestAzureAIFoundryClient:
     @pytest.mark.fast
     @pytest.mark.edge_case
     @pytest.mark.azure
+    @pytest.mark.medium
+    @pytest.mark.edge_case
     async def test_make_api_call_http_error(self, azure_ai_client):
         """Test API call with HTTP error."""
         # Mock agent to raise exception
@@ -249,6 +267,8 @@ class TestAzureAIFoundryClient:
     @pytest.mark.asyncio
     @pytest.mark.fast
     @pytest.mark.edge_case
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_make_api_call_no_session(self, azure_ai_client):
         """Test API call without agent initialization."""
         # Ensure agent is not initialized (test default state)
@@ -261,6 +281,8 @@ class TestAzureAIFoundryClient:
     @pytest.mark.integration
     @pytest.mark.azure
     @pytest.mark.email
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_classify_email_intent_success(self, azure_ai_client):
         """Test successful email intent classification."""
         mock_response = {
@@ -291,6 +313,8 @@ class TestAzureAIFoundryClient:
     @pytest.mark.fast
     @pytest.mark.edge_case
     @pytest.mark.azure
+    @pytest.mark.medium
+    @pytest.mark.edge_case
     async def test_classify_email_intent_failure(self, azure_ai_client):
         """Test email intent classification failure."""
         # Mock the agent to raise an exception
@@ -308,6 +332,8 @@ class TestAzureAIFoundryClient:
     @pytest.mark.fast
     @pytest.mark.integration
     @pytest.mark.azure
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_context_manager(self, azure_ai_client):
         """Test async context manager."""
         # Mock the _get_or_create_agent method to avoid Azure SDK calls
@@ -325,6 +351,8 @@ class TestAzureAIFoundryClient:
     @pytest.mark.medium
     @pytest.mark.integration
     @pytest.mark.azure
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_test_connection_success(self, azure_ai_client):
         """Test successful connection test."""
         mock_result = IntentClassificationResult(
@@ -355,6 +383,8 @@ class TestAzureAIFoundryClient:
     @pytest.mark.fast
     @pytest.mark.edge_case
     @pytest.mark.azure
+    @pytest.mark.medium
+    @pytest.mark.edge_case
     async def test_test_connection_failure(self, azure_ai_client):
         """Test connection test failure."""
         mock_result = IntentClassificationResult(
@@ -371,6 +401,8 @@ class TestAzureAIFoundryClient:
     @pytest.mark.fast
     @pytest.mark.edge_case
     @pytest.mark.azure
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_test_connection_exception(self, azure_ai_client):
         """Test connection test with exception."""
         with patch.object(
@@ -384,6 +416,8 @@ class TestExternalPromptIntegration:
     @pytest.mark.medium
     @pytest.mark.integration
     @pytest.mark.prompt
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_external_system_instructions_loading(self, azure_ai_settings):
         """Test that system instructions are loaded from external YAML files."""
         with patch('services.azure_ai_foundry_client.SK_AVAILABLE', True):
@@ -400,6 +434,8 @@ class TestExternalPromptIntegration:
     @pytest.mark.medium
     @pytest.mark.integration
     @pytest.mark.prompt
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_external_template_rendering(self, azure_ai_settings):
         """Test that classification templates are rendered from external files."""
         with patch('services.azure_ai_foundry_client.SK_AVAILABLE', True):
@@ -426,6 +462,8 @@ class TestExternalPromptIntegration:
     @pytest.mark.fast
     @pytest.mark.edge_case
     @pytest.mark.prompt
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_fallback_behavior_system_instructions(self, azure_ai_settings):
         """Test fallback behavior when external system instructions fail to load."""
         with patch('services.azure_ai_foundry_client.SK_AVAILABLE', True):
@@ -445,6 +483,8 @@ class TestExternalPromptIntegration:
     @pytest.mark.fast
     @pytest.mark.edge_case
     @pytest.mark.prompt
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_fallback_behavior_template_rendering(self, azure_ai_settings):
         """Test fallback behavior when external template rendering fails."""
         with patch('services.azure_ai_foundry_client.SK_AVAILABLE', True):
@@ -469,6 +509,8 @@ class TestExternalPromptIntegration:
     @pytest.mark.fast
     @pytest.mark.integration
     @pytest.mark.prompt
+    @pytest.mark.medium
+    @pytest.mark.integration
     async def test_prompt_manager_integration(self, azure_ai_settings):
         """Test that PromptManager is properly integrated."""
         with patch('services.azure_ai_foundry_client.SK_AVAILABLE', True):
@@ -483,6 +525,8 @@ class TestExternalPromptIntegration:
     @pytest.mark.medium
     @pytest.mark.integration
     @pytest.mark.prompt
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_template_variable_processing(self, azure_ai_settings):
         """Test template variable processing and substitution."""
         with patch('services.azure_ai_foundry_client.SK_AVAILABLE', True):
@@ -525,6 +569,8 @@ class TestExternalPromptIntegration:
     @pytest.mark.integration
     @pytest.mark.prompt
     @pytest.mark.azure
+    @pytest.mark.medium
+    @pytest.mark.unit
     async def test_external_prompts_preserve_functionality(self, azure_ai_settings):
         """Test that external prompt loading preserves all original functionality."""
         with patch('services.azure_ai_foundry_client.SK_AVAILABLE', True):
